@@ -1,0 +1,112 @@
+// Fill out your copyright notice in the Description page of Project Settings.
+
+#pragma once
+
+#include "Engine/TextRenderActor.h"
+#include "Runtime/Engine/Classes/Components/TextRenderComponent.h"
+#include "CoreMinimal.h"
+#include "GameFramework/Actor.h"
+#include "Kismet/KismetSystemLibrary.h"
+#include "Kismet/GameplayStatics.h"
+#include "Components/WidgetComponent.h"
+#include "Components/WidgetSwitcher.h"
+#include "Components/ProgressBar.h"
+#include "Blueprint/UserWidget.h"
+#include "Components/TextBlock.h"
+#include "Components/Image.h"
+#include "Components/Button.h"
+#include "Components/Border.h"
+#include "RHIFeatureLevel.h"
+#include "dcss.generated.h"
+
+UCLASS()
+class DCSSVR_API Adcss : public AActor
+{
+	GENERATED_BODY()
+	
+public:	
+	// Sets default values for this actor's properties
+	Adcss();
+
+	// The reference to the ui object
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToUIActor;
+
+	// The reference to the menu panels
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToMainMenuActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToSpeciesActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToBackgroundActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToNameActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToSaveActor;
+
+	// The reference to the description panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToDescriptionActor;
+
+	// The reference to the inventory panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToInventoryActor;
+
+	// The reference to the text object
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	ATextRenderActor* refToTextActor;
+
+	// The references to the floor planes
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* floorTemplate;
+
+	// The references to the wall planes
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* wallTemplate;
+
+	// The references to the enemies/plants etc.
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* enemyTemplate;
+
+	// The references to any items
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* itemTemplate;
+
+	// The references to texutres
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TMap<FString, UTexture2D*> textures;
+
+	// Whether to generate a new level
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool generateNew = false;
+
+	// Debug angles
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector debugAngles;
+
+	// The function called when a key is pressed
+	UFUNCTION(BlueprintCallable, Category = "DCSSVR")
+	void keyPressed(FString key, FVector2D delta);
+
+	// The function called when a button is hovered/unhovered
+	UFUNCTION(BlueprintCallable, Category = "DCSSVR")
+	void buttonHovered(FString buttonName, bool hovered);
+
+	// Various functions
+	void updateLevel();
+	void writeCommand(FString input);
+	void writeCommandQueued(FString input);
+	UTexture2D* getTexture(FString name);
+	FString itemNameToTextureName(FString name);
+	FString enemyNameToTextureName(FString name);
+
+protected:
+	// Called when the game starts or when spawned
+	virtual void BeginPlay() override;
+
+public:	
+	// Called every frame
+	virtual void Tick(float DeltaTime) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+};

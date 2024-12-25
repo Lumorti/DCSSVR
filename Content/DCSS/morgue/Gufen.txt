@@ -1,0 +1,161 @@
+ Dungeon Crawl Stone Soup version 0.33-a0-253-g8eb30d812e (console) character file.
+
+Game seed: 10056693387565442440
+
+Gufen the Chiller (Ghoul Ice Elementalist)             Turns: 0, Time: 00:00:07
+
+Health: 14/14      AC:  2    Str: 11    XL:     1   Next: 0%
+Magic:  3/3        EV: 11    Int: 14    God:    
+Gold:   0          SH:  0    Dex:  9    Spells: 2/3 levels left
+
+rFire   . . .        (no weapon)
+rCold   + . .        (no shield)
+rNeg    + + +        a - +0 robe
+rPois   8            (no helmet)
+rElec   .            (no cloak)
+rCorr   .            (no gloves)
+SInv    .            (no boots)
+Will    .....        (no amulet)
+Stlth   ++           (no ring)
+HPRegen 0.22/turn    (no ring)
+MPRegen 0.08/turn
+
+%: no passive effects
+@: no status effects
+A: claws 1, cold resistance 1, negative energy resistance 3, inhibited
+regeneration, torment resistance 2, devour on kill
+a: no special abilities
+
+
+You are on level 1 of the Dungeon.
+You have visited 1 branch of the dungeon, and seen 1 of its levels.
+
+Inventory:
+
+Armour
+ a - a +0 robe (worn)
+Potions
+ b - a potion of magic
+
+
+   Skills:
+ + Level 1.7 Dodging
+ + Level 2.1 Stealth
+ + Level 1.7 Spellcasting
+ + Level 4.3 Ice Magic
+
+
+You have 2 spell levels left.
+You know the following spells:
+
+ Your Spells              Type           Power      Damage    Failure   Level
+a - Freeze                Ice            52%        1d6       4%          1
+
+Your spell library contains the following spells:
+
+ Spells                   Type           Power      Damage    Failure   Level
+ Frozen Ramparts          Ice            26%        1d4       12%         3
+ Ozocubu's Armour         Ice            13%        N/A       12%         3
+ Summon Ice Beast         Ice/Summ       7%         N/A       30%         3
+
+
+Dungeon Overview and Level Annotations
+
+Branches:
+Dungeon (1/15)            
+
+Altars:
+
+
+Innate Abilities, Weirdness & Mutations
+
+You are immune to poison.
+You have sharp fingernails.
+Your flesh is cold resistant. (rC+)
+You are immune to negative energy. (rN+++)
+You do not regenerate when monsters are visible.
+You are immune to unholy pain and torment.
+You thrive by killing the living.
+
+Message History
+
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome, Gufen the Ghoul Ice Elementalist.
+It's a long way down to the Orb of Zot, but that shouldn't be any trouble.
+Press ? for a list of commands and other information.
+Found a fuming dark potion and 19 gold pieces.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Gufen the Ghoul Ice Elementalist.
+Press ? for a list of commands and other information.
+Found a fuming dark potion and 19 gold pieces.
+Found a staircase leading out of the dungeon.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Gufen the Ghoul Ice Elementalist.
+Press ? for a list of commands and other information.
+Saving game... please wait.
+
+   ##
+#  #.
+#.##.
+#.#..      #.
+#..$.##  #...
+#.....##....#
+  #..^...#.#
+   #.@.....#
+   #....#..!.
+   #.####   .
+   #.
+   #.
+   #.
+   #.
+   ..
+
+
+There are no monsters in sight!
+
+
+Notes
+Turn   | Place    | Note
+-------+----------+-------------------------------------------
+     0 | D:1      | Gufen the Ghoul Ice Elementalist began the quest for the
+                  | Orb.
+     0 | D:1      | Reached XP level 1. HP: 14/14 MP: 3/3
+
+Illustrated notes
+
+Table legend: (Time is in decaauts)
+ A = Elapsed time spent in this place.
+ B = Non-inter-level travel time spent in this place.
+ C = Inter-level travel time spent in this place.
+ D = Time resting spent in this place.
+ E = Time spent auto-exploring this place.
+ F = Levels seen in this place.
+ G = Mean time per level.
+                   A        B        C        D        E      F       G
+               +--------+--------+--------+--------+--------+-----+--------+
+         Total |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
+       Dungeon |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
+               +--------+--------+--------+--------+--------+-----+--------+
+

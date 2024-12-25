@@ -1,0 +1,156 @@
+ Dungeon Crawl Stone Soup version 0.33-a0-253-g8eb30d812e (console) character file.
+
+Game seed: 8339628696974846327
+
+Cuschux the Sneak (Naga Enchanter)                     Turns: 0, Time: 00:00:10
+
+Health: 15/15      AC:  1    Str: 10    XL:     1   Next: 0%
+Magic:  3/3        EV:  8    Int: 15    God:    
+Gold:   0          SH:  0    Dex: 11    Spells: 4/4 levels left
+
+rFire   . . .        a - +1 dagger
+rCold   . . .        (no shield)
+rNeg    . . .        b - +0 robe
+rPois   +            (no helmet)
+rElec   .            (no cloak)
+rCorr   .            (no gloves)
+SInv    +            (no barding)
+Will    .....        (no amulet)
+Stlth   ++           (no ring)
+HPRegen 0.22/turn    (no ring)
+MPRegen 0.08/turn
+
+%: no passive effects
+@: very slow
+A: AC +0, large, see invisible, deformed body, poison resistance, slowness 2,
+spit poison 1, naga tail 1
+a: Spit Poison
+
+
+You are on level 1 of the Dungeon.
+You have visited 1 branch of the dungeon, and seen 1 of its levels.
+
+Inventory:
+
+Hand Weapons
+ a - a +1 dagger (weapon)
+Armour
+ b - a +0 robe (worn)
+Potions
+ c - 2 potions of invisibility
+
+
+   Skills:
+ + Level 1.0 Short Blades
+ + Level 1.5 Dodging
+ + Level 4.4 Stealth
+ + Level 2.0 Spellcasting
+ + Level 3.0 Hexes
+
+
+You have 4 spell levels left.
+You don't know any spells.
+Your spell library contains the following spells:
+
+ Spells                   Type           Power      Damage    Failure   Level
+ Ensorcelled Hibernation  Hex/Ice        12%        N/A       19%         2
+ Confusing Touch          Hex            10%        N/A       19%         3
+ Tukima's Dance           Hex            10%        N/A       19%         3
+ Dazzling Flash           Hex/Fire       12%        N/A       34%         3
+
+
+Dungeon Overview and Level Annotations
+
+Branches:
+Dungeon (1/15)            
+
+Altars:
+
+
+Innate Abilities, Weirdness & Mutations
+
+Your serpentine skin is tough. (AC +0)
+You have supernaturally acute vision. (SInv)
+Armour fits poorly on your strangely shaped body.
+Your system is resistant to poisons. (rPois)
+You cover ground very slowly.
+You can spit poison.
+You have a snake-like lower body.
+
+Message History
+
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome, Cuschux the Naga Enchanter.
+The heart of this dungeon contains the incredible artefact, the Orb of Zot.
+Press ? for a list of commands and other information.
+Found a staircase leading out of the dungeon.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Cuschux the Naga Enchanter.
+Press ? for a list of commands and other information.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Cuschux the Naga Enchanter.
+Press ? for a list of commands and other information.
+Saving game... please wait.
+
+...#       #...
+....#     #....
+.....#   #.....
+......# #......
+#......#......#
+ #...........#
+  #.........#
+   #...@...#
+   ##.....##
+    ##...##
+     .....
+    #######
+
+
+There are no monsters in sight!
+
+
+Notes
+Turn   | Place    | Note
+-------+----------+-------------------------------------------
+     0 | D:1      | Cuschux the Naga Enchanter began the quest for the Orb.
+     0 | D:1      | Reached XP level 1. HP: 15/15 MP: 3/3
+
+Illustrated notes
+
+Table legend: (Time is in decaauts)
+ A = Elapsed time spent in this place.
+ B = Non-inter-level travel time spent in this place.
+ C = Inter-level travel time spent in this place.
+ D = Time resting spent in this place.
+ E = Time spent auto-exploring this place.
+ F = Levels seen in this place.
+ G = Mean time per level.
+                   A        B        C        D        E      F       G
+               +--------+--------+--------+--------+--------+-----+--------+
+         Total |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
+       Dungeon |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
+               +--------+--------+--------+--------+--------+-----+--------+
+

@@ -1,0 +1,152 @@
+ Dungeon Crawl Stone Soup version 0.33-a0-253-g8eb30d812e (console) character file.
+
+Game seed: 355990449159546297
+
+Muirriykh the Shooter (Tengu Hunter)                  Turns: 53, Time: 00:01:35
+
+Health: 12/12      AC:  3    Str: 11    XL:     1   Next: 0%
+Magic:  2/2        EV: 11    Int:  9    God:    
+Gold:   0          SH:  0    Dex: 17    Spells: 0/0 levels left
+
+rFire   . . .        a - +0 shortbow
+rCold   . . .        (shield currently unavailable)
+rNeg    . . .        b - +0 leather armour
+rPois   .            (helmet restricted)
+rElec   .            (no cloak)
+rCorr   .            (no gloves)
+SInv    .            (boots unavailable)
+Will    .....        (no amulet)
+Stlth   ++           (no ring)
+HPRegen 0.22/turn    (no ring)
+MPRegen 0.08/turn
+
+%: acrobat
+@: no status effects
+A: beak, talons 3, acrobatic
+a: no special abilities
+
+
+You are on level 1 of the Dungeon.
+You have visited 1 branch of the dungeon, and seen 1 of its levels.
+
+Inventory:
+
+Hand Weapons
+ a - a +0 shortbow (weapon)
+Armour
+ b - a +0 leather armour (worn)
+Scrolls
+ c - a scroll of butterflies
+
+
+   Skills:
+ + Level 2.0 Fighting
+ + Level 4.3 Ranged Weapons
+ + Level 2.1 Dodging
+ + Level 1.0 Stealth
+
+
+You cannot memorise any spells.
+You don't know any spells.
+Your spell library is empty.
+
+Dungeon Overview and Level Annotations
+
+Branches:
+Dungeon (1/15)            
+
+Altars:
+
+
+Innate Abilities, Weirdness & Mutations
+
+You have a beak for a mouth.
+You have claws for feet.
+You can magically evade attacks while moving or waiting.
+
+Message History
+
+No monsters, items or features are visible.
+Unknown command.
+No monsters, items or features are visible.
+Unknown command.
+No monsters, items or features are visible.
+Unknown command.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Muirriykh the Tengu Hunter.
+Press ? for a list of commands and other information.
+You don't know any spells.
+Unknown command.
+You start removing your armour.
+You continue removing your +0 leather armour. x4
+You finish removing your +0 leather armour.
+You start putting on your armour.
+You continue putting on your +0 leather armour. x4
+You finish putting on your +0 leather armour.
+You start removing your armour.
+You continue removing your +0 leather armour. x4
+You finish removing your +0 leather armour.
+You start putting on your armour.
+You continue putting on your +0 leather armour. x4
+You finish putting on your +0 leather armour.
+You start removing your armour.
+You continue removing your +0 leather armour. x4
+You finish removing your +0 leather armour.
+You start putting on your armour.
+You continue putting on your +0 leather armour. x4
+You finish putting on your +0 leather armour.
+You start removing your armour.
+You continue removing your +0 leather armour. x4
+You finish removing your +0 leather armour.
+You start putting on your armour.
+You continue putting on your +0 leather armour. x4
+You finish putting on your +0 leather armour.
+Saving game... please wait.
+
+    ##
+  ##.#
+ ##@#
+##.##
+#.##
+##.##
+ ##.#
+ #<##
+ ###
+
+
+There are no monsters in sight!
+
+
+Notes
+Turn   | Place    | Note
+-------+----------+-------------------------------------------
+     0 | D:1      | Muirriykh the Tengu Hunter began the quest for the Orb.
+     0 | D:1      | Reached XP level 1. HP: 12/12 MP: 2/2
+
+Illustrated notes
+
+Table legend: (Time is in decaauts)
+ A = Elapsed time spent in this place.
+ B = Non-inter-level travel time spent in this place.
+ C = Inter-level travel time spent in this place.
+ D = Time resting spent in this place.
+ E = Time spent auto-exploring this place.
+ F = Levels seen in this place.
+ G = Mean time per level.
+                   A        B        C        D        E      F       G
+               +--------+--------+--------+--------+--------+-----+--------+
+         Total |     53 |     53 |      0 |      0 |      0 |   1 |   53.0 |
+       Dungeon |     53 |     53 |      0 |      0 |      0 |   1 |   53.0 |
+               +--------+--------+--------+--------+--------+-----+--------+
+
+Top non-repeatable levels by time:
+     D:1: 53 daAuts
+

@@ -1,0 +1,315 @@
+ Dungeon Crawl Stone Soup version 0.33-a0-253-g8eb30d812e (console) character file.
+
+Game seed: 15134122137167034454
+
+Puarepp the Ducker (Minotaur Fire Elementalist)        Turns: 6, Time: 00:03:30
+
+Health: 14/14      AC:  2    Str: 12    XL:     1   Next: 0%
+Magic:  1/1        EV: 11    Int: 12    God:    No God 0 (0)
+Gold:   0          SH:  0    Dex: 10    Spells: 1/2 levels left
+
+rFire   . . .        (no weapon)
+rCold   . . .        (no shield)
+rNeg    . . .        a - +0 robe
+rPois   .            (helmet restricted)
+rElec   .            (no cloak)
+rCorr   .            (no gloves)
+SInv    .            (no boots)
+Will    .....        (no amulet)
+Stlth   ++           (no ring)
+HPRegen 0.22/turn    (no ring)
+MPRegen 0.07/turn
+
+%: no passive effects
+@: no status effects
+A: horns 2, retaliatory headbutt
+a: Build terrain, Set terrain to build, Clear terrain to floor
+
+
+You are on level 1 of the Dungeon.
+You have visited 1 branch of the dungeon, and seen 1 of its levels.
+
+Inventory:
+
+Armour
+ a - a +0 robe (worn)
+Potions
+ b - a potion of magic
+
+
+   Skills:
+ + Level 2.1 Dodging
+ + Level 1.5 Stealth
+ + Level 1.3 Spellcasting
+ + Level 0.6 Conjurations
+ + Level 2.1 Fire Magic
+
+
+You have one spell level left.
+You know the following spells:
+
+ Your Spells              Type           Power      Damage    Failure   Level
+a - Foxfire               Conj/Fire      4 (25)     2x1d4     17%         1
+
+Your spell library contains the following spells:
+
+ Spells                   Type           Power      Damage    Failure   Level
+ Scorch                   Fire           6 (50)     2d5       19%         2
+ Inner Flame              Hex/Fire       3 (100)    N/A       50%         3
+ Volatile Blastmotes      Fire/Tloc      3 (50)     2d10      50%         3
+ Flame Wave               Conj/Fire      4 (100)    2d5       86%         4
+
+
+Dungeon Overview and Level Annotations
+
+Branches:
+Dungeon (1/15)            
+
+Altars:
+
+
+Innate Abilities, Weirdness & Mutations
+
+You have a pair of horns on your head.
+You reflexively headbutt those who attack you in melee.
+
+Message History
+
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Puarepp the Minotaur Fire Elementalist.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Puarepp the Minotaur Fire Elementalist.
+Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
+Enter Wizard Command (? - help): 
+Mapping level.
+Unknown command.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Puarepp the Minotaur Fire Elementalist.
+Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
+Enter Wizard Command (? - help): 
+Mapping level.
+Unknown command.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+Saving game... please wait.
+
+        #..........#
+        #.##########
+       ##.#     #...
+      ##..#     #...
+    ###..##     #...
+    #...##      ####
+    #.###
+#####.#
+#<>@..#
+#######
+
+
+There are no monsters in sight!
+
+
+Notes
+Turn   | Place    | Note
+-------+----------+-------------------------------------------
+     0 | D:1      | Puarepp the Minotaur Fire Elementalist began the quest for
+                  | the Orb.
+     0 | D:1      | You started the game in wizard mode.
+     0 | D:1      | Reached XP level 1. HP: 14/14 MP: 1/1
+
+Illustrated notes
+
+Levels and vault maps discovered:
+[+gen,+vis] D:1:      dpeg_arrival_tiny_k, layout_rooms
+[-gen]      D:2
+[-gen]      D:3
+[-gen]      D:4
+[-gen]      D:5
+[-gen]      D:6
+[-gen]      D:7
+[-gen]      D:8
+[-gen]      D:9
+[-gen]      D:10
+[-gen]      D:11
+[-gen]      D:12
+[-gen]      D:13
+[-gen]      D:14
+[-gen]      D:15
+[+gen,-vis] Temple:   compressed_dpeg_triangle_lava_temple
+[-gen]      Lair:1
+[-gen]      Lair:2
+[-gen]      Lair:3
+[-gen]      Lair:4
+[-gen]      Lair:5
+[-gen]      Swamp:1
+[-gen]      Swamp:2
+[-gen]      Swamp:3
+[-gen]      Swamp:4
+[-gen]      Shoals:1
+[-gen]      Shoals:2
+[-gen]      Shoals:3
+[-gen]      Shoals:4
+[-gen]      Snake:1
+[-gen]      Snake:2
+[-gen]      Snake:3
+[-gen]      Snake:4
+[-gen]      Spider:1
+[-gen]      Spider:2
+[-gen]      Spider:3
+[-gen]      Spider:4
+[-gen]      Slime:1
+[-gen]      Slime:2
+[-gen]      Slime:3
+[-gen]      Slime:4
+[-gen]      Slime:5
+[-gen]      Orc:1
+[-gen]      Orc:2
+[-gen]      Elf:1
+[-gen]      Elf:2
+[-gen]      Elf:3
+[-gen]      Vaults:1
+[-gen]      Vaults:2
+[-gen]      Vaults:3
+[-gen]      Vaults:4
+[-gen]      Vaults:5
+[-gen]      Crypt:1
+[-gen]      Crypt:2
+[-gen]      Crypt:3
+[-gen]      Tomb:1
+[-gen]      Tomb:2
+[-gen]      Tomb:3
+[-gen]      Depths:1
+[-gen]      Depths:2
+[-gen]      Depths:3
+[-gen]      Depths:4
+[-gen]      Hell
+[-gen]      Dis:1
+[-gen]      Dis:2
+[-gen]      Dis:3
+[-gen]      Dis:4
+[-gen]      Dis:5
+[-gen]      Dis:6
+[-gen]      Dis:7
+[-gen]      Geh:1
+[-gen]      Geh:2
+[-gen]      Geh:3
+[-gen]      Geh:4
+[-gen]      Geh:5
+[-gen]      Geh:6
+[-gen]      Geh:7
+[-gen]      Coc:1
+[-gen]      Coc:2
+[-gen]      Coc:3
+[-gen]      Coc:4
+[-gen]      Coc:5
+[-gen]      Coc:6
+[-gen]      Coc:7
+[-gen]      Tar:1
+[-gen]      Tar:2
+[-gen]      Tar:3
+[-gen]      Tar:4
+[-gen]      Tar:5
+[-gen]      Tar:6
+[-gen]      Tar:7
+[-gen]      Zot:1
+[-gen]      Zot:2
+[-gen]      Zot:3
+[-gen]      Zot:4
+[-gen]      Zot:5
+[-gen]      Abyss:1
+[-gen]      Abyss:2
+[-gen]      Abyss:3
+[-gen]      Abyss:4
+[-gen]      Abyss:5
+[-gen]      Abyss:6
+[-gen]      Abyss:7
+[-gen]      Pan
+[-gen]      Zig:1
+[-gen]      Zig:2
+[-gen]      Zig:3
+[-gen]      Zig:4
+[-gen]      Zig:5
+[-gen]      Zig:6
+[-gen]      Zig:7
+[-gen]      Zig:8
+[-gen]      Zig:9
+[-gen]      Zig:10
+[-gen]      Zig:11
+[-gen]      Zig:12
+[-gen]      Zig:13
+[-gen]      Zig:14
+[-gen]      Zig:15
+[-gen]      Zig:16
+[-gen]      Zig:17
+[-gen]      Zig:18
+[-gen]      Zig:19
+[-gen]      Zig:20
+[-gen]      Zig:21
+[-gen]      Zig:22
+[-gen]      Zig:23
+[-gen]      Zig:24
+[-gen]      Zig:25
+[-gen]      Zig:26
+[-gen]      Zig:27
+[-gen]      Bazaar
+[-gen]      Trove
+[-gen]      Sewer
+[-gen]      Ossuary
+[-gen]      Bailey
+[-gen]      IceCv
+[-gen]      Volcano
+[-gen]      WizLab
+[-gen]      Desolation
+[-gen]      Gauntlet
+[-gen]      Arena
+[-gen]      Crucible
+
+Table legend: (Time is in decaauts)
+ A = Elapsed time spent in this place.
+ B = Non-inter-level travel time spent in this place.
+ C = Inter-level travel time spent in this place.
+ D = Time resting spent in this place.
+ E = Time spent auto-exploring this place.
+ F = Levels seen in this place.
+ G = Mean time per level.
+                   A        B        C        D        E      F       G
+               +--------+--------+--------+--------+--------+-----+--------+
+         Total |      6 |      6 |      0 |      0 |      0 |   1 |    6.0 |
+       Dungeon |      6 |      6 |      0 |      0 |      0 |   1 |    6.0 |
+               +--------+--------+--------+--------+--------+-----+--------+
+
+Top non-repeatable levels by time:
+     D:1: 6 daAuts
+

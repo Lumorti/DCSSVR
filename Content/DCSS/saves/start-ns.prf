@@ -1,0 +1,7 @@
+type = normal
+name = Puarepp
+species = Minotaur
+background = Fire Elementalist
+fully_random = no
+default_manual_training = no
+quiver_menu_focus = false
