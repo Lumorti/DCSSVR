@@ -2,7 +2,7 @@
 
 Game seed: 15134122137167034454
 
-Puarepp the Ducker (Minotaur Fire Elementalist)        Turns: 6, Time: 00:03:30
+Puarepp the Ducker (Minotaur Fire Elementalist)        Turns: 6, Time: 00:03:38
 
 Health: 14/14      AC:  2    Str: 12    XL:     1   Next: 0%
 Magic:  1/1        EV: 11    Int: 12    God:    No God 0 (0)
@@ -75,24 +75,6 @@ You reflexively headbutt those who attack you in melee.
 
 Message History
 
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Puarepp the Minotaur Fire Elementalist.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Puarepp the Minotaur Fire Elementalist.
-Press ? for a list of commands and other information.
-Unknown command.
-Unknown command.
-Enter Wizard Command (? - help): 
 Mapping level.
 Unknown command.
 Okay, then.
@@ -124,6 +106,22 @@ Okay, then.
 Okay, then.
 Okay, then.
 Okay, then.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Puarepp the Minotaur Fire Elementalist.
+Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
+Enter Wizard Command (? - help): 
+Mapping level.
+Unknown command.
 Saving game... please wait.
 
         #..........#

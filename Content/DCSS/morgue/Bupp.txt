@@ -2,7 +2,7 @@
 
 Game seed: 2495733103651171884
 
-Bupp the Sneak (Ghoul Enchanter)                       Turns: 0, Time: 00:00:47
+Bupp the Sneak (Ghoul Enchanter)                       Turns: 8, Time: 00:03:52
 
 Health: 14/14      AC:  2    Str: 11    XL:     1   Next: 0%
 Magic:  3/3        EV: 11    Int: 14    God:    
@@ -79,18 +79,13 @@ You thrive by killing the living.
 
 Message History
 
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome, Bupp the Ghoul Enchanter.
-It is said that the Orb of Zot exists deep within this dungeon.
-Press ? for a list of commands and other information.
-Found a staircase leading out of the dungeon.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
+Okay, then.
+You enter the shallow water.
+Moving in this stuff is going to be slow.
+There is a staircase leading out of the dungeon here.
 Saving game... please wait.
 Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/`.
@@ -102,6 +97,12 @@ Data directory 'C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/dat/' found.
 Welcome back, Bupp the Ghoul Enchanter.
 Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
+Okay, then.
 Saving game... please wait.
 Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/`.
@@ -113,27 +114,29 @@ Data directory 'C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/dat/' found.
 Welcome back, Bupp the Ghoul Enchanter.
 Press ? for a list of commands and other information.
-Saving game... please wait.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Bupp the Ghoul Enchanter.
-Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
+Okay, then.
+You enter the shallow water.
+Moving in this stuff is going to be slow.
+There is a staircase leading out of the dungeon here.
+You enter the shallow water.
+Moving in this stuff is going to be slow.
+There is a staircase leading out of the dungeon here.
 Saving game... please wait.
 
-~?           ?~
+              ?#
+~?           ?~?
 ?~?         ?~?
  ?~?       ?~?
-  ?~?     ?~?
-   ?~?   ?~?
+  ?~?  PP ?~?
+   ?~? PP?~?
     ?~???~?
-     ?~~~?
-     ?~@~?
+     ?~~~?PP
+     ?~@~?PP
      ?~~~?
     ?~???~?
    ?~?   ?~?
@@ -164,7 +167,10 @@ Table legend: (Time is in decaauts)
  G = Mean time per level.
                    A        B        C        D        E      F       G
                +--------+--------+--------+--------+--------+-----+--------+
-         Total |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
-       Dungeon |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
+         Total |     11 |     11 |      0 |      0 |      0 |   1 |   11.0 |
+       Dungeon |     11 |     11 |      0 |      0 |      0 |   1 |   11.0 |
                +--------+--------+--------+--------+--------+-----+--------+
+
+Top non-repeatable levels by time:
+     D:1: 11 daAuts
 

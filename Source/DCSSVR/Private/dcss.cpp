@@ -179,10 +179,12 @@ UTextRenderComponent* refToTextRender;
 
 // General TODO list
 // - background music
+// - footstep/attacking/casting/monster sounds
 // - direction indicators
 // - aquirement pop up
 // - forget a spell pop up
 // - initial weapon pop up
+// - delete save button
 // - spell casting
 // - ability casting
 
@@ -336,6 +338,7 @@ void Adcss::BeginPlay() {
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
 	exePath = binaryPath + TEXT("crawl.exe");
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
+	// args += TEXT(" -extra-opt-first monster_item_view_features+=tree ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=water ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
@@ -1159,27 +1162,6 @@ void Adcss::updateLevel() {
 				material2 = (UMaterialInstanceDynamic*)wallMeshSouth->GetMaterial(0);
 				material2->SetTextureParameterValue("TextureImage", texture2);
 
-			// If it's a plant
-            } else if (ascii == TEXT("P") || ascii == TEXT("c")) {
-
-				// Add an enemy
-				if (enemyUseCount < maxEnemies) {
-					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
-					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 2.0f));
-					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
-                    if (ascii == TEXT("P")) {
-						UTexture2D* texture2 = getTexture("Plant");
-						UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
-						material2->SetTextureParameterValue("TextureImage", texture2);
-                    } else if (ascii == TEXT("c")) {
-                        UTexture2D* texture2 = getTexture("Tree");
-						UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
-						material2->SetTextureParameterValue("TextureImage", texture2);
-                    }
-					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
-					enemyUseCount++;
-				}
-
 			// If it's an enemy
 			} else if (levelInfo[i][j].enemy.Len() > 0) {
 
@@ -1200,6 +1182,27 @@ void Adcss::updateLevel() {
 					material2->SetTextureParameterValue("TextureImage", texture2);
 					enemyUseCount++;
 
+				}
+
+			// If it's a plant TODO
+            } else if (ascii == TEXT("P") || ascii == TEXT("c") || ascii == TEXT("C")) {
+
+				// Add an enemy
+				if (enemyUseCount < maxEnemies) {
+					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
+					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 4.0f));
+					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
+                    if (ascii == TEXT("P")) {
+						UTexture2D* texture2 = getTexture("Plant");
+						UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
+						material2->SetTextureParameterValue("TextureImage", texture2);
+                    } else if (ascii == TEXT("C") || ascii == TEXT("c")) {
+                        UTexture2D* texture2 = getTexture("Tree");
+						UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
+						material2->SetTextureParameterValue("TextureImage", texture2);
+                    }
+					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
+					enemyUseCount++;
 				}
 
 			// If it's an staircase down
@@ -2547,10 +2550,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		thingBeingDragged = SelectedThing();
 
 	} else if (key == "debug") {
-		// writeCommandQueued("ctrl-X");
-		writeCommandQueued("&");
-		writeCommandQueued("{");
-		writeCommandQueued("enter");
+		writeCommandQueued("ctrl-X");
 	} else {
 		writeCommandQueued(key);
 	}
@@ -3985,6 +3985,11 @@ void Adcss::Tick(float DeltaTime) {
 									levelInfo[yCoord][xCoord].currentChar = TEXT("<");
 									levelInfo[yCoord][xCoord].floorChar = TEXT(".");
 
+								// Tree TODO
+								} else if (description.Contains(TEXT("tree"))) {
+									levelInfo[yCoord][xCoord].enemy = "a tree";
+									levelInfo[yCoord][xCoord].enemyHotkey = hotkey;
+
 								// Shallow water
 								} else if (description.Contains(TEXT("shallow water"))) {
 									levelInfo[yCoord][xCoord].currentChar = TEXT("~");
@@ -4159,6 +4164,9 @@ void Adcss::Tick(float DeltaTime) {
 					for (int j = 0; j < gridWidth; j++) {
 						if (thingsThatCountAsWalls.Contains(levelAscii[i][j], ESearchCase::CaseSensitive) || thingsThatCountAsFloors.Contains(levelAscii[i][j], ESearchCase::CaseSensitive)) {
 							levelInfo[i][j].currentChar = levelAscii[i][j];
+						} else if (levelInfo[i][j].enemy.Len() == 0 && (levelAscii[i][j] == TEXT("c") || levelAscii[i][j] == TEXT("C") || levelAscii[i][j] == TEXT("C"))) {
+							levelInfo[i][j].currentChar = levelAscii[i][j];
+							levelInfo[i][j].floorChar = TEXT(".");
 						} else if (levelAscii[i][j] == TEXT("<") || levelAscii[i][j] == TEXT(">")) {
 							levelInfo[i][j].currentChar = levelAscii[i][j];
 							levelInfo[i][j].floorChar = TEXT(".");
