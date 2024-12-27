@@ -2,6 +2,8 @@ Binaries
 DerivedDataCache
 Intermediate
 Saved
+Content/DCSS/saves/*
+Content/DCSS/morgue/*
 .vscode
 .vs
 *.VC.db
