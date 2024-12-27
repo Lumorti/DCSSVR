@@ -180,13 +180,14 @@ UTextRenderComponent* refToTextRender;
 // General TODO list
 // - background music
 // - footstep/attacking/casting/monster sounds
-// - direction indicators
+// - direction indicators / map
 // - aquirement pop up
 // - forget a spell pop up
 // - initial weapon pop up
 // - delete save button
 // - spell casting
 // - ability casting
+// - death screen
 
 // Get a texture with a given name
 UTexture2D* Adcss::getTexture(FString name) {
@@ -199,10 +200,7 @@ UTexture2D* Adcss::getTexture(FString name) {
 
 // Sets default values
 Adcss::Adcss() {
-
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
-
 }
 
 // Write a command to the process
@@ -340,6 +338,7 @@ void Adcss::BeginPlay() {
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
 	// args += TEXT(" -extra-opt-first monster_item_view_features+=tree ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=water ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=here ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
@@ -1573,6 +1572,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// Exit game button 
 		} else if (selected.thingIs == "ButtonQuit" || selected.thingIs == "ButtonMainQuit") {
 
+			// Send the save commands
+			writeCommandQueued("escape");
+			writeCommandQueued("exit");
+			writeCommandQueued("escape");
+
 			// Get the world context object
 			UWorld* myWorldRef = GetWorld();
 			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
@@ -1707,7 +1711,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 		// If it's something in the save select
-		} else if (selected.thingIs == "ButtonSaveBack" || selected.thingIs == "ButtonNewGame" || selected.thingIs.Contains(TEXT("ButtonSave"))) {
+		} else if (selected.thingIs == "ButtonSaveBack" || selected.thingIs == "ButtonNewGame" || selected.thingIs.Contains(TEXT("ButtonSave")) || selected.thingIs.Contains(TEXT("ButtonDelete"))) {
 			UWidgetComponent* WidgetComponentSaves = Cast<UWidgetComponent>(refToSaveActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 			if (WidgetComponentSaves != nullptr) {
 				UUserWidget* UserWidget = WidgetComponentSaves->GetUserWidgetObject();
@@ -1745,6 +1749,19 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToSaveActor->SetActorHiddenInGame(true);
 						refToSaveActor->SetActorEnableCollision(false);
 						hasBeenWelcomed = false;
+					} else if (selected.thingIs.Contains(TEXT("ButtonDelete"))) {
+						// TODO
+						FString saveName = selected.thingIs.Replace(TEXT("ButtonDelete"), TEXT(""));
+						int saveIndex = saveLocToIndex[FCString::Atoi(*saveName)-1 + savesPage*6];
+						UE_LOG(LogTemp, Display, TEXT("Delete button clicked: %s"), *saveName);
+						FString saveFile = saveNames[saveIndex];
+						saveFile = saveFile.Left(saveFile.Find(TEXT(" ")));
+						FString savePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\saves\\")) + saveFile + TEXT(".cs");
+						FString command = "rm \"" + savePath + "\"";
+						UE_LOG(LogTemp, Display, TEXT("Deleting save file: %s"), *command);
+						// system(TCHAR_TO_ANSI(*command));
+						// saveNames.RemoveAt(saveIndex);
+						// saveLocToIndex.RemoveAt(saveIndex);
 					}
 
 				}
@@ -2814,6 +2831,9 @@ void Adcss::Tick(float DeltaTime) {
 				int endIndex = FMath::Min(spellLetters.Num(), (spellPage+1) * perPage);
 				int pagesNeeded = FMath::CeilToInt((float)spellLetters.Num() / (float)perPage);
 				pagesNeeded = FMath::Max(pagesNeeded, 1);
+
+				// TODO
+				UE_LOG(LogTemp, Display, TEXT("Redrawing spells: %d %d %d %d %d"), startIndex, endIndex, spellLetters.Num(), spellPage, pagesNeeded);
 
 				// Set the spell level text
 				UTextBlock* SpellLevelText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextSpellLevels")));
@@ -4082,9 +4102,11 @@ void Adcss::Tick(float DeltaTime) {
 
 							// If told that we don't know any spells
 							if (newLine.Contains(TEXT("You don't know any spells"))) {
-								spellLetters.Empty();
-								spellLetterToInfo.Empty();
-								shouldRedrawSpells = true;
+								if (!memorizing) {
+									spellLetters.Empty();
+									spellLetterToInfo.Empty();
+									shouldRedrawSpells = true;
+								}
 								continue;
 							}
 

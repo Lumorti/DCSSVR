@@ -2,9 +2,17 @@
 
 Game seed: 2495733103651171884
 
-Bupp the Sneak (Ghoul Enchanter)                      Turns: 36, Time: 00:06:24
+0 Bupp the Sneak (level 1, 0/14 HPs)
+             Began as a Ghoul Enchanter on Dec 24, 2024.
+             Slain by a goblin
+             ... wielding a +0 dagger
+              (3 damage)
+             ... on level 1 of the Dungeon on Dec 27, 2024.
+             The game lasted 00:07:11 (42 turns).
 
-Health: 14/14      AC:  2    Str: 11    XL:     1   Next: 0%
+Bupp the Sneak (Ghoul Enchanter)                      Turns: 42, Time: 00:07:12
+
+Health: 0/14       AC:  2    Str: 11    XL:     1   Next: 0%
 Magic:  3/3        EV: 11    Int: 14    God:    
 Gold:   6          SH:  0    Dex:  9    Spells: 3/3 levels left
 
@@ -27,10 +35,10 @@ regeneration, torment resistance 2, devour on kill
 a: no special abilities
 
 
-You are on level 1 of the Dungeon.
-You have visited 1 branch of the dungeon, and seen 1 of its levels.
+You were on level 1 of the Dungeon.
+You visited 1 branch of the dungeon, and saw 1 of its levels.
 
-You have collected 6 gold pieces.
+You collected 6 gold pieces.
 
 Inventory:
 
@@ -50,9 +58,9 @@ Potions
  + Level 2.4 Hexes
 
 
-You have 3 spell levels left.
-You don't know any spells.
-Your spell library contains the following spells:
+You had 3 spell levels left.
+You didn't know any spells.
+Your spell library contained the following spells:
 
  Spells                   Type           Power      Damage    Failure   Level
  Ensorcelled Hibernation  Hex/Ice        8%         N/A       22%         2
@@ -81,37 +89,6 @@ You thrive by killing the living.
 
 Message History
 
-Unknown command.
-Unknown command.
-WARNING: ABOUT TO ENTER WIZARD MODE!
-If you continue, your game will not be scored!
-Do you really want to enter wizard mode? (Confirm with "yes".) 
-Okay, then.
-You don't know any spells.
-Unknown command.
-Okay, then.
-You don't know any spells.
-Unknown command.
-Okay, then.
-You don't know any spells.
-Unknown command.
-Okay, then.
-You don't know any spells.
-Unknown command.
-Okay, then.
-You don't know any spells.
-Unknown command.
-Okay, then.
-Saving game... please wait.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Bupp the Ghoul Enchanter.
 Press ? for a list of commands and other information.
 Unknown command.
 Unknown command.
@@ -119,27 +96,54 @@ WARNING: ABOUT TO ENTER WIZARD MODE!
 If you continue, your game will not be scored!
 Do you really want to enter wizard mode? (Confirm with "yes".) 
 Okay, then.
+You don't know any spells.
+Unknown command.
+Okay, then.
+Okay, then.
+Okay, then.
+Okay, then.
+You don't know any spells.
+Unknown command.
 Sorry, you're not good enough to have a special ability.
 Unknown command.
 You don't know any spells.
 Unknown command.
-Okay, then.
-Saving game... please wait.
+The goblin closely misses you.
+You hit the goblin.
+The goblin is heavily wounded.
+The goblin hits you with a +0 dagger.
+You barely miss the goblin.
+The goblin is heavily wounded.
+The goblin hits you with a +0 dagger.
+You closely miss the goblin.
+The goblin is heavily wounded.
+The goblin hits you with a +0 dagger.
+You closely miss the goblin.
+The goblin is heavily wounded.
+The goblin barely misses you.
+You closely miss the goblin.
+The goblin is heavily wounded.
+The goblin hits you with a +0 dagger.
+* * * LOW HITPOINT WARNING * * *
+You closely miss the goblin.
+The goblin is heavily wounded.
+The goblin hits you with a +0 dagger.
+You die...
 
    #############
    #...........###
-   #.g.@..????...????#
+   #.g@...????...????#
    #.....?....?.?....?#
  #......?......?......?
  ###....?.............?
-  #....$?.............?#
- #...???~?.....PP....?~?
+  #....$?.............?
+ #...???~?.....PP....?~
 ....? ..?~?...PPPP..?~?
-##.?.....?~?PPPPPPP?~?..
-   ?......?~?PPPPP?~?...
+##.?.....?~?PPPPPPP?~?.
+   ?......?~?PPPPP?~?..
 
 
-You can see a goblin.
+You could see a goblin.
 
 
 Notes
@@ -147,8 +151,18 @@ Turn   | Place    | Note
 -------+----------+-------------------------------------------
      0 | D:1      | Bupp the Ghoul Enchanter began the quest for the Orb.
      0 | D:1      | Reached XP level 1. HP: 14/14 MP: 3/3
+    42 | D:1      | Slain by a goblin
 
 Illustrated notes
+
+Levels and vault maps discovered:
+D:1:      orjb1_clovarrival, layout_rooms, minmay_lizard_king
+
+Action                     || total
+---------------------------++-------
+  Melee: Dagger            ||     6
+ Armour: Robe              ||     5
+  Dodge: Dodged            ||     2
 
 Table legend: (Time is in decaauts)
  A = Elapsed time spent in this place.
@@ -160,10 +174,10 @@ Table legend: (Time is in decaauts)
  G = Mean time per level.
                    A        B        C        D        E      F       G
                +--------+--------+--------+--------+--------+-----+--------+
-         Total |     43 |     43 |      0 |      0 |      0 |   1 |   43.0 |
-       Dungeon |     43 |     43 |      0 |      0 |      0 |   1 |   43.0 |
+         Total |     49 |     49 |      0 |      0 |      0 |   1 |   49.0 |
+       Dungeon |     49 |     49 |      0 |      0 |      0 |   1 |   49.0 |
                +--------+--------+--------+--------+--------+-----+--------+
 
 Top non-repeatable levels by time:
-     D:1: 43 daAuts
+     D:1: 49 daAuts
 
