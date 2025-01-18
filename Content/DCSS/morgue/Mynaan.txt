@@ -2,7 +2,7 @@
 
 Game seed: 981033251748942627
 
-Mynaan the Caller (Octopode Summoner)                  Turns: 0, Time: 00:01:54
+Mynaan the Caller (Octopode Summoner)                  Turns: 0, Time: 00:02:01
 
 Health: 11/11      AC:  1    Str:  7    XL:     1   Next: 0%
 Magic:  3/3        EV: 12    Int: 17    God:    
@@ -79,61 +79,64 @@ You have tentacles for arms and can constrict up to eight enemies at once.
 
 Message History
 
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Mynaan the Octopode Summoner.
+Press ? for a list of commands and other information.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Mynaan the Octopode Summoner.
+Press ? for a list of commands and other information.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Mynaan the Octopode Summoner.
+Press ? for a list of commands and other information.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Mynaan the Octopode Summoner.
+Press ? for a list of commands and other information.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Mynaan the Octopode Summoner.
+Press ? for a list of commands and other information.
 Unknown command.
+Unknown command.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
 Okay, then.
-Okay, then.
-Unknown command.
-Unknown command.
-Sorry, you're not good enough to have a special ability.
-Unknown command.
-You are not religious.
-Unknown command.
-Sorry, you're not good enough to have a special ability.
-Unknown command.
-Saving game... please wait.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Mynaan the Octopode Summoner.
-Press ? for a list of commands and other information.
-Saving game... please wait.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Mynaan the Octopode Summoner.
-Press ? for a list of commands and other information.
-Saving game... please wait.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Mynaan the Octopode Summoner.
-Press ? for a list of commands and other information.
-Saving game... please wait.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome back, Mynaan the Octopode Summoner.
-Press ? for a list of commands and other information.
 Saving game... please wait.
 
      #####

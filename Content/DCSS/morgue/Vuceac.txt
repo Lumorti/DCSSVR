@@ -2,7 +2,7 @@
 
 Game seed: 8455276517307882134
 
-Vuceac the Gusty (Demigod Air Elementalist)            Turns: 0, Time: 00:00:23
+Vuceac the Gusty (Demigod Air Elementalist)            Turns: 1, Time: 00:00:48
 
 Health: 14/14      AC:  2    Str:  9    XL:     1   Next: 0%
 Magic:  5/5        EV: 11    Int: 17    God:    
@@ -73,33 +73,64 @@ Your divine heritage dramatically boosts your attributes as you level up.
 
 Message History
 
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
 Data directory 'C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/dat/' found.
 Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/`.
 Data directory 'C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome, Vuceac the Demigod Air Elementalist.
-Below lies the Orb of Zot, rumoured to be powerful enough to resurrect a god...
+Welcome back, Vuceac the Demigod Air Elementalist.
 Press ? for a list of commands and other information.
-Found a staircase leading out of the dungeon.
+Unknown command.
+Unknown command.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
+Okay, then.
+Found a stone staircase leading down.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Vuceac the Demigod Air Elementalist.
+Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
 WARNING: ABOUT TO ENTER WIZARD MODE!
 If you continue, your game will not be scored!
 Do you really want to enter wizard mode? (Confirm with "yes".) 
 Okay, then.
 Unknown command.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Vuceac the Demigod Air Elementalist.
+Press ? for a list of commands and other information.
 Unknown command.
 Unknown command.
-Unknown command.
-Unknown command.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
+Okay, then.
 Saving game... please wait.
 
-#+
-#.
-#.##
-#.@#
+      ###
+     ...#
+#+##....>
+#........
+#@##
+#.<#
 ####
 
 
@@ -125,7 +156,10 @@ Table legend: (Time is in decaauts)
  G = Mean time per level.
                    A        B        C        D        E      F       G
                +--------+--------+--------+--------+--------+-----+--------+
-         Total |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
-       Dungeon |      0 |      0 |      0 |      0 |      0 |   1 |    0.0 |
+         Total |      1 |      1 |      0 |      0 |      0 |   1 |    1.0 |
+       Dungeon |      1 |      1 |      0 |      0 |      0 |   1 |    1.0 |
                +--------+--------+--------+--------+--------+-----+--------+
+
+Top non-repeatable levels by time:
+     D:1: 1 daAuts
 

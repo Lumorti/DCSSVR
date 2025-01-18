@@ -2,7 +2,7 @@
 
 Game seed: 8339628696974846327
 
-Cuschux the Sneak (Naga Enchanter)                     Turns: 0, Time: 00:00:10
+Cuschux the Sneak (Naga Enchanter)                     Turns: 0, Time: 00:00:17
 
 Health: 15/15      AC:  1    Str: 10    XL:     1   Next: 0%
 Magic:  3/3        EV:  8    Int: 15    God:    
@@ -87,19 +87,6 @@ Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/`.
 Data directory 'C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/dat/' found.
-Welcome, Cuschux the Naga Enchanter.
-The heart of this dungeon contains the incredible artefact, the Orb of Zot.
-Press ? for a list of commands and other information.
-Found a staircase leading out of the dungeon.
-Saving game... please wait.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
-Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/`.
-Data directory 'C:/Users/Luke/Documents/Unreal
-Projects/DCSSVR//Content/DCSS/dat/' found.
 Welcome back, Cuschux the Naga Enchanter.
 Press ? for a list of commands and other information.
 Saving game... please wait.
@@ -113,6 +100,40 @@ Data directory 'C:/Users/Luke/Documents/Unreal
 Projects/DCSSVR//Content/DCSS/dat/' found.
 Welcome back, Cuschux the Naga Enchanter.
 Press ? for a list of commands and other information.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Cuschux the Naga Enchanter.
+Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
+Okay, then.
+Saving game... please wait.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Setting crawl_dir to `C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/`.
+Data directory 'C:/Users/Luke/Documents/Unreal
+Projects/DCSSVR//Content/DCSS/dat/' found.
+Welcome back, Cuschux the Naga Enchanter.
+Press ? for a list of commands and other information.
+Unknown command.
+Unknown command.
+WARNING: ABOUT TO ENTER WIZARD MODE!
+If you continue, your game will not be scored!
+Do you really want to enter wizard mode? (Confirm with "yes".) 
+Okay, then.
 Saving game... please wait.
 
 ...#       #...

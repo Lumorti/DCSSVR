@@ -1,8 +1,7 @@
 type = normal
-name = Bupp
-species = Minotaur
-background = Fire Elementalist
-game_seed = 2495733103651171884
+name = Nyweinna
+species = Vampire
+background = Air Elementalist
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

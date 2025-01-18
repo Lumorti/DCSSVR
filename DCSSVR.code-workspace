@@ -19,7 +19,10 @@
 			"typeinfo": "cpp",
 			"chrono": "cpp",
 			"system_error": "cpp",
-			"xlocale": "cpp"
+			"xlocale": "cpp",
+			"utility": "cpp",
+			"complex": "cpp",
+			"valarray": "cpp"
 		}
 	},
 	"extensions": {
