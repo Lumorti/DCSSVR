@@ -1,5 +1,24 @@
 #include "dcss.h"
 
+
+// TODO
+//
+// 0.1 Initial Release
+// - map tab
+// - aquirement pop up
+// - forget a spell pop up
+// - initial weapon pop up
+// - death screen
+// - different walls for different branches
+// - report bug button
+// - enable VR
+//
+// 0.2 First update, hopefully filled with community suggestions
+// - footstep/attacking/casting/monster sounds
+// - nearest stairs indicator
+// - find/search
+// - multiplayer
+
 // Game params/constants
 int LOS;
 int gridWidth;
@@ -87,6 +106,8 @@ FString religionText;
 bool shouldRedrawOverview;
 bool shouldRedrawReligion;
 bool hasReturnedToMainMenu;
+UDCSSSaveGame* saveGame;
+FString saveFile;
 
 // Main menu stuff
 FString currentBackground;
@@ -114,6 +135,10 @@ TArray<TArray<FString>> inventoryLocToLetter;
 bool inventoryOpen;
 bool shouldRedrawInventory;
 FIntVector2 inventoryNextSpot;
+
+// Music/audio stuff
+int trackInd;
+TArray<FString> musicListNames;
 
 // For spells
 struct SpellInfo {
@@ -180,19 +205,6 @@ SelectedThing thingBeingDragged;
 // For debugging
 UTextRenderComponent* refToTextRender;
 
-// General TODO list
-// - background music
-// - footstep/attacking/casting/monster sounds
-// - direction indicators / map
-// - aquirement pop up
-// - forget a spell pop up
-// - initial weapon pop up
-// - bug in char selection
-// - remember equipped slots
-// - remember inventory layout
-// - casting spells/abilities
-// - death screen
-
 // Get a texture with a given name
 UTexture2D* Adcss::getTexture(FString name) {
 	if (!textures.Contains(name)) {
@@ -215,6 +227,140 @@ void Adcss::writeCommand(FString input) {
 // Write a command to the process queue
 void Adcss::writeCommandQueued(FString input) {
 	commandQueue.Add(input);
+}
+
+// Save all the data
+void Adcss::saveEverything() {
+	UE_LOG(LogTemp, Display, TEXT("Saving everything"));
+
+	// Create a save if it doesn't exist
+	if (saveGame == nullptr) {
+		saveGame = Cast<UDCSSSaveGame>(UGameplayStatics::CreateSaveGameObject(UDCSSSaveGame::StaticClass()));
+	}
+	if (saveGame == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Save game is null"));
+		return;
+	}
+	if (saveFile.IsEmpty()) {
+		UE_LOG(LogTemp, Warning, TEXT("Save file is not set"));
+		return;
+	}
+
+	// The inventory letters
+	saveGame->inventoryLetterToName = inventoryLetterToName;
+
+	// The inventory locations
+	saveGame->inventoryLocToLetter.Empty();
+	for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+		for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+			saveGame->inventoryLocToLetter.Add(inventoryLocToLetter[i][j]);
+		}
+	}
+	
+	// The hotbar info
+	saveGame->hotbarInfos.Empty();
+	for (int i = 0; i < hotbarInfos.Num(); i++) {
+		saveGame->hotbarInfos.Add(hotbarInfos[i].letter);
+		saveGame->hotbarInfos.Add(hotbarInfos[i].name);
+		saveGame->hotbarInfos.Add(hotbarInfos[i].type);
+	}
+
+	// The music volume
+	UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
+	if (musicComponent != nullptr) {
+		saveGame->musicVolume = musicComponent->VolumeMultiplier;
+	}
+
+	// The music track
+	saveGame->trackInd = trackInd;
+
+	// Actually save the file
+	UGameplayStatics::SaveGameToSlot(saveGame, saveFile, 0);
+
+}
+
+// Load all the data
+void Adcss::loadEverything() {
+	UE_LOG(LogTemp, Display, TEXT("Loading everything"));
+
+	// Load the inventory letters
+	inventoryLetterToName = saveGame->inventoryLetterToName;
+
+	// Load the inventory locations
+	inventoryLocToLetter.Empty();
+	if (saveGame->inventoryLocToLetter.Num() == 6 * 9) {
+		for (int i = 0; i < 6; i++) {
+			TArray<FString> row;
+			for (int j = 0; j < 9; j++) {
+				row.Add(saveGame->inventoryLocToLetter[i * 9 + j]);
+			}
+			inventoryLocToLetter.Add(row);
+		}
+	} else {
+		inventoryLocToLetter.SetNum(6);
+		for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+			inventoryLocToLetter[i].SetNum(9);
+		}
+	}
+
+	// Load the hotbar info
+	hotbarInfos.Empty();
+	if (saveGame->hotbarInfos.Num() == numHotbarSlots * 3) {
+		for (int i = 0; i < numHotbarSlots; i++) {
+			HotbarInfo info;
+			info.letter = saveGame->hotbarInfos[i * 3];
+			info.name = saveGame->hotbarInfos[i * 3 + 1];
+			info.type = saveGame->hotbarInfos[i * 3 + 2];
+			hotbarInfos.Add(info);
+		}
+	} else {
+		for (int i = 0; i < numHotbarSlots; i++) {
+			hotbarInfos.Add(HotbarInfo());
+		}
+	}
+
+	// Load the music volume
+	UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
+	if (musicComponent != nullptr) {
+		float currentVolume = saveGame->musicVolume;
+		currentVolume = FMath::Clamp(currentVolume, 0.0f, 1.0f);
+		musicComponent->SetVolumeMultiplier(currentVolume);
+		UE_LOG(LogTemp, Display, TEXT("Volume set to %f"), currentVolume);
+		UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		if (WidgetComponent != nullptr) {
+			UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+			if (UserWidget != nullptr) {
+				UTextBlock* VolumeText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMusicVolume")));
+				if (VolumeText != nullptr) {
+					int asPercent = FMath::RoundToInt(currentVolume*100.0);
+					VolumeText->SetText(FText::FromString("Music: " + FString::FromInt(asPercent) + "%"));
+				}
+			}
+		}
+	}
+
+	// Load the track index
+	trackInd = saveGame->trackInd;
+	UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+	if (WidgetComponent != nullptr) {
+		UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+		if (UserWidget != nullptr) {
+			UTextBlock* TrackText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextTrack")));
+			if (TrackText != nullptr) {
+				TrackText->SetText(FText::FromString("Track: " + musicListNames[trackInd]));
+			}
+		}
+	}
+	trackInd = FMath::Clamp(trackInd, 0, musicList.Num() - 1);
+	if (musicComponent != nullptr) {
+		musicComponent->SetSound(musicList[trackInd]);
+	}
+
+	// Output the sizes
+	UE_LOG(LogTemp, Display, TEXT("Inventory letter to name size: %d"), inventoryLetterToName.Num());
+	UE_LOG(LogTemp, Display, TEXT("Inventory loc to letter size: %d"), inventoryLocToLetter.Num());
+	UE_LOG(LogTemp, Display, TEXT("Hotbar infos size: %d"), hotbarInfos.Num());
+
 }
 
 // Go from item name to texture name
@@ -333,9 +479,8 @@ void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
 }
 
-// Called when the game starts or when spawned
-void Adcss::BeginPlay() {
-	Super::BeginPlay();
+// Wrapped function
+void Adcss::init() {
 
 	// Make sure all the templates are not null
 	if (floorTemplate == nullptr || wallTemplate == nullptr || enemyTemplate == nullptr || itemTemplate == nullptr) {
@@ -410,10 +555,10 @@ void Adcss::BeginPlay() {
 	inventoryLetterToName = TMap<FString, FString>();
 	inventoryLocToLetter = TArray<TArray<FString>>();
 	inventoryLocToLetter.SetNum(6);
-	targetingRange = -1;
 	for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 		inventoryLocToLetter[i].SetNum(9);
 	}
+	targetingRange = -1;
 	inventoryNextSpot = FIntVector2(-1, -1);
 	shouldRedrawInventory = true;
 	currentUI = "main";
@@ -664,6 +809,24 @@ void Adcss::BeginPlay() {
 		}
 	}
 
+	// The names of the songs
+	musicListNames.Empty();
+	musicListNames.Add(TEXT("Dark Fantasy Ambience - DeusLower"));
+	musicListNames.Add(TEXT("Dark Fantasy Atmosphere - DeusLower"));
+	musicListNames.Add(TEXT("The Time Is Upon Us - Elias Weber"));
+	musicListNames.Add(TEXT("8-bit Dungeon - Kaden_Cook"));
+	trackInd = 0;
+	UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+	if (WidgetComponent != nullptr) {
+		UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+		if (UserWidget != nullptr) {
+			UTextBlock* TrackText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextTrack")));
+			if (TrackText != nullptr) {
+				TrackText->SetText(FText::FromString("Track: " + musicListNames[trackInd]));
+			}
+		}
+	}
+
 	// Make sure we have the default texture
 	if (!textures.Contains(TEXT("Unknown"))) {
 		UE_LOG(LogTemp, Error, TEXT("Unknown texture not found"));
@@ -694,6 +857,7 @@ void Adcss::BeginPlay() {
 
 	// Setup array sizes
 	UE_LOG(LogTemp, Display, TEXT("Setting up arrays..."));
+	wallArray.Empty();
 	wallArray.SetNum(gridWidth);
 	for (int i = 0; i < gridWidth; i++) {
 		wallArray[i].SetNum(gridWidth);
@@ -701,14 +865,17 @@ void Adcss::BeginPlay() {
 			wallArray[i][j].SetNum(4);
 		}
 	}
+	floorArray.Empty();
 	floorArray.SetNum(gridWidth);
 	for (int i = 0; i < gridWidth; i++) {
 		floorArray[i].SetNum(gridWidth);
 	}
+	levelAscii.Empty();
 	levelAscii.SetNum(gridWidth);
 	for (int i = 0; i < gridWidth; i++) {
 		levelAscii[i].SetNum(gridWidth);
 	}
+	levelAsciiPrev.Empty();
 	levelAsciiPrev.SetNum(gridWidth);
 	for (int i = 0; i < gridWidth; i++) {
 		levelAsciiPrev[i].SetNum(gridWidth);
@@ -716,6 +883,7 @@ void Adcss::BeginPlay() {
 			levelAsciiPrev[i][j] = TEXT(" ");
 		}
 	}
+	levelInfo.Empty();
 	levelInfo.SetNum(gridWidth);
 	for (int i = 0; i < gridWidth; i++) {
 		levelInfo[i].SetNum(gridWidth);
@@ -724,6 +892,7 @@ void Adcss::BeginPlay() {
 			levelInfo[i][j].itemHotkeys.SetNum(0);
 		}
 	}
+	hotbarInfos.Empty();
 	hotbarInfos.SetNum(numHotbarSlots);
 	for (int i = 0; i < numHotbarSlots; i++) {
 		hotbarInfos[i] = HotbarInfo();
@@ -826,6 +995,7 @@ void Adcss::BeginPlay() {
 	}
 	
 	// Spawn the enemy planes
+	enemyArray.Empty();
 	enemyArray.SetNum(maxEnemies);
 	for (int i = 0; i < maxEnemies; i++) {
 		FActorSpawnParameters SpawnInfo;
@@ -840,6 +1010,7 @@ void Adcss::BeginPlay() {
 	}
 
 	// Spawn the item planes
+	itemArray.Empty();
 	itemArray.SetNum(maxItems);
 	for (int i = 0; i < maxItems; i++) {
 		FActorSpawnParameters SpawnInfo;
@@ -873,6 +1044,12 @@ void Adcss::BeginPlay() {
 	refToSaveActor->SetActorHiddenInGame(true);
 	refToSaveActor->SetActorEnableCollision(false);
 
+}
+
+// Called when the game starts or when spawned
+void Adcss::BeginPlay() {
+	Super::BeginPlay();
+	init();
 }
 
 // Called when the level ascii has changed
@@ -1524,7 +1701,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			refToMainMenuActor->SetActorEnableCollision(true);
 			inventoryOpen = false;
 
-			// Reaunch the process
+			// Close the process
 			UE_LOG(LogTemp, Display, TEXT("Closing process"));
 			writeCommand("exit");
 			writeCommand("escape");
@@ -1532,19 +1709,26 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			FPlatformProcess::TerminateProc(ProcHandle, true);
 			FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
 			FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
-			UE_LOG(LogTemp, Display, TEXT("Launching pipes again..."));
-			FPlatformProcess::CreatePipe(StdOutReadHandle, StdOutWriteHandle);
-			FPlatformProcess::CreatePipe(StdInReadHandle, StdInWriteHandle, true);
-			UE_LOG(LogTemp, Display, TEXT("Launching process again..."));
-			ProcHandle = FPlatformProcess::CreateProc(*exePath, *args, true, true, true, nullptr, 0, nullptr, StdOutWriteHandle, StdInReadHandle);
-			int maxSaves = 50;
-			for (int i=0; i<maxSaves; i++) {
-				writeCommandQueued("down");
+
+			// Remove all the actors
+			for (int i = 0; i < maxEnemies; i++) {
+				enemyArray[i]->Destroy();
 			}
-			for (int i = 0; i < maxSaves+15; i++) {
-				writeCommandQueued("up");
+			for (int i = 0; i < maxItems; i++) {
+				itemArray[i]->Destroy();
 			}
-			needMenu = true;
+			for (int i = 0; i < gridWidth; i++) {
+				for (int j = 0; j < gridWidth; j++) {
+					wallArray[i][j][0]->Destroy();
+					wallArray[i][j][1]->Destroy();
+					wallArray[i][j][2]->Destroy();
+					wallArray[i][j][3]->Destroy();
+					floorArray[i][j]->Destroy();
+				}
+			}
+
+			// Start everything up again
+			init();
 
 		// Change page buttons
 		} else if (selected.thingIs == "ButtonSaveRight") {
@@ -1589,6 +1773,78 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued("escape");
 				}
 			}
+
+		// Volume buttons
+		} else if (selected.thingIs.Contains(TEXT("ButtonMusicVolume"))) {
+			UE_LOG(LogTemp, Display, TEXT("Music volume button clicked: %s"), *selected.thingIs);
+
+			// Make sure the audio component exists
+			UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
+			if (musicComponent != nullptr) {
+
+				// Get the current volume
+				float currentVolume = musicComponent->VolumeMultiplier;
+				if (selected.thingIs.Contains(TEXT("Up"))) {
+					currentVolume += 0.1f;
+				} else {
+					currentVolume -= 0.1f;
+				}
+				currentVolume = FMath::Clamp(currentVolume, 0.0f, 1.0f);
+				musicComponent->SetVolumeMultiplier(currentVolume);
+				UE_LOG(LogTemp, Display, TEXT("Volume set to %f"), currentVolume);
+
+				// Change the text (TextVolume)
+				UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponent != nullptr) {
+					UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+					if (UserWidget != nullptr) {
+						UTextBlock* VolumeText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMusicVolume")));
+						if (VolumeText != nullptr) {
+							int asPercent = FMath::RoundToInt(currentVolume*100.0);
+							VolumeText->SetText(FText::FromString("Music: " + FString::FromInt(asPercent) + "%"));
+						}
+					}
+				}
+
+				// Save everything
+				saveEverything();
+			
+			}
+
+		// Change track buttons
+		} else if (selected.thingIs.Contains(TEXT("ButtonTrack"))) {
+			UE_LOG(LogTemp, Display, TEXT("Music track button clicked: %s"), *selected.thingIs);
+			UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
+
+			// Adjust the current track index
+			if (musicComponent != nullptr) {
+				if (selected.thingIs.Contains(TEXT("Next"))) {
+					trackInd++;
+				} else {
+					trackInd--;
+				}
+			}
+			if (trackInd < 0) {
+				trackInd = musicList.Num() - 1;
+			} else if (trackInd >= musicList.Num()) {
+				trackInd = 0;
+			}
+
+			// Update the audio and the text
+			musicComponent->SetSound(musicList[trackInd]);
+			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			if (WidgetComponent != nullptr) {
+				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+				if (UserWidget != nullptr) {
+					UTextBlock* TrackText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextTrack")));
+					if (TrackText != nullptr) {
+						TrackText->SetText(FText::FromString("Track: " + musicListNames[trackInd]));
+					}
+				}
+			}
+
+			// Save everything
+			saveEverything();
 
 		// A save page button
 		} else if (selected.thingIs == "ButtonSaveLeft") {
@@ -1707,11 +1963,42 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 
-		// If we're holding an ability, use it TODO
+		// If we're holding an ability, use it
 		} else if (thingBeingDragged.thingIs == "Ability" && thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < abilityLetters.Num()) {
-			FString letter = abilityLetters[thingBeingDragged.thingIndex];
-			writeCommandQueued("a");
-			writeCommandQueued(letter);
+
+			// Make sure we're in range
+			int x = selected.x;
+			int y = selected.y;
+			int dist = FMath::RoundToInt(FMath::Sqrt(FMath::Pow(float(x-LOS), 2) + FMath::Pow(float(y-LOS), 2)));
+			if (dist < targetingRange || targetingRange == 0) {
+				FString letter = abilityLetters[thingBeingDragged.thingIndex];
+				writeCommandQueued("a");
+				writeCommandQueued(letter);
+				if (targetingRange >= 1) {
+					writeCommandQueued("r");
+					int currentX = LOS;
+					int currentY = LOS;
+					while (currentX != x) {
+						if (currentX < x) {
+							writeCommandQueued("l");
+							currentX++;
+						} else {
+							writeCommandQueued("h");
+							currentX--;
+						}
+					}
+					while (currentY != y) {
+						if (currentY < y) {
+							writeCommandQueued("j");
+							currentY++;
+						} else {
+							writeCommandQueued("k");
+							currentY--;
+						}
+					}
+					writeCommandQueued("enter");
+				}
+			}
 
 		// If trying to show/hide the inventory
 		} else if (selected.thingIs == "OpenButton") {
@@ -1818,20 +2105,42 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToSaveActor->SetActorHiddenInGame(true);
 						refToSaveActor->SetActorEnableCollision(false);
 					} else if (selected.thingIs.Contains(TEXT("ButtonSave"))) {
+
+						// Get the save info
 						FString saveName = selected.thingIs.Replace(TEXT("ButtonSave"), TEXT(""));
-						int saveIndex = saveLocToIndex[FCString::Atoi(*saveName)-1 + savesPage*6];
+						int saveLoc = FCString::Atoi(*saveName)-1 + savesPage*6;
+						int saveIndex = saveLocToIndex[saveLoc];
 						UE_LOG(LogTemp, Display, TEXT("Save button clicked: %s"), *saveName);
+
+						// Send the commands
+						UE_LOG(LogTemp, Display, TEXT("Writing %i down commands"), 9+saveIndex);
 						for (int i=0; i<9+saveIndex; i++) {
 							writeCommandQueued("down");
 						}
 						writeCommandQueued("enter");
 						writeCommandQueued("enter");
 						writeCommandQueued("enter");
+
+						// Load the VR save game
+						saveFile = saveNames[saveLoc];
+						saveFile = saveFile.Left(saveFile.Find(TEXT(","))).Replace(TEXT(" "), TEXT(""));
+						saveGame = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot(saveFile, 0));
+						if (saveGame != nullptr) {
+							UE_LOG(LogTemp, Display, TEXT("Save file found, loading: %s"), *saveFile);
+							loadEverything();
+						} else {
+							UE_LOG(LogTemp, Display, TEXT("Save file not found, creating: %s"), *saveFile);
+							saveGame = Cast<UDCSSSaveGame>(UGameplayStatics::CreateSaveGameObject(UDCSSSaveGame::StaticClass()));
+							saveEverything();
+						}
+
+						// Set up the game
 						refToUIActor->SetActorHiddenInGame(false);
 						refToUIActor->SetActorEnableCollision(true);
 						refToSaveActor->SetActorHiddenInGame(true);
 						refToSaveActor->SetActorEnableCollision(false);
 						hasBeenWelcomed = false;
+
 					} else if (selected.thingIs.Contains(TEXT("ButtonDelete"))) {
 
 						// Get the location of the button and save
@@ -1849,9 +2158,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 								// Remove the file if it exists
 								UE_LOG(LogTemp, Display, TEXT("Delete button clicked: %i"), saveLoc);
-								FString saveFile = saveNames[saveLoc];
-								saveFile = saveFile.Left(saveFile.Find(TEXT(","))).Replace(TEXT(" "), TEXT(""));
-								FString savePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\saves\\")) + saveFile + TEXT(".cs");
+								FString saveFileToDelete = saveNames[saveLoc];
+								saveFileToDelete = saveFileToDelete.Left(saveFileToDelete.Find(TEXT(","))).Replace(TEXT(" "), TEXT(""));
+								FString savePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\saves\\")) + saveFileToDelete + TEXT(".cs");
 								UE_LOG(LogTemp, Display, TEXT("Attempting to delete save file: %s"), *savePath);
 								if(savePath.Len() > 0) {
 									if (FPaths::ValidatePath(savePath) && FPaths::FileExists(savePath)) {
@@ -1925,6 +2234,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 										i++;
 									}
 								}
+								backgroundRespaced = backgroundRespaced.TrimStartAndEnd();
 
 								// Set the background name text
 								NameText->SetText(FText::FromString(backgroundRespaced));
@@ -2012,11 +2322,15 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToSaveActor->SetActorHiddenInGame(false);
 						refToSaveActor->SetActorEnableCollision(true);
 					} else if (selected.thingIs == "ButtonBegin") {
+
+						// Get info
 						FString speciesLetter = speciesToLetter[currentSpecies];
 						FString backgroundLetter = backgroundToLetter[currentBackground];
 						if (currentSpecies == "Demigod") {
 							backgroundLetter = backgroundToLetterNoGods[currentBackground];
 						}
+
+						// Write all the commands
 						for (int i = 0; i < currentName.Len(); i++) {
 							writeCommandQueued(currentName.Mid(i, 1));
 						}
@@ -2033,6 +2347,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						writeCommandQueued("enter");
 						writeCommandQueued(speciesLetter);
 						writeCommandQueued(backgroundLetter);
+
+						// Set up the game
 						refToSpeciesActor->SetActorHiddenInGame(true);
 						refToSpeciesActor->SetActorEnableCollision(false);
 						refToNameActor->SetActorHiddenInGame(true);
@@ -2042,6 +2358,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToUIActor->SetActorHiddenInGame(false);
 						refToUIActor->SetActorEnableCollision(true);
 						hasBeenWelcomed = false;
+
 					}
 
 				}
@@ -2882,6 +3199,11 @@ void Adcss::Tick(float DeltaTime) {
 		// We don't need to redraw anymore
 		shouldRedrawInventory = false;
 
+		// Save everything
+		if (hasLoaded) {
+			saveEverything();
+		}
+
 	}
 
 	// If told to redraw the hotbar
@@ -2930,6 +3252,11 @@ void Adcss::Tick(float DeltaTime) {
 				}
 
 			}
+		}
+
+		// Save everything
+		if (hasLoaded) {
+			saveEverything();
 		}
 
 	}
@@ -3496,13 +3823,13 @@ void Adcss::Tick(float DeltaTime) {
 					if (charArray[i].Contains(TEXT("a level"))) {
 						FString name = charArray[i].Mid(17, 80-17).TrimStartAndEnd();
 						if (!saveNames.Contains(name)) {
-							UE_LOG(LogTemp, Warning, TEXT("Found save: %s"), *name);
+							UE_LOG(LogTemp, Display, TEXT("Found save: %s"), *name);
 							saveNames.Emplace(name);
 						}
 					} else if (charArray[i].Contains(TEXT("quick-load"))) {
 						quickLoad = charArray[i].Mid(28, 80-28).TrimStartAndEnd();
 						quickLoad = quickLoad.Replace(TEXT("the"), TEXT("")).Replace(TEXT(" "), TEXT("")).Replace(TEXT(" "), TEXT(""));
-						UE_LOG(LogTemp, Warning, TEXT("Quick load: %s"), *quickLoad);
+						UE_LOG(LogTemp, Display, TEXT("Quick load: %s"), *quickLoad);
 					}
 				}
 
@@ -3510,6 +3837,23 @@ void Adcss::Tick(float DeltaTime) {
 				saveNames.Sort([](const FString& A, const FString& B) {
 					if (A.Len() == 0 || B.Len() == 0) {
 						return A.Len() <= B.Len();
+					}
+					FString levelStringA = "";
+					for (int i = 0; i < A.Len(); i++) {
+						if (A[i] >= '0' && A[i] <= '9') {
+							levelStringA += A[i];
+						}
+					}
+					FString levelStringB = "";
+					for (int i = 0; i < B.Len(); i++) {
+						if (B[i] >= '0' && B[i] <= '9') {
+							levelStringB += B[i];
+						}
+					}
+					int levelA = FCString::Atoi(*levelStringA);
+					int levelB = FCString::Atoi(*levelStringB);
+					if (levelA != levelB) {
+						return levelA > levelB;
 					} else if (A[0] == B[0]) {
 						return A < B;
 					} else {
@@ -3530,7 +3874,7 @@ void Adcss::Tick(float DeltaTime) {
 						simpName = simpName.Replace(TEXT(","), TEXT(""));
 						simpName = simpName.Replace(TEXT(" "), TEXT(""));
 						simpName = simpName.Replace(TEXT(" "), TEXT(""));
-						UE_LOG(LogTemp, Warning, TEXT("Comparing %s to %s"), *simpName, *quickLoad);
+						UE_LOG(LogTemp, Display, TEXT("Comparing %s to %s"), *simpName, *quickLoad);
 						if (simpName == quickLoad) {
 							index = i;
 							break;
@@ -3693,6 +4037,11 @@ void Adcss::Tick(float DeltaTime) {
 
 					// Get the passive and it to the list
 					FString name = charArray[i].Mid(4).TrimStartAndEnd();
+					if (name.Contains(TEXT("Transient mutations")) 
+					|| name.Contains(TEXT("Gained at a future"))
+					|| name.Contains(TEXT("Mutations|Blood properties"))) {
+						continue;
+					}
 					if (name.Len() > 0) {
 						passives.Add(name);
 					}
@@ -4270,6 +4619,12 @@ void Adcss::Tick(float DeltaTime) {
 			if (isMap) {
 				UE_LOG(LogTemp, Display, TEXT("Status section:"));
 				if (charArray.Num() >= 15) {
+
+					// Extract the name and thus the filename
+					FString nameLine = charArray[1].Mid(37);
+					saveFile = nameLine.Left(nameLine.Find(TEXT(" the "))).Replace(TEXT(" "), TEXT(""));
+					UE_LOG(LogTemp, Display, TEXT(" name line -> %s"), *nameLine);
+					UE_LOG(LogTemp, Display, TEXT(" setting save file -> %s"), *saveFile);
 
 					// Extract the health
 					FString healthLine = charArray[3].Mid(45);

@@ -1,7 +1,7 @@
 type = normal
 name = Nyweinna
-species = Vampire
-background = Air Elementalist
+species = Barachi
+background = Alchemist
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

@@ -5,6 +5,7 @@
 #include "Engine/TextRenderActor.h"
 #include "Runtime/Engine/Classes/Components/TextRenderComponent.h"
 #include "CoreMinimal.h"
+#include "DCSSSaveGame.h"
 #include "GameFramework/Actor.h"
 #include "Kismet/KismetSystemLibrary.h"
 #include "Kismet/GameplayStatics.h"
@@ -12,10 +13,13 @@
 #include "Components/WidgetSwitcher.h"
 #include "Components/ProgressBar.h"
 #include "Blueprint/UserWidget.h"
+#include "Sound/AmbientSound.h"
+#include "Components/AudioComponent.h"
 #include "Components/TextBlock.h"
 #include "Components/Image.h"
 #include "Components/Button.h"
 #include "Components/Border.h"
+#include "Kismet/GameplayStatics.h"
 #include "RHIFeatureLevel.h"
 #include "dcss.generated.h"
 
@@ -24,7 +28,8 @@ class DCSSVR_API Adcss : public AActor
 {
 	GENERATED_BODY()
 	
-public:	
+public:
+
 	// Sets default values for this actor's properties
 	Adcss();
 
@@ -43,6 +48,12 @@ public:
 	AActor* refToNameActor;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToSaveActor;
+
+	// The references to the music
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<USoundWave*> musicList;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AAmbientSound* refToMusicActor;
 
 	// The reference to the description panel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -99,14 +110,22 @@ public:
 	UTexture2D* getTexture(FString name);
 	FString itemNameToTextureName(FString name);
 	FString enemyNameToTextureName(FString name);
+	void loadEverything();
+	void saveEverything();
+	void init();
 
 protected:
+
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
 public:	
+
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	// Called when the game ends
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 };
+
