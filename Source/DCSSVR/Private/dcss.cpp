@@ -136,6 +136,11 @@ bool inventoryOpen;
 bool shouldRedrawInventory;
 FIntVector2 inventoryNextSpot;
 
+// For choices
+TArray<FString> choiceNames;
+TArray<FString> choiceLetters;
+bool isChoiceOpen;
+
 // Music/audio stuff
 int trackInd;
 TArray<FString> musicListNames;
@@ -565,6 +570,9 @@ void Adcss::init() {
 	commandQueue.Empty();
 	lastCommandTime = 0.0;
 	inventoryOpen = true;
+	choiceNames.Empty();
+	choiceLetters.Empty();
+	isChoiceOpen = false;
 	spellLetters.Empty();
 	abilityLetters.Empty();
 	spellLetterToInfo.Empty();
@@ -3254,6 +3262,9 @@ void Adcss::Tick(float DeltaTime) {
 			}
 		}
 
+		// We don't need to redraw anymore
+		shouldRedrawHotbar = false;
+
 		// Save everything
 		if (hasLoaded) {
 			saveEverything();
@@ -4480,6 +4491,48 @@ void Adcss::Tick(float DeltaTime) {
 					}
 				}
 
+			}
+
+			// If it's a choice menu TODO
+			// You have a choice of weapons.                                                   
+			//  a - rapier                        (+1 apt)                                     
+			//  b - flail                         (+2 apt)                                     
+			//  c - war axe                       (+2 apt)                                     
+			//  d - trident                       (+2 apt)                                     
+			//  e - long sword                    (+2 apt)                                     
+			//  f - unarmed                       (+1 apt)                                     
+			// + - Recommended random choice  * - Random weapon                                
+			// % - List aptitudes             Bksp - Return to character menu                  
+			// ? - Help                                                          
+			bool isChoice = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("You have a choice of"))) {
+					isChoice = true;
+					break;
+				}
+			}
+			if (isChoice) {
+				choiceLetters.Empty();
+				choiceNames.Empty();
+				for (int i = 0; i < charArray.Num(); i++) {
+					if (charArray[i].Contains(TEXT(" - "))) {
+						TArray<FString> words;
+						charArray[i].ParseIntoArray(words, TEXT(" "), true);
+						FString hotkey = words[0];
+						FString description = TEXT("");
+						for (int j = 2; j < words.Num(); j++) {
+							description += words[j] + TEXT(" ");
+						}
+						UE_LOG(LogTemp, Display, TEXT("Added choice: {%s} %s"), *hotkey, *description);
+						choiceLetters.Add(hotkey);
+						choiceNames.Add(description);
+					}
+				}
+				isChoiceOpen = true;
+				// show the window
+			} else if (isChoiceOpen) {
+				isChoiceOpen = false;
+				// close the window
 			}
 
 			// If it's the ctrl-X menu
