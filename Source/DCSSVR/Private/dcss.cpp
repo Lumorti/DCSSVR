@@ -7,7 +7,7 @@
 // - map tab
 // - aquirement pop up
 // - forget a spell pop up
-// - initial weapon pop up
+// - level up attribute pop up
 // - death screen
 // - different walls for different branches
 // - report bug button
@@ -106,7 +106,6 @@ FString religionText;
 bool shouldRedrawOverview;
 bool shouldRedrawReligion;
 bool hasReturnedToMainMenu;
-UDCSSSaveGame* saveGame;
 FString saveFile;
 
 // Main menu stuff
@@ -566,13 +565,14 @@ void Adcss::init() {
 	targetingRange = -1;
 	inventoryNextSpot = FIntVector2(-1, -1);
 	shouldRedrawInventory = true;
-	currentUI = "main";
+	currentUI = "inventory";
 	commandQueue.Empty();
 	lastCommandTime = 0.0;
 	inventoryOpen = true;
 	choiceNames.Empty();
 	choiceLetters.Empty();
 	isChoiceOpen = false;
+	refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
 	spellLetters.Empty();
 	abilityLetters.Empty();
 	spellLetterToInfo.Empty();
@@ -1042,7 +1042,6 @@ void Adcss::init() {
 	refToInventoryActor->SetActorEnableCollision(inventoryOpen);
 
 	// Set the initial menus
-	currentUI = "main";
 	refToSpeciesActor->SetActorHiddenInGame(true);
 	refToSpeciesActor->SetActorEnableCollision(false);
 	refToBackgroundActor->SetActorHiddenInGame(true);
@@ -1694,13 +1693,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// Main menu button
 		if (selected.thingIs == "ButtonMainMenu") {
 			needMenu = true;
-			currentUI = "main";
 			UE_LOG(LogTemp, Display, TEXT("Main menu button clicked"));
 			writeCommandQueued("exit");
 			for (int i = 0; i < 20; i++) {
 				writeCommandQueued("up");
 			}
-			currentUI = "main";
 			refToUIActor->SetActorHiddenInGame(true);
 			refToUIActor->SetActorEnableCollision(false);
 			refToInventoryActor->SetActorHiddenInGame(true);
@@ -1737,6 +1734,16 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Start everything up again
 			init();
+
+		// Choice button
+		} else if (selected.thingIs.Contains(TEXT("ButtonOption")) && isChoiceOpen) {
+			UE_LOG(LogTemp, Display, TEXT("Choice button clicked: %s"), *selected.thingIs);
+			FString choiceName = selected.thingIs.Replace(TEXT("ButtonOption"), TEXT(""));
+			int choiceIndex = FCString::Atoi(*choiceName)-1;
+			if (choiceIndex >= 0 && choiceIndex < choiceLetters.Num() && choiceIndex < choiceNames.Num() && choiceNames[choiceIndex].Len() > 0) {
+				UE_LOG(LogTemp, Display, TEXT("Writing choice: %s"), *choiceLetters[choiceIndex]);
+				writeCommandQueued(choiceLetters[choiceIndex]);
+			}
 
 		// Change page buttons
 		} else if (selected.thingIs == "ButtonSaveRight") {
@@ -2016,6 +2023,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Depending on the current tab
 			if (inventoryOpen) {
+				UE_LOG(LogTemp, Display, TEXT("Inventory opened, current UI: %s"), *currentUI);
 				if (currentUI == "inventory") {
 					selected.thingIs = "ButtonInventory";
 					keyPressed("lmb", FVector2D(0.0f, 0.0f));
@@ -2047,9 +2055,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (WidgetComponentMain != nullptr) {
 				UUserWidget* UserWidget = WidgetComponentMain->GetUserWidgetObject();
 				if (UserWidget != nullptr) {
-
 					UE_LOG(LogTemp, Display, TEXT("Main menu play clicked"));
-					currentUI = "saves";
 					refToSaveActor->SetActorHiddenInGame(false);
 					refToSaveActor->SetActorEnableCollision(true);
 					refToMainMenuActor->SetActorHiddenInGame(true);
@@ -2098,7 +2104,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					// For each of the buttons
 					if (selected.thingIs == "ButtonSaveBack") {
 						UE_LOG(LogTemp, Display, TEXT("Saves back button clicked"));
-						currentUI = "main";
 						refToSaveActor->SetActorHiddenInGame(true);
 						refToSaveActor->SetActorEnableCollision(false);
 						refToMainMenuActor->SetActorHiddenInGame(false);
@@ -2320,7 +2325,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					// For each of the buttons
 					if (selected.thingIs == "ButtonCharBack") {
 						UE_LOG(LogTemp, Display, TEXT("Char back button clicked"));
-						currentUI = "saves";
 						refToBackgroundActor->SetActorHiddenInGame(true);
 						refToBackgroundActor->SetActorEnableCollision(false);
 						refToSpeciesActor->SetActorHiddenInGame(true);
@@ -2463,7 +2467,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
 						if (WidgetSwitcher != nullptr) {
 							WidgetSwitcher->SetActiveWidgetIndex(5);
-							currentUI = "menu";
 						}
 
 					// The sub-buttons in the character menu
@@ -4267,9 +4270,10 @@ void Adcss::Tick(float DeltaTime) {
 				for (int i = 0; i < charArray.Num(); i++) {
 
 					// If it's a starting line, reset the description
-					if (charArray[i].Contains(TEXT(" - "))) {
-						currentDescription = TEXT("");
-					}
+					// if (charArray[i].Contains(TEXT(" - "))) {
+					// 	currentDescription = TEXT("");
+					// 	UE_LOG(LogTemp, Display, TEXT("Resetting description"));
+					// }
 
 					// Determine the type of thing
 					if (charArray[i].Contains(TEXT("Threat:"))) {
@@ -4331,13 +4335,14 @@ void Adcss::Tick(float DeltaTime) {
 				for (int i = 0; i < withoutFirst.Len(); i++) {
 					if (withoutFirst[i] != TEXT('\n') && withoutFirst[i] != TEXT(' ')) {
 						for (int j = 0; j < std::min(40, withoutFirst.Len()-i); j++) {
+							if (withoutFirst[i+j] == TEXT('\n')) {
+								break;
+							}
 							searchString += withoutFirst[i+j];
 						}
 						break;
 					}
 				}
-				UE_LOG(LogTemp, Display, TEXT("toAdd: %s"), *toAdd);
-				UE_LOG(LogTemp, Display, TEXT("withoutFirst: %s"), *withoutFirst);
 				UE_LOG(LogTemp, Display, TEXT("searchString: %s"), *searchString);
 				int addLoc = currentDescription.Find(searchString);
 				UE_LOG(LogTemp, Display, TEXT("addLoc: %d"), addLoc);
@@ -4353,9 +4358,13 @@ void Adcss::Tick(float DeltaTime) {
 				while (currentDescription.EndsWith(TEXT("\n"))) {
 					currentDescription = currentDescription.Left(currentDescription.Len()-1);
 				}
-				currentDescription = currentDescription.Replace(TEXT("\n\n\n\n\n"), TEXT("\n\n"));
-				currentDescription = currentDescription.Replace(TEXT("\n\n\n\n"), TEXT("\n\n"));
-				currentDescription = currentDescription.Replace(TEXT("\n\n\n"), TEXT("\n\n"));
+
+				// Remove any double whitelines
+				FRegexPattern pattern(TEXT("\n[ \t]*\n[ \t]*\n"));
+				FRegexMatcher matcher(pattern, *currentDescription);
+				while (matcher.FindNext()) {
+					currentDescription = currentDescription.Left(matcher.GetMatchBeginning()) + currentDescription.Mid(matcher.GetMatchEnding()-1);
+				}
 
 				// Set the usage based on the type of object
 				currentUsage = TEXT("");
@@ -4493,7 +4502,7 @@ void Adcss::Tick(float DeltaTime) {
 
 			}
 
-			// If it's a choice menu TODO
+			// If it's a choice menu
 			// You have a choice of weapons.                                                   
 			//  a - rapier                        (+1 apt)                                     
 			//  b - flail                         (+2 apt)                                     
@@ -4516,6 +4525,15 @@ void Adcss::Tick(float DeltaTime) {
 				choiceNames.Empty();
 				for (int i = 0; i < charArray.Num(); i++) {
 					if (charArray[i].Contains(TEXT(" - "))) {
+
+						// Skip some lines
+						if (charArray[i].Contains(TEXT("random choice")) 
+							|| charArray[i].Contains(TEXT("Help"))
+							|| charArray[i].Contains(TEXT("List aptitudes"))) {
+							continue;
+						}
+
+						// Add it
 						TArray<FString> words;
 						charArray[i].ParseIntoArray(words, TEXT(" "), true);
 						FString hotkey = words[0];
@@ -4526,13 +4544,41 @@ void Adcss::Tick(float DeltaTime) {
 						UE_LOG(LogTemp, Display, TEXT("Added choice: {%s} %s"), *hotkey, *description);
 						choiceLetters.Add(hotkey);
 						choiceNames.Add(description);
+
 					}
 				}
+
+				// Set all the options
+				UWidgetComponent* WidgetComponentChoice = Cast<UWidgetComponent>(refToChoiceActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponentChoice != nullptr) {
+					UUserWidget* UserWidgetChoice = WidgetComponentChoice->GetUserWidgetObject();
+					if (UserWidgetChoice != nullptr) {
+						for (int i = 0; i < 7; i++) {
+							FString name = TEXT("TextOption") + FString::FromInt(i+1);
+							UTextBlock* TextBox = Cast<UTextBlock>(UserWidgetChoice->GetWidgetFromName(*name));
+							if (TextBox != nullptr) {
+								if (i < choiceNames.Num()) {
+									TextBox->SetText(FText::FromString(choiceNames[i]));
+								} else {
+									TextBox->SetText(FText::FromString(TEXT("")));
+								}
+							}
+						}
+					}
+				}
+				
+				// Show it
 				isChoiceOpen = true;
-				// show the window
+				refToChoiceActor->SetActorHiddenInGame(!isChoiceOpen);
+				refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
+
+			// Otherwise hide the window and reset
 			} else if (isChoiceOpen) {
+				choiceLetters.Empty();
+				choiceNames.Empty();
 				isChoiceOpen = false;
-				// close the window
+				refToChoiceActor->SetActorHiddenInGame(!isChoiceOpen);
+				refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
 			}
 
 			// If it's the ctrl-X menu

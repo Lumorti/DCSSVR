@@ -63,6 +63,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToInventoryActor;
 
+	// The reference to the choice panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToChoiceActor;
+
 	// The reference to the text object
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	ATextRenderActor* refToTextActor;
@@ -102,6 +106,10 @@ public:
 	// The function called when a button is hovered/unhovered
 	UFUNCTION(BlueprintCallable, Category = "DCSSVR")
 	void buttonHovered(FString buttonName, bool hovered);
+
+	// Put here to stop nullptr errors
+	UPROPERTY(VisibleAnywhere, Category = Basic)
+	UDCSSSaveGame* saveGame;
 
 	// Various functions
 	void updateLevel();
