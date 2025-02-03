@@ -5,9 +5,7 @@
 //
 // 0.1 Initial Release
 // - map tab
-// - aquirement pop up
 // - forget a spell pop up
-// - level up attribute pop up
 // - death screen
 // - different walls for different branches
 // - report bug button
@@ -107,6 +105,7 @@ bool shouldRedrawOverview;
 bool shouldRedrawReligion;
 bool hasReturnedToMainMenu;
 FString saveFile;
+TMap<int, TArray<FVector>> itemLocs;
 
 // Main menu stuff
 FString currentBackground;
@@ -139,6 +138,7 @@ FIntVector2 inventoryNextSpot;
 TArray<FString> choiceNames;
 TArray<FString> choiceLetters;
 bool isChoiceOpen;
+FString choiceType;
 
 // Music/audio stuff
 int trackInd;
@@ -372,6 +372,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 
 	// Determine the actual name of the item
 	FString itemName = name;
+	itemName = itemName.Replace(TEXT("The"), TEXT(""));
 	itemName = itemName.Replace(TEXT("(here)"), TEXT(""));
 	itemName = itemName.Replace(TEXT("(weapon)"), TEXT(""));
 	itemName = itemName.Replace(TEXT("(worn)"), TEXT(""));
@@ -389,6 +390,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("+7 "), TEXT(""));
 	itemName = itemName.Replace(TEXT("+8 "), TEXT(""));
 	itemName = itemName.Replace(TEXT("+9 "), TEXT(""));
+	itemName = itemName.Replace(TEXT("(apt)"), TEXT(""));
 	int32 commaIndex = itemName.Find(TEXT(","));
 	if (commaIndex != INDEX_NONE) {
 		itemName = itemName.Left(commaIndex);
@@ -398,6 +400,12 @@ FString Adcss::itemNameToTextureName(FString name) {
 	int32 ofIndex = itemName.Find(TEXT(" of "));
 	if (ofIndex != INDEX_NONE) {
 		itemName = itemName.Left(ofIndex);
+	}
+
+	// If we have a name i.e. the +1 hat "Nutis" {+Inv rF+++ Dex-5 Stlth-}
+	int32 quoteIndex = itemName.Find(TEXT("\""));
+	if (quoteIndex != INDEX_NONE) {
+		itemName = itemName.Left(quoteIndex);
 	}
 
 	// If it's a potion
@@ -428,6 +436,11 @@ FString Adcss::itemNameToTextureName(FString name) {
 		itemName = itemName.Replace(TEXT("corpse"), TEXT(""));
 		itemName = itemName.Replace(TEXT("skeleton"), TEXT(""));
 		itemName = "Monster" + itemName;
+	}
+
+	// If it ends with s
+	if (!textures.Contains(itemName) && itemName.EndsWith(TEXT("s"))) {
+		itemName = itemName.Left(itemName.Len() - 1);
 	}
 
 	// Return the texture name
@@ -572,6 +585,7 @@ void Adcss::init() {
 	choiceNames.Empty();
 	choiceLetters.Empty();
 	isChoiceOpen = false;
+	choiceType = "default";
 	refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
 	spellLetters.Empty();
 	abilityLetters.Empty();
@@ -841,6 +855,61 @@ void Adcss::init() {
 		textures.Add(TEXT("Unknown"), nullptr);
 	}
 
+	// Items locs depending on the number of items
+	float startingHeight = 0.25f * floorWidth;
+	float extraHeightPer = 0.25f * floorWidth;
+	itemLocs.Empty();
+	itemLocs.Add(1, { 
+		FVector(0.0f, 0.0f, startingHeight) 
+	});
+	itemLocs.Add(2, {
+		FVector(-0.25f * floorWidth, 0.0f, startingHeight),
+		FVector(0.25f * floorWidth, 0.0f, startingHeight)
+	});
+	itemLocs.Add(3, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.0f, -0.25f * floorWidth, startingHeight)
+	});
+	itemLocs.Add(4, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight)
+	});
+	itemLocs.Add(5, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.0f, 0.0f, startingHeight)
+	});
+	itemLocs.Add(6, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, 0.0f, startingHeight),
+		FVector(0.25f * floorWidth, 0.0f, startingHeight)
+	});
+	
+	// Then for each number after that, stack
+	for (int k = 7; k < maxEnemies; k++) {
+		TArray<FVector> newLocs = itemLocs[6];
+		int remaining = k - 6;
+		int levelCount = 1;
+		while (remaining > 0) {
+			int thisLevel = FMath::Min(remaining, 6);
+			newLocs.Append(itemLocs[thisLevel]);
+			remaining -= thisLevel;
+			for (int l = newLocs.Num() - thisLevel; l < newLocs.Num(); l++) {
+				newLocs[l].Z += extraHeightPer * levelCount;
+			}
+			levelCount++;
+		}
+		itemLocs.Add(k, newLocs);
+	}
+
 	// Cache a blank line
 	whiteLine = "";
 	for (int j = 0; j < 80; j++) {
@@ -1024,7 +1093,7 @@ void Adcss::init() {
 		FActorSpawnParameters SpawnInfo;
 		SpawnInfo.Template = itemTemplate;
 		AActor* wall = GetWorld()->SpawnActor<AActor>(itemTemplate->GetClass(), SpawnInfo);
-		wall->SetActorScale3D(FVector(0.5f*wallScaling, 0.5f*wallScaling, 1.0f));
+		wall->SetActorScale3D(FVector(0.3f*wallScaling, 0.3f*wallScaling, 1.0f));
 		wall->SetActorHiddenInGame(true);
 		itemArray[i] = wall;
 		UStaticMeshComponent* mesh = wall->FindComponentByClass<UStaticMeshComponent>();
@@ -1136,6 +1205,8 @@ void Adcss::updateLevel() {
 				texture = getTexture("WaterDeep");
 			} else if (levelInfo[i][j].floorChar == TEXT("~")) {
 				texture = getTexture("WaterDeep");
+			} else {
+				texture = getTexture("Floor");
 			}
 			UMaterialInstanceDynamic* material = (UMaterialInstanceDynamic*)mesh->GetMaterial(0);
 			material->SetTextureParameterValue("TextureImage", texture);
@@ -1361,28 +1432,6 @@ void Adcss::updateLevel() {
 				material2 = (UMaterialInstanceDynamic*)wallMeshSouth->GetMaterial(0);
 				material2->SetTextureParameterValue("TextureImage", texture2);
 
-			// If it's an enemy
-			} else if (levelInfo[i][j].enemy.Len() > 0) {
-
-				// Add an enemy
-				if (enemyUseCount < maxEnemies) {
-
-					// Set up the enemy
-					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
-					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f));
-					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
-					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
-
-					// Set the texture
-					FString enemyName = levelInfo[i][j].enemy;
-					FString textureName = enemyNameToTextureName(enemyName);
-					UTexture2D* texture2 = getTexture(textureName);
-					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
-					material2->SetTextureParameterValue("TextureImage", texture2);
-					enemyUseCount++;
-
-				}
-
 			// If it's a plant
             } else if (ascii == TEXT("P") || ascii == TEXT("c") || ascii == TEXT("C")) {
 
@@ -1434,45 +1483,33 @@ void Adcss::updateLevel() {
 					enemyUseCount++;
 				}
 
-			// If it's an item
-			} else if (levelInfo[i][j].items.Num() > 0) {
+			}
 
-				// Items locs depending on the number of items
-				TMap<int, TArray<FVector2D>> itemLocs;
-				itemLocs.Add(1, { 
-					FVector2D(0.0f, 0.0f) 
-				});
-				itemLocs.Add(2, {
-					FVector2D(-0.25f * floorWidth, 0.0f),
-					FVector2D(0.25f * floorWidth, 0.0f)
-				});
-				itemLocs.Add(3, {
-					FVector2D(-0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(0.0f, -0.25f * floorWidth)
-				});
-				itemLocs.Add(4, {
-					FVector2D(-0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(-0.25f * floorWidth, -0.25f * floorWidth),
-					FVector2D(0.25f * floorWidth, -0.25f * floorWidth)
-				});
-				itemLocs.Add(5, {
-					FVector2D(-0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(-0.25f * floorWidth, -0.25f * floorWidth),
-					FVector2D(0.25f * floorWidth, -0.25f * floorWidth),
-					FVector2D(0.0f, 0.0f)
-				});
-				itemLocs.Add(6, {
-					FVector2D(-0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(0.25f * floorWidth, 0.25f * floorWidth),
-					FVector2D(-0.25f * floorWidth, -0.25f * floorWidth),
-					FVector2D(0.25f * floorWidth, -0.25f * floorWidth),
-					FVector2D(-0.25f * floorWidth, 0.0f),
-					FVector2D(0.25f * floorWidth, 0.0f)
-				});
-				int maxItemsPerTile = 6;
+			// If it's an enemy
+			if (levelInfo[i][j].enemy.Len() > 0) {
+
+				// Add an enemy
+				if (enemyUseCount < maxEnemies) {
+
+					// Set up the enemy
+					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
+					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f));
+					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
+					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
+
+					// Set the texture
+					FString enemyName = levelInfo[i][j].enemy;
+					FString textureName = enemyNameToTextureName(enemyName);
+					UTexture2D* texture2 = getTexture(textureName);
+					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
+					material2->SetTextureParameterValue("TextureImage", texture2);
+					enemyUseCount++;
+
+				}
+			}
+
+			// If it's an item
+			if (levelInfo[i][j].items.Num() > 0) {
 
 				// Add each item
 				for (int k = 0; k < levelInfo[i][j].items.Num(); k++) {
@@ -1481,8 +1518,8 @@ void Adcss::updateLevel() {
 
 						// Setup the item
 						itemArray[itemUseCount]->SetActorHiddenInGame(false);
-						FVector2D itemDelta = itemLocs[levelInfo[i][j].items.Num()][k % maxItemsPerTile];
-						itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, floorWidth / 4.0f));
+						FVector itemDelta = itemLocs[levelInfo[i][j].items.Num()][k];
+						itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, itemDelta.Z));
 						UStaticMeshComponent* itemMesh = itemArray[itemUseCount]->FindComponentByClass<UStaticMeshComponent>();
 						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, "Item", k));
 
@@ -1516,6 +1553,7 @@ void Adcss::updateLevel() {
 
 					}
 				}
+
 			}
 
 		}
@@ -1743,6 +1781,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (choiceIndex >= 0 && choiceIndex < choiceLetters.Num() && choiceIndex < choiceNames.Num() && choiceNames[choiceIndex].Len() > 0) {
 				UE_LOG(LogTemp, Display, TEXT("Writing choice: %s"), *choiceLetters[choiceIndex]);
 				writeCommandQueued(choiceLetters[choiceIndex]);
+				if (choiceType == "aquirement") {
+					writeCommandQueued("y");
+					writeCommandQueued("ctrl-X");
+					writeCommandQueued("escape");
+				} else {
+					writeCommandQueued("enter");
+				}
 			}
 
 		// Change page buttons
@@ -2583,6 +2628,49 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		if (selected.x == -1 && selected.y == -1 && selected.thingIs == TEXT("Inventory") && inventoryOpen) {
 			draggingInventory = true;
 
+		// If right clicking on one of the choice slots
+		} else if (selected.thingIs.Contains(TEXT("ButtonOption")) && isChoiceOpen) {
+
+			// Get the index and make sure it's valid
+			FString choiceIndex = selected.thingIs.Replace(TEXT("ButtonOption"), TEXT(""));
+			int choiceNum = FCString::Atoi(*choiceIndex)-1;
+			if (choiceNum >= 0 && choiceNum < choiceLetters.Num() && choiceNum < choiceNames.Num()) {
+				FString letter = choiceLetters[choiceNum];
+
+				// If it's an aquirement
+				if (choiceType == "aquirement") {
+
+					// Write the commands
+					writeCommandQueued("!");
+					writeCommandQueued(letter);
+					writeCommandQueued(">");
+					writeCommandQueued("escape");
+					writeCommandQueued("!");
+					thingBeingDragged = SelectedThing(-1, -1, "Choice", choiceNum);
+
+					// Show the description
+					currentDescription = TEXT("");
+					currentUsage = TEXT("");
+					UWidgetComponent* WidgetComponentDesc = Cast<UWidgetComponent>(refToDescriptionActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+					if (WidgetComponentDesc != nullptr) {
+						UUserWidget* UserWidgetDesc = WidgetComponentDesc->GetUserWidgetObject();
+						if (UserWidgetDesc != nullptr) {
+							UTextBlock* TextBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Description")));
+							if (TextBox != nullptr) {
+								TextBox->SetText(FText::FromString(currentDescription));
+							}
+							UTextBlock* UsageBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Usage")));
+							if (UsageBox != nullptr) {
+								UsageBox->SetText(FText::FromString(currentUsage));
+							}
+						}
+					}
+					refToDescriptionActor->SetActorHiddenInGame(false);
+
+				}
+
+			}
+
 		// If right clicking on one of the equipped slots
 		} else if (selected.thingIs.Contains(TEXT("EquippedButton")) && inventoryOpen) {
 
@@ -3030,7 +3118,47 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		thingBeingDragged = SelectedThing();
 
 	} else if (key == "debug") {
-		writeCommandQueued("ctrl-X");
+
+		// show everything
+		// writeCommandQueued("ctrl-X");
+
+		// level up
+		// writeCommandQueued("&");
+		// writeCommandQueued("x");
+		// writeCommandQueued("enter");
+
+		// all scrolls TODO
+		TArray<FString> scrollNames = {
+			"acquirement",
+			"amnesia",
+			"blinking",
+			"brand weapon",
+			"butterflies",
+			"enchant armour",
+			"enchant weapon",
+			"fear",
+			"fog",
+			"identify",
+			"immolation",
+			"noise",
+			"poison",
+			"revelation",
+			"silence",
+			"summoning",
+			"teleportation",
+			"torment",
+			"vulnerability"
+		};
+		for (int i = 0; i < scrollNames.Num(); i++) {
+			writeCommandQueued("&");
+			writeCommandQueued("o");
+			writeCommandQueued("?");
+			for (int j = 0; j < 3; j++) {
+				writeCommandQueued(scrollNames[i].Mid(j, 1));
+			}
+			writeCommandQueued("enter");
+		}
+
 	} else {
 		writeCommandQueued(key);
 	}
@@ -3801,6 +3929,11 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 
+			// If we need to press enter to read the rest
+			if (extracted.Contains(TEXT("--more--"))) {
+				writeCommandQueued(TEXT("enter"));
+			}
+
 			// Extract the level ascii
 			extracted.ParseIntoArray(charArray, TEXT("\n"), true);
 			for (int i = 0; i < charArray.Num(); i++) {
@@ -4294,7 +4427,7 @@ void Adcss::Tick(float DeltaTime) {
 						|| charArray[i].Contains(TEXT("indicates the spell")) 
 						|| charArray[i].Contains(TEXT("prefixes")) 
 						|| charArray[i].Contains(TEXT("(i)nscribe")) 
-						|| charArray[i].Contains(TEXT("{")) 
+						|| (charArray[i].Contains(TEXT("{")) && i > 1) 
 						|| charArray[i].Contains(TEXT("(g)o")) 
 						|| charArray[i].Contains(TEXT("sum of A"))) {
 						continue;
@@ -4506,29 +4639,40 @@ void Adcss::Tick(float DeltaTime) {
 			// You have a choice of weapons.                                                   
 			//  a - rapier                        (+1 apt)                                     
 			//  b - flail                         (+2 apt)                                     
-			//  c - war axe                       (+2 apt)                                     
-			//  d - trident                       (+2 apt)                                     
-			//  e - long sword                    (+2 apt)                                     
-			//  f - unarmed                       (+1 apt)                                     
 			// + - Recommended random choice  * - Random weapon                                
 			// % - List aptitudes             Bksp - Return to character menu                  
-			// ? - Help                                                          
+			// ? - Help                                         
+			// Choose an item to acquire.                                                      
+			//  a - the +1 hat of Waymoroh {Dex+7}                                             
+			//  b - a staff of death                                                           
+			//  c - the ring of the Butterfly {Ice Fly rN+++ Str-5 Slay-5}                     
+			//  d - 842 gold pieces (you have 0 gold)                                          
+			// [!] acquire|examine items  [a-d] select item for acquirement         [Esc] exit                  
 			bool isChoice = false;
+			FString choiceTitle = "";
+			choiceType = "default";
 			for (int i = 0; i < charArray.Num(); i++) {
-				if (charArray[i].Contains(TEXT("You have a choice of"))) {
+				if (charArray[i].Contains(TEXT("You have a choice of")) 
+				|| charArray[i].Contains(TEXT("Choose an item to acquire"))) {
 					isChoice = true;
+					choiceTitle = charArray[i].TrimStartAndEnd();
+					if (choiceTitle.Contains(TEXT("to acquire"))) {
+						choiceType = "aquirement";
+					}
 					break;
 				}
 			}
 			if (isChoice) {
 				choiceLetters.Empty();
 				choiceNames.Empty();
+				isChoiceOpen = true;
 				for (int i = 0; i < charArray.Num(); i++) {
 					if (charArray[i].Contains(TEXT(" - "))) {
 
 						// Skip some lines
 						if (charArray[i].Contains(TEXT("random choice")) 
 							|| charArray[i].Contains(TEXT("Help"))
+							|| charArray[i].Contains(TEXT("[!]"))
 							|| charArray[i].Contains(TEXT("List aptitudes"))) {
 							continue;
 						}
@@ -4548,11 +4692,57 @@ void Adcss::Tick(float DeltaTime) {
 					}
 				}
 
-				// Set all the options
+			}
+
+			// If we have a level up attribute choice
+			bool isAttributeChoice = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("experience leads to an increase"))) {
+					bool hasAlreadyChosen = false;
+					for (int j = i; j < charArray.Num(); j++) {
+						if (charArray[j].Contains(TEXT("You feel"))) {
+							hasAlreadyChosen = true;
+							break;
+						}
+					}
+					if (!hasAlreadyChosen) {
+						isAttributeChoice = true;
+					}
+					break;
+				}
+			}
+			if (isAttributeChoice) {
+				UE_LOG(LogTemp, Display, TEXT("Found attribute choice"));
+				choiceLetters.Empty();
+				choiceNames.Empty();
+				choiceLetters.Add(TEXT("S"));
+				choiceNames.Add(TEXT("Strength"));
+				choiceLetters.Add(TEXT("I"));
+				choiceNames.Add(TEXT("Intelligence"));
+				choiceLetters.Add(TEXT("D"));
+				choiceNames.Add(TEXT("Dexterity"));
+				choiceTitle = TEXT("Choose an attribute to increase:");
+				isChoiceOpen = true;				
+			}
+
+			// Otherwise hide the window and reset
+			if (isChoiceOpen && !isChoice && !isAttributeChoice && !isItemOrEnemy) {
+				choiceLetters.Empty();
+				choiceNames.Empty();
+				isChoiceOpen = false;
+				refToChoiceActor->SetActorHiddenInGame(!isChoiceOpen);
+				refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
+
+			// If we should show the choice window
+			} else if (isChoiceOpen && (isChoice || isAttributeChoice)) { 
+
+				// Set up the window
 				UWidgetComponent* WidgetComponentChoice = Cast<UWidgetComponent>(refToChoiceActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 				if (WidgetComponentChoice != nullptr) {
 					UUserWidget* UserWidgetChoice = WidgetComponentChoice->GetUserWidgetObject();
 					if (UserWidgetChoice != nullptr) {
+
+						// Set all the options
 						for (int i = 0; i < 7; i++) {
 							FString name = TEXT("TextOption") + FString::FromInt(i+1);
 							UTextBlock* TextBox = Cast<UTextBlock>(UserWidgetChoice->GetWidgetFromName(*name));
@@ -4563,7 +4753,30 @@ void Adcss::Tick(float DeltaTime) {
 									TextBox->SetText(FText::FromString(TEXT("")));
 								}
 							}
+							FString imageName = name.Replace(TEXT("TextOption"), TEXT("ImageOption"));
+							UImage* ButtonImage = Cast<UImage>(UserWidgetChoice->GetWidgetFromName(*imageName));
+							if (ButtonImage != nullptr) {
+								if (i < choiceLetters.Num()) {
+									FString matName = itemNameToTextureName(choiceNames[i]);
+									UTexture2D* tex2D = getTexture(matName);
+									if (tex2D != nullptr) {
+										ButtonImage->SetBrushFromTexture(tex2D);
+										ButtonImage->SetVisibility(ESlateVisibility::Visible);
+									} else {
+										ButtonImage->SetVisibility(ESlateVisibility::Hidden);
+									}
+								} else {
+									ButtonImage->SetVisibility(ESlateVisibility::Hidden);
+								}
+							}
 						}
+
+						// Set the title
+						UTextBlock* TitleBox = Cast<UTextBlock>(UserWidgetChoice->GetWidgetFromName(TEXT("TextOptionTitle")));
+						if (TitleBox != nullptr) {
+							TitleBox->SetText(FText::FromString(choiceTitle));
+						}
+
 					}
 				}
 				
@@ -4572,13 +4785,6 @@ void Adcss::Tick(float DeltaTime) {
 				refToChoiceActor->SetActorHiddenInGame(!isChoiceOpen);
 				refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
 
-			// Otherwise hide the window and reset
-			} else if (isChoiceOpen) {
-				choiceLetters.Empty();
-				choiceNames.Empty();
-				isChoiceOpen = false;
-				refToChoiceActor->SetActorHiddenInGame(!isChoiceOpen);
-				refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
 			}
 
 			// If it's the ctrl-X menu
@@ -4623,9 +4829,6 @@ void Adcss::Tick(float DeltaTime) {
 						charArray[i] = charArray[i].Replace(TEXT("( )"), TEXT("()"));
 						TArray<FString> words;
 						charArray[i].ParseIntoArray(words, TEXT(" "), true);
-						for (int j = 0; j < words.Num(); j++) {
-							UE_LOG(LogTemp, Display, TEXT(" -> %s"), *words[j]);
-						}
 						FString hotkey = words[0];
 						FString xString = words[3].Replace(TEXT("("), TEXT("")).Replace(TEXT(","), TEXT(""));
 						FString yString = words[4].Replace(TEXT(")"), TEXT(""));
@@ -4754,6 +4957,7 @@ void Adcss::Tick(float DeltaTime) {
 					leftText = leftText.TrimStartAndEnd();
 					rightText = rightText.TrimStartAndEnd();
 					statusText = statusText.TrimEnd();
+					statusText = statusText.Replace(TEXT("===MENU==="), TEXT(""));
 					rightText = rightText.Mid(3);
 					UE_LOG(LogTemp, Display, TEXT(" left line -> %s"), *leftText);
 					UE_LOG(LogTemp, Display, TEXT(" right line -> %s"), *rightText);
