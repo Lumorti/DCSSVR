@@ -139,6 +139,7 @@ TArray<FString> choiceNames;
 TArray<FString> choiceLetters;
 bool isChoiceOpen;
 FString choiceType;
+bool waitingForChoice;
 
 // Music/audio stuff
 int trackInd;
@@ -509,6 +510,7 @@ void Adcss::init() {
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
 	exePath = binaryPath + TEXT("crawl.exe");
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
+	// args += TEXT(" -extra-opt-first bad_item_prompt=false ");
 	// args += TEXT(" -extra-opt-first monster_item_view_features+=tree ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=water ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=here ");
@@ -582,6 +584,7 @@ void Adcss::init() {
 	commandQueue.Empty();
 	lastCommandTime = 0.0;
 	inventoryOpen = true;
+	waitingForChoice = false;
 	choiceNames.Empty();
 	choiceLetters.Empty();
 	isChoiceOpen = false;
@@ -1961,7 +1964,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				useType = "t";
 			} else if (currentDescription.Contains(TEXT("(weapon)"))) {
 				useType = "u";
-			} else if (currentDescription.Contains(TEXT(" scroll "))) {
+			} else if (currentDescription.Contains(TEXT(" scroll "))) { // TODO
 				useType = "r";
 			} else if (currentDescription.Contains(TEXT(" potion "))) {
 				useType = "q";
@@ -3265,6 +3268,19 @@ void Adcss::Tick(float DeltaTime) {
 	FVector playerForward = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetActorForwardVector();
 	FVector playerRight = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorRightVector();
 	FVector playerUp = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorUpVector();
+	FVector playerForwardProjected = FVector(playerForward.X, playerForward.Y, 0.0f);
+	playerForwardProjected.Normalize();
+
+	// Keep the pop up following the player's head 
+	if (isChoiceOpen) {
+		FVector choiceLocation = playerLocation + playerForwardProjected * 150.0f;
+		refToChoiceActor->SetActorLocation(choiceLocation);
+		FRotator choiceRotation = playerForward.Rotation();
+		choiceRotation.Pitch = 0.0f;
+		choiceRotation.Yaw += 180.0f;
+		choiceRotation.Roll = 0.0f;
+		refToChoiceActor->SetActorRotation(choiceRotation);
+	}
 
 	// Keep the description panel following the player rotation
 	if (rmbOn) {
@@ -3839,12 +3855,34 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 
-	// Do an instruction from the queue
-	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===")) {
-		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
-		FString command = commandQueue[0];
-		commandQueue.RemoveAt(0);
-		writeCommand(command);
+	// If we're waiting for a choice, don't process commands outside of said choice TODO
+	if (waitingForChoice) {
+
+		// Search for a valid choice letter in the command list
+		for (int i = 0; i < commandQueue.Num(); i++) {
+			if (commandQueue[i].Len() == 1 && choiceLetters.Contains(commandQueue[i])) {
+				UE_LOG(LogTemp, Display, TEXT("Found valid choice letter: %s"), *commandQueue[i]);
+				writeCommand(commandQueue[i]);
+				commandQueue.RemoveAt(i);
+				waitingForChoice = false;
+				break;
+			}
+		} 
+		 
+	} else {
+
+		// Do an instruction from the queue
+		if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===")) {
+			UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
+			FString command = commandQueue[0];
+			if (command == TEXT("WAITCHOICE")) {
+				waitingForChoice = true;
+			} else {
+				commandQueue.RemoveAt(0);
+				writeCommand(command);
+			}
+		}
+
 	}
 
 	// Turn all enemy planes towards the player
@@ -4653,7 +4691,8 @@ void Adcss::Tick(float DeltaTime) {
 			choiceType = "default";
 			for (int i = 0; i < charArray.Num(); i++) {
 				if (charArray[i].Contains(TEXT("You have a choice of")) 
-				|| charArray[i].Contains(TEXT("Choose an item to acquire"))) {
+				|| charArray[i].Contains(TEXT("Choose an item to acquire"))
+				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
 					choiceTitle = charArray[i].TrimStartAndEnd();
 					if (choiceTitle.Contains(TEXT("to acquire"))) {
