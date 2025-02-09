@@ -4,14 +4,16 @@
 // TODO
 //
 // 0.1 Initial Release
-// - map tab
-// - forget a spell pop up
 // - death screen
+// - all scrolls
+// - all potions
 // - different walls for different branches
 // - report bug button
+// - menu settings
 // - enable VR
 //
 // 0.2 First update, hopefully filled with community suggestions
+// - map?
 // - footstep/attacking/casting/monster sounds
 // - nearest stairs indicator
 // - find/search
@@ -133,6 +135,8 @@ TArray<TArray<FString>> inventoryLocToLetter;
 bool inventoryOpen;
 bool shouldRedrawInventory;
 FIntVector2 inventoryNextSpot;
+TMap<FString, FString> inventoryLetterToNamePrev;
+int gold;
 
 // For choices
 TArray<FString> choiceNames;
@@ -251,6 +255,15 @@ void Adcss::saveEverything() {
 		return;
 	}
 
+	// Same for the global
+	if (saveGameGlobal == nullptr) {
+		saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::CreateSaveGameObject(UDCSSSaveGame::StaticClass()));
+	}
+	if (saveGameGlobal == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Save game global is null"));
+		return;
+	}
+
 	// The inventory letters
 	saveGame->inventoryLetterToName = inventoryLetterToName;
 
@@ -273,14 +286,15 @@ void Adcss::saveEverything() {
 	// The music volume
 	UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
 	if (musicComponent != nullptr) {
-		saveGame->musicVolume = musicComponent->VolumeMultiplier;
+		saveGameGlobal->musicVolume = musicComponent->VolumeMultiplier;
 	}
 
 	// The music track
-	saveGame->trackInd = trackInd;
+	saveGameGlobal->trackInd = trackInd;
 
-	// Actually save the file
+	// Actually save the files
 	UGameplayStatics::SaveGameToSlot(saveGame, saveFile, 0);
+	UGameplayStatics::SaveGameToSlot(saveGameGlobal, TEXT("globalsavefile"), 0);
 
 }
 
@@ -288,77 +302,87 @@ void Adcss::saveEverything() {
 void Adcss::loadEverything() {
 	UE_LOG(LogTemp, Display, TEXT("Loading everything"));
 
-	// Load the inventory letters
-	inventoryLetterToName = saveGame->inventoryLetterToName;
+	// Make sure the save file is set
+	if (saveGame != nullptr) {
 
-	// Load the inventory locations
-	inventoryLocToLetter.Empty();
-	if (saveGame->inventoryLocToLetter.Num() == 6 * 9) {
-		for (int i = 0; i < 6; i++) {
-			TArray<FString> row;
-			for (int j = 0; j < 9; j++) {
-				row.Add(saveGame->inventoryLocToLetter[i * 9 + j]);
+		// Load the inventory letters
+		inventoryLetterToName = saveGame->inventoryLetterToName;
+
+		// Load the inventory locations
+		inventoryLocToLetter.Empty();
+		if (saveGame->inventoryLocToLetter.Num() == 6 * 9) {
+			for (int i = 0; i < 6; i++) {
+				TArray<FString> row;
+				for (int j = 0; j < 9; j++) {
+					row.Add(saveGame->inventoryLocToLetter[i * 9 + j]);
+				}
+				inventoryLocToLetter.Add(row);
 			}
-			inventoryLocToLetter.Add(row);
+		} else {
+			inventoryLocToLetter.SetNum(6);
+			for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+				inventoryLocToLetter[i].SetNum(9);
+			}
 		}
-	} else {
-		inventoryLocToLetter.SetNum(6);
-		for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
-			inventoryLocToLetter[i].SetNum(9);
+
+		// Load the hotbar info
+		hotbarInfos.Empty();
+		if (saveGame->hotbarInfos.Num() == numHotbarSlots * 3) {
+			for (int i = 0; i < numHotbarSlots; i++) {
+				HotbarInfo info;
+				info.letter = saveGame->hotbarInfos[i * 3];
+				info.name = saveGame->hotbarInfos[i * 3 + 1];
+				info.type = saveGame->hotbarInfos[i * 3 + 2];
+				hotbarInfos.Add(info);
+			}
+		} else {
+			for (int i = 0; i < numHotbarSlots; i++) {
+				hotbarInfos.Add(HotbarInfo());
+			}
 		}
+
 	}
 
-	// Load the hotbar info
-	hotbarInfos.Empty();
-	if (saveGame->hotbarInfos.Num() == numHotbarSlots * 3) {
-		for (int i = 0; i < numHotbarSlots; i++) {
-			HotbarInfo info;
-			info.letter = saveGame->hotbarInfos[i * 3];
-			info.name = saveGame->hotbarInfos[i * 3 + 1];
-			info.type = saveGame->hotbarInfos[i * 3 + 2];
-			hotbarInfos.Add(info);
-		}
-	} else {
-		for (int i = 0; i < numHotbarSlots; i++) {
-			hotbarInfos.Add(HotbarInfo());
-		}
-	}
+	// MAke sure the global file is set (it should always be, but just in case)
+	if (saveGameGlobal != nullptr) {
 
-	// Load the music volume
-	UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
-	if (musicComponent != nullptr) {
-		float currentVolume = saveGame->musicVolume;
-		currentVolume = FMath::Clamp(currentVolume, 0.0f, 1.0f);
-		musicComponent->SetVolumeMultiplier(currentVolume);
-		UE_LOG(LogTemp, Display, TEXT("Volume set to %f"), currentVolume);
+		// Load the music volume
+		UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
+		if (musicComponent != nullptr) {
+			float currentVolume = saveGameGlobal->musicVolume;
+			currentVolume = FMath::Clamp(currentVolume, 0.0f, 1.0f);
+			musicComponent->SetVolumeMultiplier(currentVolume);
+			UE_LOG(LogTemp, Display, TEXT("Volume set to %f"), currentVolume);
+			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			if (WidgetComponent != nullptr) {
+				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+				if (UserWidget != nullptr) {
+					UTextBlock* VolumeText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMusicVolume")));
+					if (VolumeText != nullptr) {
+						int asPercent = FMath::RoundToInt(currentVolume*100.0);
+						VolumeText->SetText(FText::FromString("Music: " + FString::FromInt(asPercent) + "%"));
+					}
+				}
+			}
+		}
+
+		// Load the track index
+		trackInd = saveGameGlobal->trackInd;
 		UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 		if (WidgetComponent != nullptr) {
 			UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
 			if (UserWidget != nullptr) {
-				UTextBlock* VolumeText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMusicVolume")));
-				if (VolumeText != nullptr) {
-					int asPercent = FMath::RoundToInt(currentVolume*100.0);
-					VolumeText->SetText(FText::FromString("Music: " + FString::FromInt(asPercent) + "%"));
+				UTextBlock* TrackText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextTrack")));
+				if (TrackText != nullptr) {
+					TrackText->SetText(FText::FromString("Track: " + musicListNames[trackInd]));
 				}
 			}
 		}
-	}
-
-	// Load the track index
-	trackInd = saveGame->trackInd;
-	UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-	if (WidgetComponent != nullptr) {
-		UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
-		if (UserWidget != nullptr) {
-			UTextBlock* TrackText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextTrack")));
-			if (TrackText != nullptr) {
-				TrackText->SetText(FText::FromString("Track: " + musicListNames[trackInd]));
-			}
+		trackInd = FMath::Clamp(trackInd, 0, musicList.Num() - 1);
+		if (musicComponent != nullptr) {
+			musicComponent->SetSound(musicList[trackInd]);
 		}
-	}
-	trackInd = FMath::Clamp(trackInd, 0, musicList.Num() - 1);
-	if (musicComponent != nullptr) {
-		musicComponent->SetSound(musicList[trackInd]);
+
 	}
 
 	// Output the sizes
@@ -374,9 +398,6 @@ FString Adcss::itemNameToTextureName(FString name) {
 	// Determine the actual name of the item
 	FString itemName = name;
 	itemName = itemName.Replace(TEXT("The"), TEXT(""));
-	itemName = itemName.Replace(TEXT("(here)"), TEXT(""));
-	itemName = itemName.Replace(TEXT("(weapon)"), TEXT(""));
-	itemName = itemName.Replace(TEXT("(worn)"), TEXT(""));
 	int32 labelledIndex = itemName.Find(TEXT("labelled"));
 	if (labelledIndex != INDEX_NONE) {
 		itemName = itemName.Left(labelledIndex);
@@ -391,10 +412,18 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("+7 "), TEXT(""));
 	itemName = itemName.Replace(TEXT("+8 "), TEXT(""));
 	itemName = itemName.Replace(TEXT("+9 "), TEXT(""));
-	itemName = itemName.Replace(TEXT("(apt)"), TEXT(""));
 	int32 commaIndex = itemName.Find(TEXT(","));
 	if (commaIndex != INDEX_NONE) {
 		itemName = itemName.Left(commaIndex);
+	}
+	itemName = itemName.Replace(TEXT("-"), TEXT(" "));
+
+	// Remove any text in brackets using Regex
+	FRegexPattern pattern(TEXT("\\(.*?\\)"));
+	FRegexMatcher matcher(pattern, itemName);
+	while (matcher.FindNext()) {
+		itemName = itemName.Replace(*matcher.GetCaptureGroup(0), TEXT(""));
+		matcher = FRegexMatcher(pattern, itemName);
 	}
 
 	// Deal with brands e.g. dagger of venom
@@ -510,7 +539,7 @@ void Adcss::init() {
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
 	exePath = binaryPath + TEXT("crawl.exe");
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
-	// args += TEXT(" -extra-opt-first bad_item_prompt=false ");
+	args += TEXT(" -extra-opt-first bad_item_prompt=false ");
 	// args += TEXT(" -extra-opt-first monster_item_view_features+=tree ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=water ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=here ");
@@ -554,6 +583,7 @@ void Adcss::init() {
 	numHotbarSlots = 5;
 	thingBeingDragged = selected;
 	buttonConfirming = -1;
+	gold = -1;
 	spellLevels = 0;
 	currentDescription = TEXT("");
 	currentUsage = TEXT("");
@@ -573,6 +603,7 @@ void Adcss::init() {
 	inventoryGrabPoint = FVector(0.0f, 0.0f, 0.0f);
 	inventoryLetterToName = TMap<FString, FString>();
 	inventoryLocToLetter = TArray<TArray<FString>>();
+	inventoryLetterToNamePrev = TMap<FString, FString>();
 	inventoryLocToLetter.SetNum(6);
 	for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 		inventoryLocToLetter[i].SetNum(9);
@@ -858,61 +889,6 @@ void Adcss::init() {
 		textures.Add(TEXT("Unknown"), nullptr);
 	}
 
-	// Items locs depending on the number of items
-	float startingHeight = 0.25f * floorWidth;
-	float extraHeightPer = 0.25f * floorWidth;
-	itemLocs.Empty();
-	itemLocs.Add(1, { 
-		FVector(0.0f, 0.0f, startingHeight) 
-	});
-	itemLocs.Add(2, {
-		FVector(-0.25f * floorWidth, 0.0f, startingHeight),
-		FVector(0.25f * floorWidth, 0.0f, startingHeight)
-	});
-	itemLocs.Add(3, {
-		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(0.0f, -0.25f * floorWidth, startingHeight)
-	});
-	itemLocs.Add(4, {
-		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
-		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight)
-	});
-	itemLocs.Add(5, {
-		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
-		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
-		FVector(0.0f, 0.0f, startingHeight)
-	});
-	itemLocs.Add(6, {
-		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
-		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
-		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
-		FVector(-0.25f * floorWidth, 0.0f, startingHeight),
-		FVector(0.25f * floorWidth, 0.0f, startingHeight)
-	});
-	
-	// Then for each number after that, stack
-	for (int k = 7; k < maxEnemies; k++) {
-		TArray<FVector> newLocs = itemLocs[6];
-		int remaining = k - 6;
-		int levelCount = 1;
-		while (remaining > 0) {
-			int thisLevel = FMath::Min(remaining, 6);
-			newLocs.Append(itemLocs[thisLevel]);
-			remaining -= thisLevel;
-			for (int l = newLocs.Num() - thisLevel; l < newLocs.Num(); l++) {
-				newLocs[l].Z += extraHeightPer * levelCount;
-			}
-			levelCount++;
-		}
-		itemLocs.Add(k, newLocs);
-	}
-
 	// Cache a blank line
 	whiteLine = "";
 	for (int j = 0; j < 80; j++) {
@@ -1122,6 +1098,70 @@ void Adcss::init() {
 	refToNameActor->SetActorEnableCollision(false);
 	refToSaveActor->SetActorHiddenInGame(true);
 	refToSaveActor->SetActorEnableCollision(false);
+
+	// Load the global save game
+	saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot("globalsavefile", 0));
+	if (saveGameGlobal == nullptr) {
+		UE_LOG(LogTemp, Display, TEXT("Global save file not found, creating"));
+		saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::CreateSaveGameObject(UDCSSSaveGame::StaticClass()));
+		saveEverything();
+	}
+	loadEverything();
+
+	// Items locs depending on the number of items
+	float startingHeight = 0.25f * floorWidth;
+	float extraHeightPer = 0.25f * floorWidth;
+	itemLocs.Empty();
+	itemLocs.Add(1, { 
+		FVector(0.0f, 0.0f, startingHeight) 
+	});
+	itemLocs.Add(2, {
+		FVector(-0.25f * floorWidth, 0.0f, startingHeight),
+		FVector(0.25f * floorWidth, 0.0f, startingHeight)
+	});
+	itemLocs.Add(3, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.0f, -0.25f * floorWidth, startingHeight)
+	});
+	itemLocs.Add(4, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight)
+	});
+	itemLocs.Add(5, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.0f, 0.0f, startingHeight)
+	});
+	itemLocs.Add(6, {
+		FVector(-0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, 0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(0.25f * floorWidth, -0.25f * floorWidth, startingHeight),
+		FVector(-0.25f * floorWidth, 0.0f, startingHeight),
+		FVector(0.25f * floorWidth, 0.0f, startingHeight)
+	});
+
+	// Then for each number after that, stack
+	for (int k = 7; k < maxEnemies; k++) {
+		TArray<FVector> newLocs = itemLocs[6];
+		int remaining = k - 6;
+		int levelCount = 1;
+		while (remaining > 0) {
+			int thisLevel = FMath::Min(remaining, 6);
+			newLocs.Append(itemLocs[thisLevel]);
+			remaining -= thisLevel;
+			for (int l = newLocs.Num() - thisLevel; l < newLocs.Num(); l++) {
+				newLocs[l].Z += extraHeightPer * levelCount;
+			}
+			levelCount++;
+		}
+		itemLocs.Add(k, newLocs);
+	}
 
 }
 
@@ -1728,13 +1768,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 	} else if (key == "shiftoff") {
 		shiftOn = false;
 	} else if (key == "lmb") {
-		UE_LOG(LogTemp, Display, TEXT("Left mouse: (%d, %d) %s %d"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
-		UE_LOG(LogTemp, Display, TEXT("Thing being dragged: %s %d"), *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
+		UE_LOG(LogTemp, Display, TEXT("INPUT - Left mouse: (%d, %d) %s %d"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
+		UE_LOG(LogTemp, Display, TEXT("INPUT- Thing being dragged: %s %d"), *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
 
 		// Main menu button
 		if (selected.thingIs == "ButtonMainMenu") {
 			needMenu = true;
-			UE_LOG(LogTemp, Display, TEXT("Main menu button clicked"));
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu button clicked"));
 			writeCommandQueued("exit");
 			for (int i = 0; i < 20; i++) {
 				writeCommandQueued("up");
@@ -1748,7 +1788,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			inventoryOpen = false;
 
 			// Close the process
-			UE_LOG(LogTemp, Display, TEXT("Closing process"));
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
 			writeCommand("exit");
 			writeCommand("escape");
 			FPlatformProcess::Sleep(0.5);
@@ -1778,13 +1818,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 		// Choice button
 		} else if (selected.thingIs.Contains(TEXT("ButtonOption")) && isChoiceOpen) {
-			UE_LOG(LogTemp, Display, TEXT("Choice button clicked: %s"), *selected.thingIs);
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Choice button clicked: %s"), *selected.thingIs);
 			FString choiceName = selected.thingIs.Replace(TEXT("ButtonOption"), TEXT(""));
 			int choiceIndex = FCString::Atoi(*choiceName)-1;
 			if (choiceIndex >= 0 && choiceIndex < choiceLetters.Num() && choiceIndex < choiceNames.Num() && choiceNames[choiceIndex].Len() > 0) {
 				UE_LOG(LogTemp, Display, TEXT("Writing choice: %s"), *choiceLetters[choiceIndex]);
 				writeCommandQueued(choiceLetters[choiceIndex]);
-				if (choiceType == "aquirement") {
+				if (choiceType == "acquirement") {
 					writeCommandQueued("y");
 					writeCommandQueued("ctrl-X");
 					writeCommandQueued("escape");
@@ -1826,7 +1866,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 		// If it's a ladder
 		} else if (thingBeingDragged.thingIs.Contains(TEXT("Ladder")) || selected.thingIs.Contains(TEXT("Ladder"))) {
-			UE_LOG(LogTemp, Display, TEXT("Ladder clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Ladder clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
 			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
 				if (thingBeingDragged.thingIs.Contains(TEXT("Up"))) {
 					writeCommandQueued("<");
@@ -1839,7 +1879,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 		// Volume buttons
 		} else if (selected.thingIs.Contains(TEXT("ButtonMusicVolume"))) {
-			UE_LOG(LogTemp, Display, TEXT("Music volume button clicked: %s"), *selected.thingIs);
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Music volume button clicked: %s"), *selected.thingIs);
 
 			// Make sure the audio component exists
 			UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
@@ -1854,7 +1894,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 				currentVolume = FMath::Clamp(currentVolume, 0.0f, 1.0f);
 				musicComponent->SetVolumeMultiplier(currentVolume);
-				UE_LOG(LogTemp, Display, TEXT("Volume set to %f"), currentVolume);
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Volume set to %f"), currentVolume);
 
 				// Change the text (TextVolume)
 				UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
@@ -1876,7 +1916,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 		// Change track buttons
 		} else if (selected.thingIs.Contains(TEXT("ButtonTrack"))) {
-			UE_LOG(LogTemp, Display, TEXT("Music track button clicked: %s"), *selected.thingIs);
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Music track button clicked: %s"), *selected.thingIs);
 			UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
 
 			// Adjust the current track index
@@ -1971,15 +2011,25 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			} else if (currentDescription.Contains(TEXT(" ring "))) {
 				useType = "p";
 			}
-			UE_LOG(LogTemp, Display, TEXT("Using item %s with command %s"), *inventoryLetterToName[letter], *useType);
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Using item %s with command %s"), *inventoryLetterToName[letter], *useType);
 
 			// Use the item
+			// identify TODO
+			// amnesia TODO
 			writeCommandQueued("i");
 			writeCommandQueued(letter);
 			writeCommandQueued(useType);
+			if (useType == "r" && (itemName.Contains(TEXT(" of identify")) 
+			|| itemName.Contains(TEXT(" of brand weapon"))
+			|| itemName.Contains(TEXT(" of amnesia"))
+			|| itemName.Contains(TEXT(" of acquirement"))
+			|| itemName.Contains(TEXT(" of enchant weapon"))
+			|| itemName.Contains(TEXT(" of enchant armour")))) {
+				writeCommandQueued("WAITCHOICE");
+			}
 			writeCommandQueued("i");
-			writeCommandQueued(letter);
 			writeCommandQueued(">");
+			writeCommandQueued(letter);
 			writeCommandQueued("escape");
 			writeCommandQueued("escape");
 
@@ -2071,7 +2121,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Depending on the current tab
 			if (inventoryOpen) {
-				UE_LOG(LogTemp, Display, TEXT("Inventory opened, current UI: %s"), *currentUI);
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory opened, current UI: %s"), *currentUI);
 				if (currentUI == "inventory") {
 					selected.thingIs = "ButtonInventory";
 					keyPressed("lmb", FVector2D(0.0f, 0.0f));
@@ -2103,7 +2153,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (WidgetComponentMain != nullptr) {
 				UUserWidget* UserWidget = WidgetComponentMain->GetUserWidgetObject();
 				if (UserWidget != nullptr) {
-					UE_LOG(LogTemp, Display, TEXT("Main menu play clicked"));
+					UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu play clicked"));
 					refToSaveActor->SetActorHiddenInGame(false);
 					refToSaveActor->SetActorEnableCollision(true);
 					refToMainMenuActor->SetActorHiddenInGame(true);
@@ -2171,10 +2221,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						FString saveName = selected.thingIs.Replace(TEXT("ButtonSave"), TEXT(""));
 						int saveLoc = FCString::Atoi(*saveName)-1 + savesPage*6;
 						int saveIndex = saveLocToIndex[saveLoc];
-						UE_LOG(LogTemp, Display, TEXT("Save button clicked: %s"), *saveName);
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Save button clicked: %s"), *saveName);
 
 						// Send the commands
-						UE_LOG(LogTemp, Display, TEXT("Writing %i down commands"), 9+saveIndex);
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Writing %i down commands"), 9+saveIndex);
 						for (int i=0; i<9+saveIndex; i++) {
 							writeCommandQueued("down");
 						}
@@ -2187,10 +2237,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						saveFile = saveFile.Left(saveFile.Find(TEXT(","))).Replace(TEXT(" "), TEXT(""));
 						saveGame = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot(saveFile, 0));
 						if (saveGame != nullptr) {
-							UE_LOG(LogTemp, Display, TEXT("Save file found, loading: %s"), *saveFile);
+							UE_LOG(LogTemp, Display, TEXT("INPUT - Save file found, loading: %s"), *saveFile);
 							loadEverything();
 						} else {
-							UE_LOG(LogTemp, Display, TEXT("Save file not found, creating: %s"), *saveFile);
+							UE_LOG(LogTemp, Display, TEXT("INPUT - Save file not found, creating: %s"), *saveFile);
 							saveGame = Cast<UDCSSSaveGame>(UGameplayStatics::CreateSaveGameObject(UDCSSSaveGame::StaticClass()));
 							saveEverything();
 						}
@@ -2218,11 +2268,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							if (buttonConfirming == buttonLoc) {
 
 								// Remove the file if it exists
-								UE_LOG(LogTemp, Display, TEXT("Delete button clicked: %i"), saveLoc);
+								UE_LOG(LogTemp, Display, TEXT("INPUT - Delete button clicked: %i"), saveLoc);
 								FString saveFileToDelete = saveNames[saveLoc];
 								saveFileToDelete = saveFileToDelete.Left(saveFileToDelete.Find(TEXT(","))).Replace(TEXT(" "), TEXT(""));
 								FString savePath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\saves\\")) + saveFileToDelete + TEXT(".cs");
-								UE_LOG(LogTemp, Display, TEXT("Attempting to delete save file: %s"), *savePath);
+								UE_LOG(LogTemp, Display, TEXT("INPUT - Attempting to delete save file: %s"), *savePath);
 								if(savePath.Len() > 0) {
 									if (FPaths::ValidatePath(savePath) && FPaths::FileExists(savePath)) {
 										UE_LOG(LogTemp, Display, TEXT("Deleting save file: %s"), *savePath);
@@ -2250,7 +2300,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 								if (tex2D != nullptr) {
 									ButtonImage->SetBrushFromTexture(tex2D);
 								} else {
-									UE_LOG(LogTemp, Warning, TEXT("Couldn't find texture for confirmation"));
+									UE_LOG(LogTemp, Warning, TEXT("INPUT - Couldn't find texture for confirmation"));
 								}
 
 							}
@@ -2284,7 +2334,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 								// Get the name
 								FString backgroundName = selected.thingIs.Replace(TEXT("ButtonBackground"), TEXT(""));
-								UE_LOG(LogTemp, Display, TEXT("Background button clicked: %s"), *backgroundName);
+								UE_LOG(LogTemp, Display, TEXT("INPUT - Background button clicked: %s"), *backgroundName);
 								currentBackground = backgroundName;
 
 								// Add the spaces back in
@@ -2335,7 +2385,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 								// Get the name
 								FString speciesName = selected.thingIs.Replace(TEXT("ButtonSpecies"), TEXT(""));
-								UE_LOG(LogTemp, Display, TEXT("Species button clicked: %s"), *speciesName);
+								UE_LOG(LogTemp, Display, TEXT("INPUT - Species button clicked: %s"), *speciesName);
 								currentSpecies = speciesName;
 
 								// Add the spaces back in
@@ -2372,7 +2422,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 					// For each of the buttons
 					if (selected.thingIs == "ButtonCharBack") {
-						UE_LOG(LogTemp, Display, TEXT("Char back button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Char back button clicked"));
 						refToBackgroundActor->SetActorHiddenInGame(true);
 						refToBackgroundActor->SetActorEnableCollision(false);
 						refToSpeciesActor->SetActorHiddenInGame(true);
@@ -2435,8 +2485,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 					// For each of the top buttons
 					if (selected.thingIs == "ButtonInventory") {
-						UE_LOG(LogTemp, Display, TEXT("Inventory button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory button clicked"));
 						writeCommandQueued("i");
+						writeCommandQueued(">");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
 						if (WidgetSwitcher != nullptr) {
@@ -2444,7 +2495,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							currentUI = "inventory";
 						}
 					} else if (selected.thingIs == "ButtonSpells") {
-						UE_LOG(LogTemp, Display, TEXT("Spells button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Spells button clicked"));
 						writeCommandQueued("I");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
@@ -2465,7 +2516,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 
 					} else if (selected.thingIs == "ButtonAbilities") {
-						UE_LOG(LogTemp, Display, TEXT("Abilities button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Abilities button clicked"));
 						writeCommandQueued("a");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
@@ -2474,7 +2525,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							currentUI = "abilities";
 						}
 					} else if (selected.thingIs == "ButtonSkills") {
-						UE_LOG(LogTemp, Display, TEXT("Skills button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Skills button clicked"));
 						writeCommandQueued("m");
 						writeCommandQueued("*");
 						writeCommandQueued("escape");
@@ -2488,7 +2539,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							SpellLevelText->SetVisibility(ESlateVisibility::Hidden);
 						}
 					} else if (selected.thingIs == "ButtonCharacter") {
-						UE_LOG(LogTemp, Display, TEXT("Character button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Character button clicked"));
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
 						if (WidgetSwitcher != nullptr) {
 							WidgetSwitcher->SetActiveWidgetIndex(4);
@@ -2511,7 +2562,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							}
 						}
 					} else if (selected.thingIs == "ButtonMenu") {
-						UE_LOG(LogTemp, Display, TEXT("Menu button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Menu button clicked"));
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
 						if (WidgetSwitcher != nullptr) {
 							WidgetSwitcher->SetActiveWidgetIndex(5);
@@ -2519,7 +2570,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 					// The sub-buttons in the character menu
 					} else if (selected.thingIs == "ButtonOverview") {
-						UE_LOG(LogTemp, Display, TEXT("Overview button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Overview button clicked"));
 						writeCommandQueued("%");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherCharacter")));
@@ -2528,7 +2579,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							currentUI = "overview";
 						}
 					} else if (selected.thingIs == "ButtonPassive") {
-						UE_LOG(LogTemp, Display, TEXT("Passives button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Passives button clicked"));
 						writeCommandQueued("A");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherCharacter")));
@@ -2537,7 +2588,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							currentUI = "passives";
 						} 
 					} else if (selected.thingIs == "ButtonReligion") {
-						UE_LOG(LogTemp, Display, TEXT("Religion button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Religion button clicked"));
 						writeCommandQueued("^");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherCharacter")));
@@ -2548,7 +2599,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 					// If swapping to/from memorize
 					} else if (selected.thingIs == "ButtonMemorize") {
-						UE_LOG(LogTemp, Display, TEXT("Memorize button clicked"));
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Memorize button clicked"));
 						memorizing = !memorizing;
 
 						// Depending on the mode, write the command
@@ -2582,7 +2633,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 					// The skill buttons
 					} else if (selected.thingIs.Contains(TEXT("ButtonSkill"))) {
-						UE_LOG(LogTemp, Display, TEXT("Skill button %s clicked"), *selected.thingIs);
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Skill button %s clicked"), *selected.thingIs);
 						FString skillName = selected.thingIs.Replace(TEXT("ButtonSkill"), TEXT(""));
 						if (skillNameToInfo.Contains(skillName)) {
 							FString letter = skillNameToInfo[skillName].letter;
@@ -2591,7 +2642,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							writeCommandQueued(letter);
 							writeCommandQueued("escape");
 						} else {
-							UE_LOG(LogTemp, Warning, TEXT("Skill name not found: %s"), *skillName);
+							UE_LOG(LogTemp, Warning, TEXT("INPUT - Skill name not found: %s"), *skillName);
 						}
 					}
 
@@ -2624,7 +2675,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		}
 
 	} else if (key == "rmb") {
-		UE_LOG(LogTemp, Display, TEXT("Right click: (%d, %d) %s %d"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
+		UE_LOG(LogTemp, Display, TEXT("INPUT - Right click: (%d, %d) %s %d"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
 		rmbOn = true;
 
 		// If dragging the inventory panel
@@ -2640,8 +2691,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (choiceNum >= 0 && choiceNum < choiceLetters.Num() && choiceNum < choiceNames.Num()) {
 				FString letter = choiceLetters[choiceNum];
 
-				// If it's an aquirement
-				if (choiceType == "aquirement") {
+				// If it's an acquirement
+				if (choiceType == "acquirement") {
 
 					// Write the commands
 					writeCommandQueued("!");
@@ -2912,7 +2963,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// If it's not an empty slot
 			if (inventoryLocToLetter[row][col].Len() > 0) {
 				thingBeingDragged = SelectedThing(col, row, "InventoryItem", 0);
-				UE_LOG(LogTemp, Display, TEXT("Thing being dragged: (%d, %d) %s %d"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Thing being dragged: (%d, %d) %s %d"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
 
 				// Send the commands to get the description
 				writeCommandQueued("i");
@@ -3014,13 +3065,14 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 	} else if (key == "rmbUp") {
 
 		// If we're holding an item and are looking at the ground
-		UE_LOG(LogTemp, Display, TEXT("Right click released: (%d, %d) %s %d"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
+		UE_LOG(LogTemp, Display, TEXT("INPUT - Right click released: (%d, %d) %s %d"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
 		if (selected.x == 8 && selected.y == 8 && thingBeingDragged.thingIs == "InventoryItem" && thingBeingDragged.x != -1 && thingBeingDragged.y != -1) {
 			UE_LOG(LogTemp, Display, TEXT("Dropping item"));
 			writeCommandQueued("d");
 			writeCommandQueued(inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x]);
 			writeCommandQueued("enter");
 			writeCommandQueued("i");
+			writeCommandQueued(">");
 			writeCommandQueued("escape");
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued("escape");
@@ -3033,6 +3085,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex]);
 			writeCommandQueued("g");
 			writeCommandQueued("i");
+			writeCommandQueued(">");
 			writeCommandQueued("escape");
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued("escape");
@@ -3052,7 +3105,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// If the name is different
 			if (!rightText.Contains(inventoryLetterToName[letter])) {
-				UE_LOG(LogTemp, Display, TEXT("Equipping item via drag onto equip slot %s"), *inventoryLetterToName[letter]);
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Equipping item via drag onto equip slot %s"), *inventoryLetterToName[letter]);
 
 				// Try to equip it
 				writeCommandQueued("w");
@@ -3060,6 +3113,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 				// Refresh the inventory
 				writeCommandQueued("i");
+				writeCommandQueued(">");
 				writeCommandQueued("escape");
 
 			}
@@ -3156,7 +3210,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("&");
 			writeCommandQueued("o");
 			writeCommandQueued("?");
-			for (int j = 0; j < 3; j++) {
+			for (int j = 0; j < scrollNames[i].Len(); j++) {
 				writeCommandQueued(scrollNames[i].Mid(j, 1));
 			}
 			writeCommandQueued("enter");
@@ -3346,6 +3400,12 @@ void Adcss::Tick(float DeltaTime) {
 						}
 
 					}
+				}
+
+				// Redraw the gold
+				UTextBlock* GoldText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextGold")));
+				if (GoldText != nullptr) {
+					GoldText->SetText(FText::FromString(FString::FromInt(gold)));
 				}
 
 			}
@@ -3862,9 +3922,12 @@ void Adcss::Tick(float DeltaTime) {
 		for (int i = 0; i < commandQueue.Num(); i++) {
 			if (commandQueue[i].Len() == 1 && choiceLetters.Contains(commandQueue[i])) {
 				UE_LOG(LogTemp, Display, TEXT("Found valid choice letter: %s"), *commandQueue[i]);
-				writeCommand(commandQueue[i]);
-				commandQueue.RemoveAt(i);
 				waitingForChoice = false;
+				writeCommand(commandQueue[i]);
+				commandQueue.RemoveAt(0, i+1);
+				writeCommandQueued(TEXT("i"));
+				writeCommandQueued(TEXT(">"));
+				writeCommandQueued(TEXT("escape"));
 				break;
 			}
 		} 
@@ -3878,9 +3941,9 @@ void Adcss::Tick(float DeltaTime) {
 			if (command == TEXT("WAITCHOICE")) {
 				waitingForChoice = true;
 			} else {
-				commandQueue.RemoveAt(0);
 				writeCommand(command);
 			}
+			commandQueue.RemoveAt(0);
 		}
 
 	}
@@ -3970,6 +4033,11 @@ void Adcss::Tick(float DeltaTime) {
 			// If we need to press enter to read the rest
 			if (extracted.Contains(TEXT("--more--"))) {
 				writeCommandQueued(TEXT("enter"));
+			}
+
+			// If we don't know how much gold we have
+			if (gold == -1) {
+				writeCommandQueued(TEXT("$"));
 			}
 
 			// Extract the level ascii
@@ -4074,6 +4142,29 @@ void Adcss::Tick(float DeltaTime) {
 					}
 				}
 
+			}
+
+			// If we have a scroll of amnesia and read isn't an option TODO
+			if (waitingForChoice || commandQueue.Contains(TEXT("WAITCHOICE"))) {
+				bool isIdentify = false;
+				for (int i = 0; i < charArray.Num(); i++) {
+					if (charArray[i].Contains(TEXT("Reading this right now will have no effect:"))) {
+						isIdentify = true;
+						break;
+					}
+				}
+
+				// Remove the wait command
+				if (isIdentify) {
+					for (int i = 0; i < commandQueue.Num(); i++) {
+						if (commandQueue[i] == TEXT("WAITCHOICE")) {
+							commandQueue.RemoveAt(i);
+							break;
+						}
+					}
+					writeCommandQueued(TEXT("escape"));
+					writeCommandQueued(TEXT("escape"));
+				}
 			}
 
 			// If it's the spell memorize list
@@ -4440,11 +4531,10 @@ void Adcss::Tick(float DeltaTime) {
 				FString toAdd = TEXT("");
 				for (int i = 0; i < charArray.Num(); i++) {
 
-					// If it's a starting line, reset the description
-					// if (charArray[i].Contains(TEXT(" - "))) {
-					// 	currentDescription = TEXT("");
-					// 	UE_LOG(LogTemp, Display, TEXT("Resetting description"));
-					// }
+					// If the first line is a blank line, skip it
+					if (i == 0 && charArray[i].TrimStartAndEnd().Len() == 0) {
+						continue;
+					}
 
 					// Determine the type of thing
 					if (charArray[i].Contains(TEXT("Threat:"))) {
@@ -4534,7 +4624,10 @@ void Adcss::Tick(float DeltaTime) {
 				FRegexPattern pattern(TEXT("\n[ \t]*\n[ \t]*\n"));
 				FRegexMatcher matcher(pattern, *currentDescription);
 				while (matcher.FindNext()) {
-					currentDescription = currentDescription.Left(matcher.GetMatchBeginning()) + currentDescription.Mid(matcher.GetMatchEnding()-1);
+					int groupStart = matcher.GetMatchBeginning();
+					int groupEnd = matcher.GetMatchEnding()-1;
+					currentDescription = currentDescription.Left(groupStart) + currentDescription.Mid(groupEnd);
+					matcher = FRegexMatcher(pattern, *currentDescription);
 				}
 
 				// Set the usage based on the type of object
@@ -4609,11 +4702,17 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 			if (isInventory) {
-				UE_LOG(LogTemp, Display, TEXT("Inventory menu:"));
-				TMap<FString, FString> inventoryLetterToNamePrev = inventoryLetterToName;
-				inventoryLetterToName.Empty();
+
+				// Process the inventory lines
+				inventoryLetterToNamePrev = inventoryLetterToName; 
+				int numBlankLines = 0;
 				for (int i = 0; i < charArray.Num(); i++) {
-					UE_LOG(LogTemp, Display, TEXT(" -> %s"), *charArray[i]);
+					UE_LOG(LogTemp, Display, TEXT("INVENTORY -> %s"), *charArray[i]);
+
+					// If it's a blank line
+					if (charArray[i].TrimStartAndEnd().Len() == 0) {
+						numBlankLines++;
+					}
 
 					// If it's a line with an item
 					if (charArray[i].Contains(TEXT(" - "))) {
@@ -4624,11 +4723,12 @@ void Adcss::Tick(float DeltaTime) {
 						for (int j = 2; j < words.Num(); j++) {
 							description += words[j] + TEXT(" ");
 						}
-						UE_LOG(LogTemp, Display, TEXT("Added to inventory: {%s} %s"), *hotkey, *description);
+						UE_LOG(LogTemp, Display, TEXT("INVENTORY - Added to inventory: {%s} %s"), *hotkey, *description);
 						inventoryLetterToName.Add(hotkey, description);
 						if (!inventoryLetterToNamePrev.Contains(hotkey)) {
 							if (inventoryNextSpot.X != -1 && inventoryNextSpot.Y != -1) {
 								inventoryLocToLetter[inventoryNextSpot.X][inventoryNextSpot.Y] = hotkey;
+								UE_LOG(LogTemp, Display, TEXT("INVENTORY - put %s at specific loc (%d, %d)"), *hotkey, inventoryNextSpot.X, inventoryNextSpot.Y);
 								inventoryNextSpot = FIntVector2(-1, -1);
 							} else {
 								bool added = false;
@@ -4636,7 +4736,7 @@ void Adcss::Tick(float DeltaTime) {
 									for (int k = 0; k < inventoryLocToLetter[j].Num(); k++) {
 										if (inventoryLocToLetter[j][k] == TEXT("")) {
 											inventoryLocToLetter[j][k] = hotkey;
-											UE_LOG(LogTemp, Display, TEXT("Added to inventory: %s at loc (%d, %d)"), *hotkey, j, k);
+											UE_LOG(LogTemp, Display, TEXT("INVENTORY - put %s at loc (%d, %d)"), *hotkey, j, k);
 											added = true;
 											break;
 										}
@@ -4650,25 +4750,57 @@ void Adcss::Tick(float DeltaTime) {
 						shouldRedrawInventory = true;
 					}
 				}
+				inventoryLetterToNamePrev = inventoryLetterToName;
 
-				// Make sure all of locs to letter are valid
-				for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
-					for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
-						if (!inventoryLetterToName.Contains(inventoryLocToLetter[i][j])) {
-							inventoryLocToLetter[i][j] = TEXT("");
+				// If we have at least two blank lines, we have finished reading the inv
+				if (numBlankLines >= 2) {
+
+					// Make sure all of locs to letter are valid
+					for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+							if (!inventoryLetterToName.Contains(inventoryLocToLetter[i][j])) {
+								inventoryLocToLetter[i][j] = TEXT("");
+							}
 						}
 					}
-				}
 
-				// Make sure all the hotbar slots are valid
-				for (int i = 0; i < numHotbarSlots; i++) {
-					if (hotbarInfos[i].type == "InventoryItem") {
-						if (!inventoryLetterToName.Contains(hotbarInfos[i].letter)) {
-							hotbarInfos[i].name = TEXT("");
-							hotbarInfos[i].type = TEXT("");
-							hotbarInfos[i].letter = TEXT("");
+					// Make sure all the hotbar slots are valid
+					for (int i = 0; i < numHotbarSlots; i++) {
+						if (hotbarInfos[i].type == "InventoryItem") {
+							if (!inventoryLetterToName.Contains(hotbarInfos[i].letter)) {
+								hotbarInfos[i].name = TEXT("");
+								hotbarInfos[i].type = TEXT("");
+								hotbarInfos[i].letter = TEXT("");
+							}
 						}
 					}
+
+					// Make sure all the letter locs are unique
+					for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+							for (int k = 0; k < inventoryLocToLetter.Num(); k++) {
+								for (int l = 0; l < inventoryLocToLetter[k].Num(); l++) {
+									if (i != k || j != l) {
+										if (inventoryLocToLetter[i][j] == inventoryLocToLetter[k][l]) {
+											inventoryLocToLetter[k][l] = TEXT("");
+										}
+									}
+								}
+							}
+						}
+					}
+
+					// Remove any duplicates from the hotbar
+					for (int i = 0; i < numHotbarSlots; i++) {
+						for (int j = 0; j < numHotbarSlots; j++) {
+							if (i != j && hotbarInfos[i].letter == hotbarInfos[j].letter) {
+								hotbarInfos[j].name = TEXT("");
+								hotbarInfos[j].type = TEXT("");
+								hotbarInfos[j].letter = TEXT("");
+							}
+						}
+					}
+
 				}
 
 			}
@@ -4692,11 +4824,14 @@ void Adcss::Tick(float DeltaTime) {
 			for (int i = 0; i < charArray.Num(); i++) {
 				if (charArray[i].Contains(TEXT("You have a choice of")) 
 				|| charArray[i].Contains(TEXT("Choose an item to acquire"))
+				|| charArray[i].Contains(TEXT("Brand which weapon?"))
+				|| charArray[i].Contains(TEXT("Enchant which weapon?"))
+				|| charArray[i].Contains(TEXT("Enchant which item?"))
 				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
 					choiceTitle = charArray[i].TrimStartAndEnd();
 					if (choiceTitle.Contains(TEXT("to acquire"))) {
-						choiceType = "aquirement";
+						choiceType = "acquirement";
 					}
 					break;
 				}
@@ -4707,6 +4842,7 @@ void Adcss::Tick(float DeltaTime) {
 				isChoiceOpen = true;
 				for (int i = 0; i < charArray.Num(); i++) {
 					if (charArray[i].Contains(TEXT(" - "))) {
+						UE_LOG(LogTemp, Display, TEXT("CHOICE - Found choice: %s"), *charArray[i]);
 
 						// Skip some lines
 						if (charArray[i].Contains(TEXT("random choice")) 
@@ -4724,7 +4860,7 @@ void Adcss::Tick(float DeltaTime) {
 						for (int j = 2; j < words.Num(); j++) {
 							description += words[j] + TEXT(" ");
 						}
-						UE_LOG(LogTemp, Display, TEXT("Added choice: {%s} %s"), *hotkey, *description);
+						UE_LOG(LogTemp, Display, TEXT("CHOICE - Added choice: {%s} %s"), *hotkey, *description);
 						choiceLetters.Add(hotkey);
 						choiceNames.Add(description);
 
@@ -4846,7 +4982,6 @@ void Adcss::Tick(float DeltaTime) {
 				}
 
 				// Parse the full description
-				UE_LOG(LogTemp, Display, TEXT("Full description:"));
 				FString currentType = TEXT("Monsters");
 				for (int i = 0; i < charArray.Num(); i++) {
 
@@ -4864,7 +4999,7 @@ void Adcss::Tick(float DeltaTime) {
 						shouldRedraw = true;
 
 						// Extract the coordinates and description
-						UE_LOG(LogTemp, Display, TEXT("Thing: %s"), *charArray[i]);
+						UE_LOG(LogTemp, Display, TEXT("FULL -> %s"), *charArray[i]);
 						charArray[i] = charArray[i].Replace(TEXT("( )"), TEXT("()"));
 						TArray<FString> words;
 						charArray[i].ParseIntoArray(words, TEXT(" "), true);
@@ -4877,7 +5012,7 @@ void Adcss::Tick(float DeltaTime) {
 						for (int j = 5; j < words.Num(); j++) {
 							description += words[j] + TEXT(" ");
 						}
-						UE_LOG(LogTemp, Display, TEXT(" -> (%d, %d): %s (%s)"), xCoord, yCoord, *description, *currentType);
+						UE_LOG(LogTemp, Display, TEXT("FULL - parsed (%d, %d): %s (%s)"), xCoord, yCoord, *description, *currentType);
 
 						// Depending on the type, update the level info
 						if (xCoord >= 0 && xCoord < gridWidth && yCoord >= 0 && yCoord < gridWidth) {
@@ -4958,19 +5093,18 @@ void Adcss::Tick(float DeltaTime) {
 
 			// If the map is being shown, then it means we also have the status section
 			if (isMap) {
-				UE_LOG(LogTemp, Display, TEXT("Status section:"));
 				if (charArray.Num() >= 15) {
 
 					// Extract the name and thus the filename
 					FString nameLine = charArray[1].Mid(37);
 					saveFile = nameLine.Left(nameLine.Find(TEXT(" the "))).Replace(TEXT(" "), TEXT(""));
-					UE_LOG(LogTemp, Display, TEXT(" name line -> %s"), *nameLine);
-					UE_LOG(LogTemp, Display, TEXT(" setting save file -> %s"), *saveFile);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - name line -> %s"), *nameLine);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - setting save file -> %s"), *saveFile);
 
 					// Extract the health
 					FString healthLine = charArray[3].Mid(45);
 					healthLine = healthLine.Replace(TEXT("/"), TEXT(" "));
-					UE_LOG(LogTemp, Display, TEXT(" health line -> %s"), *healthLine);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - health line -> %s"), *healthLine);
 					TArray<FString> wordsHP;
 					healthLine.ParseIntoArray(wordsHP, TEXT(" "), true);
 					if (wordsHP.Num() >= 2) {
@@ -4980,7 +5114,7 @@ void Adcss::Tick(float DeltaTime) {
 
 					// Extract the mana
 					FString manaLine = charArray[4].Mid(45);
-					UE_LOG(LogTemp, Display, TEXT(" mana line -> %s"), *manaLine);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - mana line -> %s"), *manaLine);
 					manaLine = manaLine.Replace(TEXT("/"), TEXT(" "));
 					TArray<FString> wordsMP;
 					manaLine.ParseIntoArray(wordsMP, TEXT(" "), true);
@@ -4990,6 +5124,8 @@ void Adcss::Tick(float DeltaTime) {
 					}
 
 					// Extract the left/right/status lines
+					FString prevLeftText = leftText;
+					FString prevRightText = rightText;
 					leftText = charArray[11].Mid(36);
 					rightText = charArray[10].Mid(36);
 					statusText = charArray[12].Mid(37);
@@ -4998,9 +5134,12 @@ void Adcss::Tick(float DeltaTime) {
 					statusText = statusText.TrimEnd();
 					statusText = statusText.Replace(TEXT("===MENU==="), TEXT(""));
 					rightText = rightText.Mid(3);
-					UE_LOG(LogTemp, Display, TEXT(" left line -> %s"), *leftText);
-					UE_LOG(LogTemp, Display, TEXT(" right line -> %s"), *rightText);
-					UE_LOG(LogTemp, Display, TEXT(" status line -> %s"), *statusText);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - left line -> %s"), *leftText);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - right line -> %s"), *rightText);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - status line -> %s"), *statusText);
+					if (leftText != prevLeftText || rightText != prevRightText) {
+						shouldRedrawHotbar = true;
+					}
 
 				}
 
@@ -5008,7 +5147,6 @@ void Adcss::Tick(float DeltaTime) {
 
 			// If the map is being shown, then we also have the log
 			if (isMap) {
-				UE_LOG(LogTemp, Display, TEXT("Log section:"));
 				if (charArray.Num() >= 18) {
 					logText.Empty();
 					for (int i = 18; i < charArray.Num(); i++) {
@@ -5023,6 +5161,22 @@ void Adcss::Tick(float DeltaTime) {
 							if (newLine.Contains(TEXT("You are not religious"))) {
 								religionText = TEXT("You are not religious.");
 								shouldRedrawReligion = true;
+								continue;
+							}
+
+							// If told how much gold we have "You now have 899 gold pieces" TODO
+							if (newLine.Contains(TEXT("gold pieces")) && newLine.Contains(TEXT(" have"))) {
+								FString goldString = "";
+								for (int j = 0; j < newLine.Len(); j++) {
+									if (newLine[j] >= TEXT('0') && newLine[j] <= TEXT('9')) {
+										goldString += newLine[j];
+									}
+									if (newLine[j] == TEXT('(') && goldString.Len() > 0) {
+										break;
+									}
+								}
+								gold = FCString::Atoi(*goldString);
+								shouldRedrawInventory = true;
 								continue;
 							}
 
@@ -5060,7 +5214,7 @@ void Adcss::Tick(float DeltaTime) {
 								continue;
 							}
 
-							UE_LOG(LogTemp, Display, TEXT(" adding -> %s"), *newLine);
+							UE_LOG(LogTemp, Display, TEXT("LOG - adding: %s"), *newLine);
 							logText.Add(newLine);
 						}
 					}
@@ -5079,7 +5233,7 @@ void Adcss::Tick(float DeltaTime) {
 								}
 								LogBox->SetText(FText::FromString(toRender));
 							} else {
-								UE_LOG(LogTemp, Warning, TEXT("Log box not found"));
+								UE_LOG(LogTemp, Warning, TEXT("LOG - Log box not found"));
 							}
 						}
 					}

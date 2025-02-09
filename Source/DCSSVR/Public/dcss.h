@@ -110,6 +110,8 @@ public:
 	// Put here to stop nullptr errors
 	UPROPERTY(VisibleAnywhere, Category = Basic)
 	UDCSSSaveGame* saveGame;
+	UPROPERTY(VisibleAnywhere, Category = Basic)
+	UDCSSSaveGame* saveGameGlobal;
 
 	// Various functions
 	void updateLevel();
