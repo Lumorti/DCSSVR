@@ -108,6 +108,7 @@ bool shouldRedrawReligion;
 bool hasReturnedToMainMenu;
 FString saveFile;
 TMap<int, TArray<FVector>> itemLocs;
+bool justUsedAScroll;
 
 // Main menu stuff
 FString currentBackground;
@@ -137,13 +138,13 @@ bool shouldRedrawInventory;
 FIntVector2 inventoryNextSpot;
 TMap<FString, FString> inventoryLetterToNamePrev;
 int gold;
+FIntVector2 locForBlink;
 
 // For choices
 TArray<FString> choiceNames;
 TArray<FString> choiceLetters;
 bool isChoiceOpen;
 FString choiceType;
-bool waitingForChoice;
 
 // Music/audio stuff
 int trackInd;
@@ -417,6 +418,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 		itemName = itemName.Left(commaIndex);
 	}
 	itemName = itemName.Replace(TEXT("-"), TEXT(" "));
+	itemName = itemName.Replace(TEXT("glowing"), TEXT(""));
 
 	// Remove any text in brackets using Regex
 	FRegexPattern pattern(TEXT("\\(.*?\\)"));
@@ -572,9 +574,11 @@ void Adcss::init() {
 	thingsThatCountAsItems = "()|%[?O:/}!=\"";
 	shiftOn = false;
 	numProcessed = 0;
+	locForBlink = FIntVector2(-1, -1);
 	prevProcessed = 0;
 	isChecking = false;
 	epsilon = 10;
+	justUsedAScroll = false;
 	saveNames.Empty();
 	draggingInventory = false;
 	smallWallScaling = wallScaling / 2.0f;
@@ -615,7 +619,6 @@ void Adcss::init() {
 	commandQueue.Empty();
 	lastCommandTime = 0.0;
 	inventoryOpen = true;
-	waitingForChoice = false;
 	choiceNames.Empty();
 	choiceLetters.Empty();
 	isChoiceOpen = false;
@@ -2004,7 +2007,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				useType = "t";
 			} else if (currentDescription.Contains(TEXT("(weapon)"))) {
 				useType = "u";
-			} else if (currentDescription.Contains(TEXT(" scroll "))) { // TODO
+			} else if (currentDescription.Contains(TEXT(" scroll ")) || currentDescription.Contains(TEXT(" scrolls "))) {
 				useType = "r";
 			} else if (currentDescription.Contains(TEXT(" potion "))) {
 				useType = "q";
@@ -2014,24 +2017,22 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Using item %s with command %s"), *inventoryLetterToName[letter], *useType);
 
 			// Use the item
-			// identify TODO
-			// amnesia TODO
+			// blinking TODO
 			writeCommandQueued("i");
 			writeCommandQueued(letter);
 			writeCommandQueued(useType);
-			if (useType == "r" && (itemName.Contains(TEXT(" of identify")) 
-			|| itemName.Contains(TEXT(" of brand weapon"))
-			|| itemName.Contains(TEXT(" of amnesia"))
-			|| itemName.Contains(TEXT(" of acquirement"))
-			|| itemName.Contains(TEXT(" of enchant weapon"))
-			|| itemName.Contains(TEXT(" of enchant armour")))) {
-				writeCommandQueued("WAITCHOICE");
+			if (useType != "r") {
+				writeCommandQueued("i");
+				writeCommandQueued(">");
+				writeCommandQueued(letter);
+				writeCommandQueued("escape");
+				writeCommandQueued("escape");
+			} else {
+				justUsedAScroll = true;
+				locForBlink = FIntVector2(selected.x, selected.y);
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used a scroll"));
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Blink location: (%d, %d)"), locForBlink.X, locForBlink.Y);
 			}
-			writeCommandQueued("i");
-			writeCommandQueued(">");
-			writeCommandQueued(letter);
-			writeCommandQueued("escape");
-			writeCommandQueued("escape");
 
    			// Reset some things if we used the item
 			if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("")) {
@@ -3184,37 +3185,45 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// writeCommandQueued("x");
 		// writeCommandQueued("enter");
 
+		// forget everything
+		// writeCommandQueued("&");
+		// writeCommandQueued("I");
+
+		// identify everything
+		writeCommandQueued("&");
+		writeCommandQueued("i");
+
 		// all scrolls TODO
-		TArray<FString> scrollNames = {
-			"acquirement",
-			"amnesia",
-			"blinking",
-			"brand weapon",
-			"butterflies",
-			"enchant armour",
-			"enchant weapon",
-			"fear",
-			"fog",
-			"identify",
-			"immolation",
-			"noise",
-			"poison",
-			"revelation",
-			"silence",
-			"summoning",
-			"teleportation",
-			"torment",
-			"vulnerability"
-		};
-		for (int i = 0; i < scrollNames.Num(); i++) {
-			writeCommandQueued("&");
-			writeCommandQueued("o");
-			writeCommandQueued("?");
-			for (int j = 0; j < scrollNames[i].Len(); j++) {
-				writeCommandQueued(scrollNames[i].Mid(j, 1));
-			}
-			writeCommandQueued("enter");
-		}
+		// TArray<FString> scrollNames = {
+		// 	"acquirement",
+		// 	"amnesia",
+		// 	"blinking",
+		// 	"brand weapon",
+		// 	"butterflies",
+		// 	"enchant armour",
+		// 	"enchant weapon",
+		// 	"fear",
+		// 	"fog",
+		// 	"identify",
+		// 	"immolation",
+		// 	"noise",
+		// 	"poison",
+		// 	"revelation",
+		// 	"silence",
+		// 	"summoning",
+		// 	"teleportation",
+		// 	"torment",
+		// 	"vulnerability"
+		// };
+		// for (int i = 0; i < scrollNames.Num(); i++) {
+		// 	writeCommandQueued("&");
+		// 	writeCommandQueued("o");
+		// 	writeCommandQueued("?");
+		// 	for (int j = 0; j < scrollNames[i].Len(); j++) {
+		// 		writeCommandQueued(scrollNames[i].Mid(j, 1));
+		// 	}
+		// 	writeCommandQueued("enter");
+		// }
 
 	} else {
 		writeCommandQueued(key);
@@ -3915,37 +3924,12 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 
-	// If we're waiting for a choice, don't process commands outside of said choice TODO
-	if (waitingForChoice) {
-
-		// Search for a valid choice letter in the command list
-		for (int i = 0; i < commandQueue.Num(); i++) {
-			if (commandQueue[i].Len() == 1 && choiceLetters.Contains(commandQueue[i])) {
-				UE_LOG(LogTemp, Display, TEXT("Found valid choice letter: %s"), *commandQueue[i]);
-				waitingForChoice = false;
-				writeCommand(commandQueue[i]);
-				commandQueue.RemoveAt(0, i+1);
-				writeCommandQueued(TEXT("i"));
-				writeCommandQueued(TEXT(">"));
-				writeCommandQueued(TEXT("escape"));
-				break;
-			}
-		} 
-		 
-	} else {
-
-		// Do an instruction from the queue
-		if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===")) {
-			UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
-			FString command = commandQueue[0];
-			if (command == TEXT("WAITCHOICE")) {
-				waitingForChoice = true;
-			} else {
-				writeCommand(command);
-			}
-			commandQueue.RemoveAt(0);
-		}
-
+	// Do an instruction from the queue
+	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===")) {
+		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
+		FString command = commandQueue[0];
+		writeCommand(command);
+		commandQueue.RemoveAt(0);
 	}
 
 	// Turn all enemy planes towards the player
@@ -4144,27 +4128,69 @@ void Adcss::Tick(float DeltaTime) {
 
 			}
 
-			// If we have a scroll of amnesia and read isn't an option TODO
-			if (waitingForChoice || commandQueue.Contains(TEXT("WAITCHOICE"))) {
-				bool isIdentify = false;
+			// If we just used a scroll and it's asking us where to blink to TODO
+			if (locForBlink.X == -1 && locForBlink.Y == -1) {
+				bool isBlink = false;
 				for (int i = 0; i < charArray.Num(); i++) {
-					if (charArray[i].Contains(TEXT("Reading this right now will have no effect:"))) {
-						isIdentify = true;
+					if (charArray[i].Contains(TEXT("Blink to where?"))) {
+						isBlink = true;
 						break;
 					}
 				}
-
-				// Remove the wait command
-				if (isIdentify) {
-					for (int i = 0; i < commandQueue.Num(); i++) {
-						if (commandQueue[i] == TEXT("WAITCHOICE")) {
-							commandQueue.RemoveAt(i);
-							break;
+				if (isBlink) {
+					UE_LOG(LogTemp, Display, TEXT("Blinking to %d %d"), locForBlink.X, locForBlink.Y);
+					if (locForBlink.X > 0) {
+						for (int i = 0; i < locForBlink.X; i++) {
+							writeCommandQueued(TEXT("right"));
+						}
+					} else {
+						for (int i = 0; i < -locForBlink.X; i++) {
+							writeCommandQueued(TEXT("left"));
 						}
 					}
+					if (locForBlink.Y > 0) {
+						for (int i = 0; i < locForBlink.Y; i++) {
+							writeCommandQueued(TEXT("down"));
+						}
+					} else {
+						for (int i = 0; i < -locForBlink.Y; i++) {
+							writeCommandQueued(TEXT("up"));
+						}
+					}
+					writeCommandQueued(TEXT("enter"));
+					locForBlink = FIntVector2(-1, -1);
+				}
+			}
+
+			// If we have a scroll of amnesia and read isn't an option TODO
+			if (justUsedAScroll) {
+				bool cantRead = false;
+				for (int i = 0; i < charArray.Num(); i++) {
+					if (charArray[i].Contains(TEXT("Reading this right now will have no effect:"))) {
+						cantRead = true;
+						break;
+					}
+				}
+				if (cantRead) {
+					justUsedAScroll = false;
 					writeCommandQueued(TEXT("escape"));
 					writeCommandQueued(TEXT("escape"));
 				}
+			}
+
+			// When a scroll has finished TODO
+			bool scrollFinished = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("crumbles to dust"))) {
+					scrollFinished = true;
+					break;
+				}
+			}
+			if (scrollFinished && justUsedAScroll) {
+				writeCommandQueued("i");
+				writeCommandQueued(">");
+				writeCommandQueued("escape");
+				justUsedAScroll = false;
 			}
 
 			// If it's the spell memorize list
@@ -4543,7 +4569,7 @@ void Adcss::Tick(float DeltaTime) {
 						typeOfThing = TEXT("Spell");
 					} else if (charArray[i].Contains(TEXT("potion"))) {
 						typeOfThing = TEXT("Potion");
-					} else if (charArray[i].Contains(TEXT("To read a"))) {
+					} else if (charArray[i].Contains(TEXT("To read a")) || charArray[i].Contains(TEXT("disposable arcane formula"))) {
 						typeOfThing = TEXT("Scroll");
 					} else if (charArray[i].Contains(TEXT("trap."))) {
 						typeOfThing = TEXT("Trap");
@@ -4826,6 +4852,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Choose an item to acquire"))
 				|| charArray[i].Contains(TEXT("Brand which weapon?"))
 				|| charArray[i].Contains(TEXT("Enchant which weapon?"))
+				|| charArray[i].Contains(TEXT("Identify which item?"))
 				|| charArray[i].Contains(TEXT("Enchant which item?"))
 				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
@@ -5164,7 +5191,7 @@ void Adcss::Tick(float DeltaTime) {
 								continue;
 							}
 
-							// If told how much gold we have "You now have 899 gold pieces" TODO
+							// If told how much gold we have "You now have 899 gold pieces"
 							if (newLine.Contains(TEXT("gold pieces")) && newLine.Contains(TEXT(" have"))) {
 								FString goldString = "";
 								for (int j = 0; j < newLine.Len(); j++) {
