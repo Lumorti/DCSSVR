@@ -79,6 +79,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* wallTemplate;
 
+	// The references to the effect planes
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* effectTemplate;
+
 	// The references to the enemies/plants etc.
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* enemyTemplate;

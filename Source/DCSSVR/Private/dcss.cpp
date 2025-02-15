@@ -1,12 +1,11 @@
 #include "dcss.h"
 
-
 // TODO
 //
 // 0.1 Initial Release
-// - death screen
 // - all scrolls
 // - all potions
+// - death screen
 // - different walls for different branches
 // - report bug button
 // - menu settings
@@ -23,6 +22,7 @@
 int LOS;
 int gridWidth;
 int maxEnemies;
+int maxEffects;
 int maxItems;
 float wallScaling;
 float diagWallScaling;
@@ -56,6 +56,7 @@ struct TileInfo {
 	FString floorChar;
 	TArray<FString> items;
 	TArray<FString> itemHotkeys;
+	FString effect;
 	FString enemy;
 	FString enemyHotkey;
 };
@@ -80,10 +81,12 @@ TArray<TArray<TArray<AActor*>>> wallArray;
 TArray<TArray<AActor*>> floorArray;
 TArray<AActor*> enemyArray;
 TArray<AActor*> itemArray;
+TArray<AActor*> effectArray;
 float floorWidth;
 float floorHeight;
 float wallWidth;
 int enemyUseCount;
+int effectUseCount;
 int itemUseCount;
 TMap<FString, FString> enemyList;
 TArray<TTuple<int, int>> checkLocs;
@@ -542,8 +545,8 @@ void Adcss::init() {
 	exePath = binaryPath + TEXT("crawl.exe");
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
 	args += TEXT(" -extra-opt-first bad_item_prompt=false ");
-	// args += TEXT(" -extra-opt-first monster_item_view_features+=tree ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=water ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=cloud ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=here ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
@@ -561,9 +564,11 @@ void Adcss::init() {
 	LOS = 8;
 	maxLogShown = 6;
 	enemyUseCount = 0;
+	effectUseCount = 0;
 	itemUseCount = 0;
 	gridWidth = 2 * LOS + 1;
 	maxEnemies = 30;
+	maxEffects = 30;
 	maxItems = 30;
 	wallScaling = 4.0f;
 	hasBeenWelcomed = false;
@@ -965,6 +970,7 @@ void Adcss::init() {
 			levelInfo[i][j].floorChar = TEXT(".");
 			levelInfo[i][j].items.Empty();
 			levelInfo[i][j].itemHotkeys.Empty();
+			levelInfo[i][j].effect = TEXT("");
 			levelInfo[i][j].enemy = TEXT("");
 			levelInfo[i][j].enemyHotkey = TEXT("");
 		}
@@ -1083,6 +1089,21 @@ void Adcss::init() {
 		mesh->SetMaterial(0, dynamicMaterial);
 	}
 
+	// Spawn the effect planes
+	effectArray.Empty();
+	effectArray.SetNum(maxEffects);
+	for (int i = 0; i < maxEffects; i++) {
+		FActorSpawnParameters SpawnInfo;
+		SpawnInfo.Template = effectTemplate;
+		AActor* wall = GetWorld()->SpawnActor<AActor>(effectTemplate->GetClass(), SpawnInfo);
+		wall->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
+		wall->SetActorHiddenInGame(true);
+		effectArray[i] = wall;
+		UStaticMeshComponent* mesh = wall->FindComponentByClass<UStaticMeshComponent>();
+		UMaterialInstanceDynamic* dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
+		mesh->SetMaterial(0, dynamicMaterial);
+	}
+
 	// Clear the check locations
 	checkLocs.Empty();
 	UE_LOG(LogTemp, Display, TEXT("Num check locs: %d"), checkLocs.Num());
@@ -1188,6 +1209,11 @@ void Adcss::updateLevel() {
 		itemArray[i]->SetActorHiddenInGame(true);
 		itemArray[i]->SetActorLocation(FVector(-1000.0f, -1000.0f, -1000.0f));
 	}
+	effectUseCount = 0;
+	for (int i = 0; i < maxEffects; i++) {
+		effectArray[i]->SetActorHiddenInGame(true);
+		effectArray[i]->SetActorLocation(FVector(-1000.0f, -1000.0f, -1000.0f));
+	}
 
 	// For debugging, output the whole level info
 	UE_LOG(LogTemp, Display, TEXT("Current chars:"));
@@ -1224,6 +1250,7 @@ void Adcss::updateLevel() {
 			}
 		}
 	}
+	UE_LOG(LogTemp, Display, TEXT("Effect: %s"), *levelInfo[0][0].effect);
 
 	// For each tile in the level
 	for (int i = 0; i < levelInfo.Num(); i++) {
@@ -1258,6 +1285,34 @@ void Adcss::updateLevel() {
 			material->SetTextureParameterValue("TextureImage", texture);
 			floor->SetActorHiddenInGame(false);
 			meshNameToThing.Add(floor->GetName(), SelectedThing(j, i, "Floor", 0));
+
+			// If we have an effect
+			if (levelInfo[i][j].effect.Len() > 0) {
+			
+				// Create the effect
+				if (enemyUseCount < maxEnemies) {
+
+					// Set up the effect
+					effectArray[effectUseCount]->SetActorHiddenInGame(false);
+					effectArray[effectUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f));
+					UStaticMeshComponent* effectMesh = effectArray[effectUseCount]->FindComponentByClass<UStaticMeshComponent>();
+					meshNameToThing.Add(effectArray[effectUseCount]->GetName(), SelectedThing(j, i, "Effect", 0));
+
+					// Set the texture
+					FString effect = levelInfo[i][j].effect;
+					FString textureName = itemNameToTextureName(effect);
+					UTexture2D* texture2 = getTexture(textureName);
+					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)effectMesh->GetMaterial(0);
+					material2->SetTextureParameterValue("TextureImage", texture2);
+					material2->SetScalarParameterValue("Transparency", 0.2f);
+					effectUseCount++;
+
+					// No collision
+					effectArray[effectUseCount]->SetActorEnableCollision(false);
+
+				}
+
+			}
 
 			// If the ascii character is a wall
 			if (ascii == TEXT("#")) {
@@ -1552,6 +1607,7 @@ void Adcss::updateLevel() {
 					enemyUseCount++;
 
 				}
+
 			}
 
 			// If it's an item
@@ -2017,7 +2073,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Using item %s with command %s"), *inventoryLetterToName[letter], *useType);
 
 			// Use the item
-			// blinking TODO
 			writeCommandQueued("i");
 			writeCommandQueued(letter);
 			writeCommandQueued(useType);
@@ -3023,7 +3078,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			refToDescriptionActor->SetActorHiddenInGame(false);
 
 		// Describing something
-		} else if (selected.x != -1 && selected.y != -1 && selected.thingIs != TEXT("Floor")) {
+		} else if (selected.x != -1 && selected.y != -1 && selected.thingIs != TEXT("Floor") && selected.thingIs != TEXT("Effect")) {
 
 			// Send the commands to get the description
 			if (selected.thingIs == "Enemy") {
@@ -3178,7 +3233,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 	} else if (key == "debug") {
 
 		// show everything
-		// writeCommandQueued("ctrl-X");
+		writeCommandQueued("ctrl-X");
 
 		// level up
 		// writeCommandQueued("&");
@@ -3190,8 +3245,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// writeCommandQueued("I");
 
 		// identify everything
-		writeCommandQueued("&");
-		writeCommandQueued("i");
+		// writeCommandQueued("&");
+		// writeCommandQueued("i");
 
 		// all scrolls TODO
 		// TArray<FString> scrollNames = {
@@ -3247,6 +3302,12 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 	floorArray[LOS][LOS]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(true);
+
+	// If the current scroll is a blink or unknown, we should show the targeting
+	bool isBlinkOrUnknown = false;
+	if (currentDescription.Contains(TEXT("blink")) || currentDescription.Contains(TEXT("disposable arcane formula"))) {
+		isBlinkOrUnknown = true;
+	}
 	
 	// Checking what the player is looking at
 	FVector Start = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetCameraLocation();
@@ -3273,7 +3334,7 @@ void Adcss::Tick(float DeltaTime) {
 					}
 
 					// Highlight it
-					if (!rmbOn) {
+					if (!rmbOn || isBlinkOrUnknown) {
 						hitMesh->SetRenderCustomDepth(true);
 
 					// Or spell targeting
@@ -3960,6 +4021,16 @@ void Adcss::Tick(float DeltaTime) {
 
 	}
 
+	// Turn all effect planes towards the player
+	for (int i = 0; i < effectUseCount; i++) {
+		FVector effectLocation = effectArray[i]->GetActorLocation();
+		FRotator newRotation = (playerLocation - effectLocation).Rotation();
+		newRotation.Pitch = 0.0f;
+		newRotation.Yaw += -90.0f;
+		newRotation.Roll = 90.0f;
+		effectArray[i]->SetActorRotation(newRotation);
+	}
+
 	// Continuously read from the pipe
 	FString outText = FPlatformProcess::ReadPipe(StdOutReadHandle);
 	if (needMenu) {
@@ -4128,8 +4199,8 @@ void Adcss::Tick(float DeltaTime) {
 
 			}
 
-			// If we just used a scroll and it's asking us where to blink to TODO
-			if (locForBlink.X == -1 && locForBlink.Y == -1) {
+			// If we just used a scroll and it's asking us where to blink to
+			if (locForBlink.X != -1 && locForBlink.Y != -1) {
 				bool isBlink = false;
 				for (int i = 0; i < charArray.Num(); i++) {
 					if (charArray[i].Contains(TEXT("Blink to where?"))) {
@@ -4137,23 +4208,24 @@ void Adcss::Tick(float DeltaTime) {
 						break;
 					}
 				}
+				UE_LOG(LogTemp, Display, TEXT("Is blink: %d"), isBlink);
 				if (isBlink) {
 					UE_LOG(LogTemp, Display, TEXT("Blinking to %d %d"), locForBlink.X, locForBlink.Y);
-					if (locForBlink.X > 0) {
-						for (int i = 0; i < locForBlink.X; i++) {
+					if (locForBlink.X > LOS) {
+						for (int i = 0; i < locForBlink.X-LOS; i++) {
 							writeCommandQueued(TEXT("right"));
 						}
 					} else {
-						for (int i = 0; i < -locForBlink.X; i++) {
+						for (int i = 0; i < LOS-locForBlink.X; i++) {
 							writeCommandQueued(TEXT("left"));
 						}
 					}
-					if (locForBlink.Y > 0) {
-						for (int i = 0; i < locForBlink.Y; i++) {
+					if (locForBlink.Y > LOS) {
+						for (int i = 0; i < locForBlink.Y-LOS; i++) {
 							writeCommandQueued(TEXT("down"));
 						}
 					} else {
-						for (int i = 0; i < -locForBlink.Y; i++) {
+						for (int i = 0; i < LOS-locForBlink.Y; i++) {
 							writeCommandQueued(TEXT("up"));
 						}
 					}
@@ -4162,7 +4234,7 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 
-			// If we have a scroll of amnesia and read isn't an option TODO
+			// If we have a scroll of amnesia and read isn't an option
 			if (justUsedAScroll) {
 				bool cantRead = false;
 				for (int i = 0; i < charArray.Num(); i++) {
@@ -4178,7 +4250,7 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 
-			// When a scroll has finished TODO
+			// When a scroll has finished
 			bool scrollFinished = false;
 			for (int i = 0; i < charArray.Num(); i++) {
 				if (charArray[i].Contains(TEXT("crumbles to dust"))) {
@@ -4191,6 +4263,18 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				justUsedAScroll = false;
+			}
+
+			// If asking to confirm a cancel
+			bool isCancel = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("Are you sure you want to cancel"))) {
+					isCancel = true;
+					break;
+				}
+			}
+			if (isCancel) {
+				writeCommandQueued(TEXT("Y"));
 			}
 
 			// If it's the spell memorize list
@@ -4857,6 +4941,9 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
 					choiceTitle = charArray[i].TrimStartAndEnd();
+					if (i < charArray.Num()-1 && !charArray[i+1].Contains(TEXT(" - "))) {
+						choiceTitle += TEXT(" ") + charArray[i+1].TrimStartAndEnd();
+					}
 					if (choiceTitle.Contains(TEXT("to acquire"))) {
 						choiceType = "acquirement";
 					}
@@ -5005,6 +5092,7 @@ void Adcss::Tick(float DeltaTime) {
 						levelInfo[i][j].items.Empty();
 						levelInfo[i][j].itemHotkeys.Empty();
 						levelInfo[i][j].enemy = TEXT("");
+						levelInfo[i][j].effect = TEXT("");
 					}
 				}
 
@@ -5043,6 +5131,15 @@ void Adcss::Tick(float DeltaTime) {
 
 						// Depending on the type, update the level info
 						if (xCoord >= 0 && xCoord < gridWidth && yCoord >= 0 && yCoord < gridWidth) {
+
+							// If it's smoke
+							if (description.Contains(TEXT("clouded"))) {
+								FString smokeDescription = description.Mid(description.Find(TEXT("clouded in "))).TrimStartAndEnd();
+								smokeDescription = smokeDescription.Replace(TEXT("clouded in "), TEXT(""));
+								smokeDescription = smokeDescription.Replace(TEXT("("), TEXT(""));
+								smokeDescription = smokeDescription.Replace(TEXT(")"), TEXT(""));
+								levelInfo[yCoord][xCoord].effect = smokeDescription;
+							}
 
 							// If it's a monster
 							if (currentType == TEXT("Monsters")) {
@@ -5231,6 +5328,7 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Data directory"))
 								|| newLine.Contains(TEXT("DCSS"))
 								|| newLine.Contains(TEXT("Unknown command"))
+								|| newLine.Contains(TEXT("Blink to where?"))
 								|| newLine.Contains(TEXT("Wizard Command"))
 								|| newLine.Contains(TEXT("Aiming:"))
 								|| newLine.Contains(TEXT("Casting:"))
@@ -5330,6 +5428,7 @@ void Adcss::Tick(float DeltaTime) {
 							for (int j = 0; j < gridWidth; j++) {
 								levelInfo[i][j].items.Empty();
 								levelInfo[i][j].enemy = TEXT("");
+								levelInfo[i][j].effect = TEXT("");
 							}
 						}
 						break;
