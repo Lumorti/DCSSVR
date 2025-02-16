@@ -3,20 +3,42 @@
 // TODO
 //
 // 0.1 Initial Release
-// - all scrolls
-// - all potions
-// - death screen
+// - victory screen
 // - different walls for different branches
 // - report bug button
 // - menu settings
+// - typing
 // - enable VR
 //
 // 0.2 First update, hopefully filled with community suggestions
 // - map?
 // - footstep/attacking/casting/monster sounds
 // - nearest stairs indicator
+// - morgue
 // - find/search
 // - multiplayer
+
+// From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
+// Needed because FString == FString is case-insensitive, which is literally insane
+// Which developer thought that was a good idea? 
+// Who ever compares two objects and wants a transformation on them first?
+// "A" == "a" is true? What? Should "101" be equal to "5" just because it is if you convert it to binary? 
+template<typename TValueType>
+struct FCaseSensitiveLookupKeyFuncs : BaseKeyFuncs<TValueType, FString>
+{
+    static FORCEINLINE const FString& GetSetKey(const TPair<FString, TValueType>& Element)
+    {
+        return Element.Key;
+    }
+    static FORCEINLINE bool Matches(const FString& A, const FString& B)
+    {
+        return A.Equals(B, ESearchCase::CaseSensitive);
+    }
+    static FORCEINLINE uint32 GetKeyHash(const FString& Key)
+    {
+        return FCrc::StrCrc32<TCHAR>(*Key);
+    }
+};
 
 // Game params/constants
 int LOS;
@@ -34,7 +56,7 @@ FString thingsThatCountAsItems;
 float epsilon;
 int maxLogShown;
 int numHotbarSlots;
-TMap<FString, FString> skillDescriptions;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> skillDescriptions;
 FString menuOutput;
 
 // Stuff for the process
@@ -88,7 +110,7 @@ float wallWidth;
 int enemyUseCount;
 int effectUseCount;
 int itemUseCount;
-TMap<FString, FString> enemyList;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> enemyList;
 TArray<TTuple<int, int>> checkLocs;
 int currentHP;
 int maxHP;
@@ -118,13 +140,13 @@ FString currentBackground;
 FString currentSpecies;
 FString currentName;
 FString currentSeed;
-TMap<FString, FString> speciesDescriptions;
-TMap<FString, FString> backgroundDescriptions;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> speciesDescriptions;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> backgroundDescriptions;
 FString defaultBackgroundDescription;
 FString defaultSpeciesDescription;
-TMap<FString, FString> backgroundToLetter;
-TMap<FString, FString> backgroundToLetterNoGods;
-TMap<FString, FString> speciesToLetter;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> backgroundToLetter;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> backgroundToLetterNoGods;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> speciesToLetter;
 TArray<FString> saveNames;
 int savesPage;
 TArray<int> saveLocToIndex;
@@ -134,12 +156,12 @@ int buttonConfirming;
 bool draggingInventory;
 float inventoryGrabDistance;
 FVector inventoryGrabPoint;
-TMap<FString, FString> inventoryLetterToName;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> inventoryLetterToName;
 TArray<TArray<FString>> inventoryLocToLetter;
 bool inventoryOpen;
 bool shouldRedrawInventory;
 FIntVector2 inventoryNextSpot;
-TMap<FString, FString> inventoryLetterToNamePrev;
+TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> inventoryLetterToNamePrev;
 int gold;
 FIntVector2 locForBlink;
 
@@ -160,7 +182,7 @@ struct SpellInfo {
 	int level;
 	int failure;
 };
-TMap<FString, SpellInfo> spellLetterToInfo;
+TMap<FString, SpellInfo, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<SpellInfo>> spellLetterToInfo;
 TArray<FString> spellLetters;
 bool shouldRedrawSpells;
 int spellPage;
@@ -174,7 +196,7 @@ struct AbilityInfo {
 	FString cost;
 	int failure;
 };
-TMap<FString, AbilityInfo> abilityLetterToInfo;
+TMap<FString, AbilityInfo, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<AbilityInfo>> abilityLetterToInfo;
 TArray<FString> abilityLetters;
 bool shouldRedrawAbilities;
 int abilityPage;
@@ -187,7 +209,7 @@ struct SkillInfo {
 	int train;
 	int apt;
 };
-TMap<FString, SkillInfo> skillNameToInfo;
+TMap<FString, SkillInfo, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<SkillInfo>> skillNameToInfo;
 bool shouldRedrawSkills;
 
 // For passives
@@ -212,7 +234,7 @@ struct SelectedThing {
 	int thingIndex = -1;
 };
 SelectedThing selected;
-TMap<FString, SelectedThing> meshNameToThing;
+TMap<FString, SelectedThing, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<SelectedThing>> meshNameToThing;
 SelectedThing thingBeingDragged;
 
 // For debugging
@@ -269,7 +291,9 @@ void Adcss::saveEverything() {
 	}
 
 	// The inventory letters
-	saveGame->inventoryLetterToName = inventoryLetterToName;
+	for (auto& Elem : inventoryLetterToName) {
+		saveGame->inventoryLetterToName.Add(Elem.Key, Elem.Value);
+	}
 
 	// The inventory locations
 	saveGame->inventoryLocToLetter.Empty();
@@ -310,7 +334,9 @@ void Adcss::loadEverything() {
 	if (saveGame != nullptr) {
 
 		// Load the inventory letters
-		inventoryLetterToName = saveGame->inventoryLetterToName;
+		for (auto& Elem : saveGame->inventoryLetterToName) {
+			inventoryLetterToName.Add(Elem.Key, Elem.Value);
+		}
 
 		// Load the inventory locations
 		inventoryLocToLetter.Empty();
@@ -610,9 +636,9 @@ void Adcss::init() {
 	currentSpecies = "Minotaur";
 	currentBackground = "Fighter";
 	inventoryGrabPoint = FVector(0.0f, 0.0f, 0.0f);
-	inventoryLetterToName = TMap<FString, FString>();
+	inventoryLetterToName = TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>>();
 	inventoryLocToLetter = TArray<TArray<FString>>();
-	inventoryLetterToNamePrev = TMap<FString, FString>();
+	inventoryLetterToNamePrev = TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>>();
 	inventoryLocToLetter.SetNum(6);
 	for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 		inventoryLocToLetter[i].SetNum(9);
@@ -1110,18 +1136,32 @@ void Adcss::init() {
 
 	// Start with the inventory closed
 	inventoryOpen = false;
-	refToInventoryActor->SetActorHiddenInGame(!inventoryOpen);
-	refToInventoryActor->SetActorEnableCollision(inventoryOpen);
+	if (refToInventoryActor != nullptr) {
+		refToInventoryActor->SetActorHiddenInGame(!inventoryOpen);
+		refToInventoryActor->SetActorEnableCollision(inventoryOpen);
+	}
 
 	// Set the initial menus
-	refToSpeciesActor->SetActorHiddenInGame(true);
-	refToSpeciesActor->SetActorEnableCollision(false);
-	refToBackgroundActor->SetActorHiddenInGame(true);
-	refToBackgroundActor->SetActorEnableCollision(false);
-	refToNameActor->SetActorHiddenInGame(true);
-	refToNameActor->SetActorEnableCollision(false);
-	refToSaveActor->SetActorHiddenInGame(true);
-	refToSaveActor->SetActorEnableCollision(false);
+	if (refToSpeciesActor != nullptr) {
+		refToSpeciesActor->SetActorHiddenInGame(true);
+		refToSpeciesActor->SetActorEnableCollision(false);
+	}
+	if (refToBackgroundActor != nullptr) {
+		refToBackgroundActor->SetActorHiddenInGame(true);
+		refToBackgroundActor->SetActorEnableCollision(false);
+	}
+	if (refToNameActor != nullptr) {
+		refToNameActor->SetActorHiddenInGame(true);
+		refToNameActor->SetActorEnableCollision(false);
+	}
+	if (refToSaveActor != nullptr) {
+		refToSaveActor->SetActorHiddenInGame(true);
+		refToSaveActor->SetActorEnableCollision(false);
+	}
+	if (refToDeathActor != nullptr) {
+		refToDeathActor->SetActorHiddenInGame(true);
+		refToDeathActor->SetActorEnableCollision(false);
+	}
 
 	// Load the global save game
 	saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot("globalsavefile", 0));
@@ -1642,12 +1682,14 @@ void Adcss::updateLevel() {
 							isSpecial = true;
 						}
 
-						// If it's a corpse, different rotation
+						// If it's a corpse, different rotation, also bigger
 						if (itemName.Contains(TEXT("Corpse")) || itemName.Contains(TEXT("Skeleton"))) {
 							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 0.0f));
+							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, 2*epsilon));
 						} else {
 							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 90.0f));
+							itemArray[itemUseCount]->SetActorScale3D(FVector(0.3f*wallScaling, 0.3f*wallScaling, 1.0f));
 						}
 
 						// Update the item count
@@ -2065,7 +2107,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				useType = "u";
 			} else if (currentDescription.Contains(TEXT(" scroll ")) || currentDescription.Contains(TEXT(" scrolls "))) {
 				useType = "r";
-			} else if (currentDescription.Contains(TEXT(" potion "))) {
+			} else if (currentDescription.Contains(TEXT(" potion ")) || currentDescription.Contains(TEXT(" potions "))) {
 				useType = "q";
 			} else if (currentDescription.Contains(TEXT(" ring "))) {
 				useType = "p";
@@ -2079,7 +2121,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (useType != "r") {
 				writeCommandQueued("i");
 				writeCommandQueued(">");
+				writeCommandQueued(">");
 				writeCommandQueued(letter);
+				writeCommandQueued(">");
+				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
 			} else {
@@ -2543,6 +2588,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					if (selected.thingIs == "ButtonInventory") {
 						UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory button clicked"));
 						writeCommandQueued("i");
+						writeCommandQueued(">");
 						writeCommandQueued(">");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
@@ -3025,6 +3071,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("i");
 				writeCommandQueued(inventoryLocToLetter[row][col]);
 				writeCommandQueued(">");
+				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
 
@@ -3129,6 +3176,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("enter");
 			writeCommandQueued("i");
 			writeCommandQueued(">");
+			writeCommandQueued(">");
 			writeCommandQueued("escape");
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued("escape");
@@ -3141,6 +3189,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex]);
 			writeCommandQueued("g");
 			writeCommandQueued("i");
+			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued("escape");
 			writeCommandQueued("ctrl-X");
@@ -3169,6 +3218,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 				// Refresh the inventory
 				writeCommandQueued("i");
+				writeCommandQueued(">");
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
 
@@ -3248,7 +3298,19 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// writeCommandQueued("&");
 		// writeCommandQueued("i");
 
-		// all scrolls TODO
+		// kill
+		// writeCommandQueued("&");
+		// writeCommandQueued("m");
+		// writeCommandQueued("g");
+		// writeCommandQueued("r");
+		// writeCommandQueued("i");
+		// writeCommandQueued("n");
+		// writeCommandQueued("d");
+		// writeCommandQueued("enter");
+
+		// give the orb of zot TODO
+
+		// all scrolls
 		// TArray<FString> scrollNames = {
 		// 	"acquirement",
 		// 	"amnesia",
@@ -3276,6 +3338,36 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// 	writeCommandQueued("?");
 		// 	for (int j = 0; j < scrollNames[i].Len(); j++) {
 		// 		writeCommandQueued(scrollNames[i].Mid(j, 1));
+		// 	}
+		// 	writeCommandQueued("enter");
+		// }
+
+		// all potions
+		// TArray<FString> potionNames = {
+		// 	"ambrosia",
+		// 	"attraction",
+		// 	"berserk rage",
+		// 	"brilliance",
+		// 	"cancellation",
+		// 	"curing",
+		// 	"degeneration",
+		// 	"enlightenment",
+		// 	"experience",
+		// 	"haste",
+		// 	"heal wounds",
+		// 	"invisibility",
+		// 	"lignification",
+		// 	"magic",
+		// 	"might",
+		// 	"mutation",
+		// 	"resistance"
+		// };
+		// for (int i = 0; i < potionNames.Num(); i++) {
+		// 	writeCommandQueued("&");
+		// 	writeCommandQueued("o");
+		// 	writeCommandQueued("!");
+		// 	for (int j = 0; j < potionNames[i].Len(); j++) {
+		// 		writeCommandQueued(potionNames[i].Mid(j, 1));
 		// 	}
 		// 	writeCommandQueued("enter");
 		// }
@@ -4090,8 +4182,16 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued(TEXT("enter"));
 			}
 
+			// If we have died
+			if (extracted.Contains(TEXT("You die..."))) {
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("escape"));
+			}
+
 			// If we don't know how much gold we have
-			if (gold == -1) {
+			if (gold == -1 && !isMenu) {
 				writeCommandQueued(TEXT("$"));
 			}
 
@@ -4261,6 +4361,7 @@ void Adcss::Tick(float DeltaTime) {
 			if (scrollFinished && justUsedAScroll) {
 				writeCommandQueued("i");
 				writeCommandQueued(">");
+				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				justUsedAScroll = false;
 			}
@@ -4275,6 +4376,58 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isCancel) {
 				writeCommandQueued(TEXT("Y"));
+			}
+
+			// The death screen
+			// 			Goodbye, Ibuc.                                                                  
+			//          137 Ibuc the Blocker (level 5, -6/46 HPs) *WIZ*                        
+			//              Began as a Minotaur Fighter on Feb 1, 2025.                        
+			//              Mangled by Grinder (8 damage)                                      
+			//              ... on level 1 of the Dungeon on Feb 16, 2025.                     
+			//              The game lasted 00:53:15 (1481 turns).                             
+			// Best Crawlers -                                                                 
+			//   1.       0 Bupp       GhEn-01 slain by a goblin (D:1)                         
+			// You can find your morgue file in the 'C:/Users/Luke/Documents/Unreal Projects/DC
+			bool isDeath = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("Goodbye,"))) {
+					isDeath = true;
+					break;
+				}
+			}
+			if (isDeath) {
+				FString deathText = TEXT("");
+				for (int i = 0; i < charArray.Num(); i++) {
+					if (charArray[i].Contains(TEXT("find your morgue file"))) {
+						continue;
+					}
+					FString toAdd = charArray[i].Replace(TEXT("*WIZ*"), TEXT("     "));
+					deathText += charArray[i] + TEXT("\n");
+				}
+				UE_LOG(LogTemp, Display, TEXT("Death text: %s"), *deathText);
+					
+				// Show the death actor and set the text
+				if (refToDeathActor != nullptr) {
+					UWidgetComponent* WidgetComponentDeath = Cast<UWidgetComponent>(refToDeathActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+					if (WidgetComponentDeath != nullptr) {
+						UUserWidget* UserWidgetDeath = WidgetComponentDeath->GetUserWidgetObject();
+						if (UserWidgetDeath != nullptr) {
+							UTextBlock* DeathText = Cast<UTextBlock>(UserWidgetDeath->GetWidgetFromName(TEXT("TextDeath")));
+							if (DeathText != nullptr) {
+								DeathText->SetText(FText::FromString(deathText));
+							}
+						}
+					}
+					refToDeathActor->SetActorHiddenInGame(false);
+					refToDeathActor->SetActorEnableCollision(true);
+				}
+
+				// Hide everything else
+				refToInventoryActor->SetActorHiddenInGame(true);
+				refToInventoryActor->SetActorEnableCollision(false);
+				refToUIActor->SetActorHiddenInGame(true);
+				refToUIActor->SetActorEnableCollision(false);
+
 			}
 
 			// If it's the spell memorize list
@@ -4856,6 +5009,8 @@ void Adcss::Tick(float DeltaTime) {
 									}
 								}
 							}
+						} else {
+							UE_LOG(LogTemp, Display, TEXT("INVENTORY - already contains %s"), *hotkey);
 						}
 						shouldRedrawInventory = true;
 					}
@@ -4864,20 +5019,74 @@ void Adcss::Tick(float DeltaTime) {
 
 				// If we have at least two blank lines, we have finished reading the inv
 				if (numBlankLines >= 2) {
+					UE_LOG(LogTemp, Display, TEXT("INVENTORY - Finished reading inventory"));
+
+					// Output the current state
+					UE_LOG(LogTemp, Display, TEXT("INVENTORY - Current state:"));
+					for (auto& Elem : inventoryLetterToName) {
+						UE_LOG(LogTemp, Display, TEXT("INVENTORY - {%s} %s"), *Elem.Key, *Elem.Value);
+					}
+					for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+							UE_LOG(LogTemp, Display, TEXT("INVENTORY - loc (%d, %d) %s"), i, j, *inventoryLocToLetter[i][j]);
+						}
+					}
 
 					// Make sure all of locs to letter are valid
 					for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+							if (inventoryLocToLetter[i][j].Len() == 0) {
+								continue;
+							}
 							if (!inventoryLetterToName.Contains(inventoryLocToLetter[i][j])) {
+								UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, replaced %s at loc (%d, %d)"), *inventoryLocToLetter[i][j], i, j);
 								inventoryLocToLetter[i][j] = TEXT("");
+							}
+						}
+					}
+
+					// Make sure everything in the inventory has a location
+					for (auto& Elem : inventoryLetterToName) {
+						FString letter = Elem.Key;
+						FString name = Elem.Value;
+						bool hasLoc = false;
+						for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+							for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+								if (inventoryLocToLetter[i][j].Equals(letter, ESearchCase::CaseSensitive)) {
+									hasLoc = true;
+									break;
+								}
+							}
+							if (hasLoc) {
+								break;
+							}
+						}
+						if (!hasLoc) {
+							bool hasAdded = false;
+							for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+								for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+									if (inventoryLocToLetter[i][j] == TEXT("")) {
+										inventoryLocToLetter[i][j] = letter;
+										UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, added %s to loc (%d, %d)"), *letter, i, j);
+										hasAdded = true;
+										break;
+									}
+								}
+								if (hasAdded) {
+									break;
+								}
 							}
 						}
 					}
 
 					// Make sure all the hotbar slots are valid
 					for (int i = 0; i < numHotbarSlots; i++) {
+						if (hotbarInfos[i].letter.Len() == 0) {
+							continue;
+						}
 						if (hotbarInfos[i].type == "InventoryItem") {
 							if (!inventoryLetterToName.Contains(hotbarInfos[i].letter)) {
+								UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, removed letter %s from hotbar slot %d"), *hotbarInfos[i].letter, i);
 								hotbarInfos[i].name = TEXT("");
 								hotbarInfos[i].type = TEXT("");
 								hotbarInfos[i].letter = TEXT("");
@@ -4885,13 +5094,17 @@ void Adcss::Tick(float DeltaTime) {
 						}
 					}
 
-					// Make sure all the letter locs are unique
+					// Remove any duplicates from the inventory
 					for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+							if (inventoryLocToLetter[i][j].Len() == 0) {
+								continue;
+							}
 							for (int k = 0; k < inventoryLocToLetter.Num(); k++) {
 								for (int l = 0; l < inventoryLocToLetter[k].Num(); l++) {
 									if (i != k || j != l) {
-										if (inventoryLocToLetter[i][j] == inventoryLocToLetter[k][l]) {
+										if (inventoryLocToLetter[i][j].Equals(inventoryLocToLetter[k][l], ESearchCase::CaseSensitive)) {
+											UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, removed duplicate letter %s at loc (%d, %d)"), *inventoryLocToLetter[i][j], i, j);
 											inventoryLocToLetter[k][l] = TEXT("");
 										}
 									}
@@ -4902,8 +5115,12 @@ void Adcss::Tick(float DeltaTime) {
 
 					// Remove any duplicates from the hotbar
 					for (int i = 0; i < numHotbarSlots; i++) {
+						if (hotbarInfos[i].letter.Len() == 0) {
+							continue;
+						}
 						for (int j = 0; j < numHotbarSlots; j++) {
-							if (i != j && hotbarInfos[i].letter == hotbarInfos[j].letter) {
+							if (i != j && hotbarInfos[i].letter.Equals(hotbarInfos[j].letter, ESearchCase::CaseSensitive)) {
+								UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, removed duplicate letter %s from hotbar slot %d"), *hotbarInfos[i].letter, i);
 								hotbarInfos[j].name = TEXT("");
 								hotbarInfos[j].type = TEXT("");
 								hotbarInfos[j].letter = TEXT("");
@@ -5364,6 +5581,20 @@ void Adcss::Tick(float DeltaTime) {
 					}
 				}
 			}
+			
+			// When we kill something, do a ctrl-X TODO
+
+			// If trying to attack unarmed, let them
+			FString lastLine = charArray[charArray.Num()-1];
+			int lastLineInd = 2;
+			while (lastLine.TrimStartAndEnd().Len() == 0 && charArray.Num()-lastLineInd >= 0) {
+				lastLine = charArray[charArray.Num()-lastLineInd];
+				lastLineInd++;
+			}
+			if (lastLine.Contains(TEXT("Really attack while"))) {
+				writeCommandQueued(TEXT("Y"));
+				writeCommandQueued(TEXT("enter"));
+			}
 
 			// If we have the welcome text, we should pretend as though it's new
 			bool hasWelcomeText = false;
@@ -5395,7 +5626,7 @@ void Adcss::Tick(float DeltaTime) {
 					for (int j = 0; j < gridWidth; j++) {
 						if (thingsThatCountAsWalls.Contains(levelAscii[i][j], ESearchCase::CaseSensitive) || thingsThatCountAsFloors.Contains(levelAscii[i][j], ESearchCase::CaseSensitive)) {
 							levelInfo[i][j].currentChar = levelAscii[i][j];
-						} else if (levelInfo[i][j].enemy.Len() == 0 && (levelAscii[i][j] == TEXT("c") || levelAscii[i][j] == TEXT("C") || levelAscii[i][j] == TEXT("C"))) {
+						} else if (levelInfo[i][j].enemy.Len() == 0 && (levelAscii[i][j] == TEXT("c") || levelAscii[i][j] == TEXT("C"))) {
 							levelInfo[i][j].currentChar = levelAscii[i][j];
 							levelInfo[i][j].floorChar = TEXT(".");
 						} else if (levelAscii[i][j] == TEXT("<") || levelAscii[i][j] == TEXT(">")) {

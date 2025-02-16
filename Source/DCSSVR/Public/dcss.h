@@ -63,6 +63,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToInventoryActor;
 
+	// The reference to the death panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToDeathActor;
+
 	// The reference to the choice panel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToChoiceActor;

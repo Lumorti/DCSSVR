@@ -1,8 +1,9 @@
 type = normal
-name = Ibuc
+name = Ivuirch
 species = Minotaur
 background = Fighter
 weapon = trident
+game_seed = 7597862539585074516
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false
