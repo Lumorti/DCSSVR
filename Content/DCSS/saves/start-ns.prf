@@ -1,9 +1,8 @@
 type = normal
-name = Ivuirch
+name = Ycauran
 species = Minotaur
 background = Fighter
 weapon = trident
-game_seed = 7597862539585074516
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

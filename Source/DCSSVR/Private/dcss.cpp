@@ -3,9 +3,11 @@
 // TODO
 //
 // 0.1 Initial Release
-// - victory screen
 // - different walls for different branches
 // - report bug button
+// - altars
+// - shops
+// - gates
 // - menu settings
 // - typing
 // - enable VR
@@ -134,6 +136,7 @@ bool hasReturnedToMainMenu;
 FString saveFile;
 TMap<int, TArray<FVector>> itemLocs;
 bool justUsedAScroll;
+FString currentBranch;
 
 // Main menu stuff
 FString currentBackground;
@@ -575,6 +578,7 @@ void Adcss::init() {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=cloud ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=here ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=statue ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=gate ");
@@ -609,6 +613,7 @@ void Adcss::init() {
 	prevProcessed = 0;
 	isChecking = false;
 	epsilon = 10;
+	currentBranch = "Dungeon";
 	justUsedAScroll = false;
 	saveNames.Empty();
 	draggingInventory = false;
@@ -1313,13 +1318,11 @@ void Adcss::updateLevel() {
 			AActor* floor = floorArray[i][j];
 			floor->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), 0.0f));
 			UStaticMeshComponent* mesh = floor->FindComponentByClass<UStaticMeshComponent>();
-			UTexture2D* texture = getTexture("Floor");
+			UTexture2D* texture = getTexture("Floor" + currentBranch);
 			if (levelInfo[i][j].floorChar == TEXT("H")) {
 				texture = getTexture("WaterDeep");
 			} else if (levelInfo[i][j].floorChar == TEXT("~")) {
 				texture = getTexture("WaterDeep");
-			} else {
-				texture = getTexture("Floor");
 			}
 			UMaterialInstanceDynamic* material = (UMaterialInstanceDynamic*)mesh->GetMaterial(0);
 			material->SetTextureParameterValue("TextureImage", texture);
@@ -1379,7 +1382,7 @@ void Adcss::updateLevel() {
 				UStaticMeshComponent* wallMeshSouth = wallSouth->FindComponentByClass<UStaticMeshComponent>();
 				UStaticMeshComponent* wallMeshEast = wallEast->FindComponentByClass<UStaticMeshComponent>();
 				UStaticMeshComponent* wallMeshWest = wallWest->FindComponentByClass<UStaticMeshComponent>();
-				UTexture2D* texture2 = getTexture("Wall");
+				UTexture2D* texture2 = getTexture("Wall" + currentBranch);
 				UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)wallMeshNorth->GetMaterial(0);
 				material2->SetTextureParameterValue("TextureImage", texture2);
 				material2 = (UMaterialInstanceDynamic*)wallMeshSouth->GetMaterial(0);
@@ -1928,6 +1931,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				if (choiceType == "acquirement") {
 					writeCommandQueued("y");
 					writeCommandQueued("ctrl-X");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
 					writeCommandQueued("escape");
 				} else {
 					writeCommandQueued("enter");
@@ -3179,6 +3184,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(">");
 			writeCommandQueued("escape");
 			writeCommandQueued("ctrl-X");
+			writeCommandQueued(">");
+			writeCommandQueued(">");
 			writeCommandQueued("escape");
 
 		// If we're selecting an item from the ground and dropping it into the inventory
@@ -3193,6 +3200,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(">");
 			writeCommandQueued("escape");
 			writeCommandQueued("ctrl-X");
+			writeCommandQueued(">");
+			writeCommandQueued(">");
 			writeCommandQueued("escape");
 
 			// Note the location so that it goes into the right spot
@@ -3283,7 +3292,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 	} else if (key == "debug") {
 
 		// show everything
-		writeCommandQueued("ctrl-X");
+		// writeCommandQueued("ctrl-X");
 
 		// level up
 		// writeCommandQueued("&");
@@ -3308,7 +3317,57 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// writeCommandQueued("d");
 		// writeCommandQueued("enter");
 
-		// give the orb of zot TODO
+		// give the orb of zot
+		// writeCommandQueued("&");
+		// writeCommandQueued("o");
+		// writeCommandQueued("0");
+
+		// change level TODO
+		TArray<TTuple<FString, FString>> branches = {
+			{"Dungeon", "D"},
+			{"Temple", "T"},
+			{"Lair", "L"},
+			{"Swamp", "S"},
+			{"Shoals", "A"},
+			{"Snake Pit", "P"},
+			{"Spider Nest", "N"},
+			{"Slime Pits", "M"},
+			{"Orcish Mines", "O"},
+			{"Elven Halls", "E"},
+			{"Vaults", "V"},
+			{"Crypt", "C"},
+			{"Tomb", "W"},
+			{"Depths", "U"},
+			{"Hell", "H"},
+			{"Dis", "I"},
+			{"Gehenna", "G"},
+			{"Cocytus", "X"},
+			{"Tartarus", "Y"},
+			{"Zot", "Z"},
+			{"Abyss", "J"},
+			{"Pandemonium", "R"},
+			{"Ziggurat", "Q"},
+			{"Bazaar", "1"},
+			{"Trove", "2"},
+			{"Sewer", "3"},
+			{"Ossuary", "4"},
+			{"Bailey", "5"},
+			{"Ice Cave", "6"},
+			{"Volcano", "7"},
+			{"Wizlab", "8"},
+			{"Desolation", "9"},
+			{"Gauntlet", "!"},
+			{"Arena", "\""},
+			{"Crucible", "@"},
+		};
+		writeCommandQueued("&");
+		writeCommandQueued("~");
+		for (int i = 0; i < branches.Num(); i++) {
+			if (currentBranch == branches[i].Key) {
+				writeCommandQueued(branches[i+1 % branches.Num()].Value);
+				break;
+			}
+		}
 
 		// all scrolls
 		// TArray<FString> scrollNames = {
@@ -4190,6 +4249,14 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued(TEXT("escape"));
 			}
 
+			// If we have won
+			if (extracted.Contains(TEXT("You have escaped!"))) {
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("escape"));
+			}
+
 			// If we don't know how much gold we have
 			if (gold == -1 && !isMenu) {
 				writeCommandQueued(TEXT("$"));
@@ -4782,6 +4849,7 @@ void Adcss::Tick(float DeltaTime) {
 				if (charArray[i].Contains(TEXT("Threat:")) 
 				|| charArray[i].Contains(TEXT("prefixes"))
 				|| charArray[i].Contains(TEXT("trap."))
+				|| charArray[i].Contains(TEXT("Pray here with"))
 				|| charArray[i].Contains(TEXT("Range:"))
 				) {
 					isItemOrEnemy = true;
@@ -5371,8 +5439,23 @@ void Adcss::Tick(float DeltaTime) {
 							// If it's a dungeon feature
 							} else if (currentType == TEXT("Features")) {
 								
-								// Traps are just items
+								// Traps
 								if (description.Contains(TEXT("trap"))) {
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
+
+								// Statues TODO
+								} else if (description.Contains(TEXT("statue"))) {
+									levelInfo[yCoord][xCoord].enemy = description;
+									levelInfo[yCoord][xCoord].enemyHotkey = hotkey;
+								
+								// Altars TODO
+								} else if (description.Contains(TEXT("altar"))) {
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
+
+								// Shops TODO
+								} else if (description.Contains(TEXT("shop"))) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
@@ -5463,6 +5546,17 @@ void Adcss::Tick(float DeltaTime) {
 						currentMP = FCString::Atoi(*wordsMP[0]);
 						maxMP = FCString::Atoi(*wordsMP[1]);
 					}
+
+					// Extract the branch info
+					FString branchLine = charArray[8].Mid(55);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - branch line -> %s"), *branchLine);
+					branchLine = branchLine.Replace(TEXT("Place: "), TEXT(""));
+					int32 colonIndex = branchLine.Find(TEXT(":"));
+					if (colonIndex != INDEX_NONE) {
+						branchLine = branchLine.Mid(0, colonIndex);
+					}
+					currentBranch = itemNameToTextureName(branchLine);
+					UE_LOG(LogTemp, Display, TEXT("STATUS - branch -> %s"), *currentBranch);
 
 					// Extract the left/right/status lines
 					FString prevLeftText = leftText;
@@ -5607,6 +5701,8 @@ void Adcss::Tick(float DeltaTime) {
 			if (!isMenu && hasWelcomeText && !hasBeenWelcomed) {
 				UE_LOG(LogTemp, Display, TEXT("Getting initial list of things..."));
 				writeCommandQueued("ctrl-X");
+				writeCommandQueued(">");
+				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("enter");
 				writeCommandQueued("&");
@@ -5670,6 +5766,8 @@ void Adcss::Tick(float DeltaTime) {
 				if (!isMenu) {
 					UE_LOG(LogTemp, Display, TEXT("Getting list of things..."));
 					writeCommandQueued("ctrl-X");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
 					writeCommandQueued("escape");
 				}
 
