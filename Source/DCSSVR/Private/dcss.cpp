@@ -3,7 +3,6 @@
 // TODO
 //
 // 0.1 Initial Release
-// - different walls for different branches
 // - report bug button
 // - altars
 // - shops
@@ -11,6 +10,10 @@
 // - menu settings
 // - typing
 // - enable VR
+// - check all the branches
+// - check all the monsters
+// - add all the items
+
 //
 // 0.2 First update, hopefully filled with community suggestions
 // - map?
@@ -137,6 +140,7 @@ FString saveFile;
 TMap<int, TArray<FVector>> itemLocs;
 bool justUsedAScroll;
 FString currentBranch;
+bool skipNextFullDescription;
 
 // Main menu stuff
 FString currentBackground;
@@ -242,11 +246,17 @@ SelectedThing thingBeingDragged;
 
 // For debugging
 UTextRenderComponent* refToTextRender;
+TSet<FString> listOfMissingThings;
 
 // Get a texture with a given name
 UTexture2D* Adcss::getTexture(FString name) {
 	if (!textures.Contains(name)) {
-		UE_LOG(LogTemp, Warning, TEXT("Texture not found: %s"), *name);
+		listOfMissingThings.Add(name);
+		FString allMissingTextures = TEXT("");
+		for (auto& Elem : listOfMissingThings) {
+			allMissingTextures += Elem + TEXT(", ");
+		}
+		UE_LOG(LogTemp, Warning, TEXT("Missing textures: %s"), *allMissingTextures);
 		return textures[FString("Unknown")];
 	}
 	return textures[name];
@@ -264,7 +274,21 @@ void Adcss::writeCommand(FString input) {
 
 // Write a command to the process queue
 void Adcss::writeCommandQueued(FString input) {
+	UE_LOG(LogTemp, Display, TEXT("Adding command to queue: %s"), *input);
 	commandQueue.Add(input);
+}
+
+// Clear all items and enemies in info
+void Adcss::clearThings() { 
+	UE_LOG(LogTemp, Display, TEXT("Clearing things"));
+	for (int i = 0; i < gridWidth; i++) {
+		for (int j = 0; j < gridWidth; j++) {
+			levelInfo[i][j].items.Empty();
+			levelInfo[i][j].itemHotkeys.Empty();
+			levelInfo[i][j].enemy = TEXT("");
+			levelInfo[i][j].effect = TEXT("");
+		}
+	}
 }
 
 // Save all the data
@@ -491,7 +515,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	}
 
 	// If it's gold
-	if (itemName.Contains(TEXT("gold"))) {
+	if (itemName.Contains(TEXT("gold")) && !itemName.Contains(TEXT("golden"))) {
 		return "Gold";
 	}
 
@@ -583,6 +607,7 @@ void Adcss::init() {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=gate ");
 	args += TEXT(" -extra-opt-first wiz_mode=yes");
+	args += TEXT(" -extra-opt-first char_set=ascii");
 	args += TEXT(" -extra-opt-first crawl_dir=\"") + binaryPath + TEXT("\" ");
 	UE_LOG(LogTemp, Display, TEXT("Executable loc: %s"), *exePath);
 	UE_LOG(LogTemp, Display, TEXT("Args: %s"), *args);
@@ -599,6 +624,7 @@ void Adcss::init() {
 	gridWidth = 2 * LOS + 1;
 	maxEnemies = 30;
 	maxEffects = 30;
+	skipNextFullDescription = false;
 	maxItems = 30;
 	wallScaling = 4.0f;
 	hasBeenWelcomed = false;
@@ -1295,7 +1321,14 @@ void Adcss::updateLevel() {
 			}
 		}
 	}
-	UE_LOG(LogTemp, Display, TEXT("Effect: %s"), *levelInfo[0][0].effect);
+	UE_LOG(LogTemp, Display, TEXT("Effects:"));
+	for (int i = 0; i < gridWidth; i++) {
+		for (int j = 0; j < gridWidth; j++) {
+			if (levelInfo[i][j].effect.Len() > 0) {
+				UE_LOG(LogTemp, Display, TEXT("(%d, %d): %s"), i, j, *levelInfo[i][j].effect);
+			}
+		}
+	}
 
 	// For each tile in the level
 	for (int i = 0; i < levelInfo.Num(); i++) {
@@ -1658,7 +1691,6 @@ void Adcss::updateLevel() {
 
 				// Add each item
 				for (int k = 0; k < levelInfo[i][j].items.Num(); k++) {
-					UE_LOG(LogTemp, Display, TEXT("Item adding at (%d, %d): %s"), i, j, *levelInfo[i][j].items[k]);
 					if (itemUseCount < maxEnemies) {
 
 						// Setup the item
@@ -1666,7 +1698,11 @@ void Adcss::updateLevel() {
 						FVector itemDelta = itemLocs[levelInfo[i][j].items.Num()][k];
 						itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, itemDelta.Z));
 						UStaticMeshComponent* itemMesh = itemArray[itemUseCount]->FindComponentByClass<UStaticMeshComponent>();
-						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, "Item", k));
+						FString typeName = "Item";
+						if (levelInfo[i][j].items[k].Contains(TEXT("altar"))) {
+							typeName = "Altar";
+						}
+						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, typeName, k));
 
 						// Determine the actual name of the item
 						FString itemName = levelInfo[i][j].items[k];
@@ -1930,6 +1966,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(choiceLetters[choiceIndex]);
 				if (choiceType == "acquirement") {
 					writeCommandQueued("y");
+					writeCommandQueued("CLEAR");
 					writeCommandQueued("ctrl-X");
 					writeCommandQueued(">");
 					writeCommandQueued(">");
@@ -1981,6 +2018,22 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
 				}
+			}
+
+		// If it's an altar TODO
+		} else if (thingBeingDragged.thingIs.Contains(TEXT("Altar")) || selected.thingIs.Contains(TEXT("Altar"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Altar clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
+			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
+				writeCommandQueued(">");
+				writeCommandQueued("enter");
+			}
+		
+		// If it's an shop TODO
+		} else if (thingBeingDragged.thingIs.Contains(TEXT("Shop")) || selected.thingIs.Contains(TEXT("Shop"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Shop clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
+			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
+				writeCommandQueued(">");
+				writeCommandQueued("enter");
 			}
 
 		// Volume buttons
@@ -3134,6 +3187,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Send the commands to get the description
 			if (selected.thingIs == "Enemy") {
+				writeCommandQueued("SKIP");
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued("!");
 				writeCommandQueued(levelInfo[selected.y][selected.x].enemyHotkey);
@@ -3141,10 +3195,20 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
 			} else if (selected.thingIs == "Item" && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
+				writeCommandQueued("SKIP");
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued("!");
 				writeCommandQueued(levelInfo[selected.y][selected.x].itemHotkeys[selected.thingIndex]);
-				writeCommandQueued(">");
+				if (!levelInfo[selected.y][selected.x].items[selected.thingIndex].Contains("altar")) {
+					writeCommandQueued(">");
+				}
+				writeCommandQueued("escape");
+				writeCommandQueued("escape");
+			} else if (selected.thingIs == "Altar" && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
+				writeCommandQueued("SKIP");
+				writeCommandQueued("ctrl-X");
+				writeCommandQueued("!");
+				writeCommandQueued(levelInfo[selected.y][selected.x].itemHotkeys[selected.thingIndex]);
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
 			}
@@ -3183,6 +3247,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued("escape");
+			writeCommandQueued("CLEAR");
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -3191,6 +3256,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// If we're selecting an item from the ground and dropping it into the inventory
 		} else if (thingBeingDragged.x == 8 && thingBeingDragged.y == 8 && thingBeingDragged.thingIs == "Item" && selected.thingIs.Contains(TEXT("ItemButton"))) {
 			UE_LOG(LogTemp, Display, TEXT("Picking up item"));
+			writeCommandQueued("SKIP");
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued("!");
 			writeCommandQueued(levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex]);
@@ -3199,6 +3265,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued("escape");
+			writeCommandQueued("CLEAR");
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -4140,7 +4207,13 @@ void Adcss::Tick(float DeltaTime) {
 	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===")) {
 		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
 		FString command = commandQueue[0];
-		writeCommand(command);
+		if (command == "CLEAR") {
+			clearThings();
+		} else if (command == "SKIP") {
+			skipNextFullDescription = true;
+		} else {
+			writeCommand(command);
+		}
 		commandQueue.RemoveAt(0);
 	}
 
@@ -4258,7 +4331,14 @@ void Adcss::Tick(float DeltaTime) {
 			}
 
 			// If we don't know how much gold we have
-			if (gold == -1 && !isMenu) {
+			bool goldInQueue = false;
+			for (int i = 0; i < commandQueue.Num(); i++) {
+				if (commandQueue[i] == TEXT("$")) {
+					goldInQueue = true;
+					break;
+				}
+			}
+			if (gold == -1 && !isMenu && !goldInQueue) {
 				writeCommandQueued(TEXT("$"));
 			}
 
@@ -4280,6 +4360,13 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isReady) {
 				UE_LOG(LogTemp, Display, TEXT("Buffer contains ready marker"));
+			}
+
+			// Output the length of each line
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Len() != 80 && charArray[i].Len() > 0) {
+					UE_LOG(LogTemp, Warning, TEXT("Line %d has %s chars"), i, *charArray[i]);
+				}
 			}
 
 			// If it's the main menu, get the list of saves
@@ -4850,6 +4937,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("prefixes"))
 				|| charArray[i].Contains(TEXT("trap."))
 				|| charArray[i].Contains(TEXT("Pray here with"))
+				|| charArray[i].Contains(TEXT("It can be dug through"))
 				|| charArray[i].Contains(TEXT("Range:"))
 				) {
 					isItemOrEnemy = true;
@@ -4878,6 +4966,10 @@ void Adcss::Tick(float DeltaTime) {
 						typeOfThing = TEXT("Scroll");
 					} else if (charArray[i].Contains(TEXT("trap."))) {
 						typeOfThing = TEXT("Trap");
+					} else if (charArray[i].Contains(TEXT("altar"))) {
+						typeOfThing = TEXT("Altar");
+					} else if (charArray[i].Contains(TEXT("statue"))) {
+						typeOfThing = TEXT("Statue");
 					}
 
 					// Ignore some lines
@@ -5002,6 +5094,10 @@ void Adcss::Tick(float DeltaTime) {
 					}
 				} else if (typeOfThing == TEXT("Potion")) {
 					currentUsage = TEXT("Press USE whilst HELD to drink the potion.\nRELEASE onto a slot or the floor to move it.");
+				} else if (typeOfThing == TEXT("Altar")) {
+					currentUsage = TEXT("Press USE whilst on the same tile to view the altar menu.");
+				} else if (typeOfThing == TEXT("Statue")) {
+					currentUsage = TEXT("");
 				} else if (typeOfThing == TEXT("Scroll")) {
 					currentUsage = TEXT("Press USE whilst HELD to read the scroll.\nRELEASE onto a slot or the floor to move it.");
 				}
@@ -5371,14 +5467,10 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isFullDescription) {
 
-				// Clear all items and enemies in info
-				for (int i = 0; i < gridWidth; i++) {
-					for (int j = 0; j < gridWidth; j++) {
-						levelInfo[i][j].items.Empty();
-						levelInfo[i][j].itemHotkeys.Empty();
-						levelInfo[i][j].enemy = TEXT("");
-						levelInfo[i][j].effect = TEXT("");
-					}
+				// If told to skip, skip
+				if (skipNextFullDescription) {
+					skipNextFullDescription = false;
+					continue;
 				}
 
 				// Parse the full description
@@ -5611,6 +5703,7 @@ void Adcss::Tick(float DeltaTime) {
 									}
 								}
 								gold = FCString::Atoi(*goldString);
+								UE_LOG(LogTemp, Display, TEXT("LOG - gold: %d"), gold);
 								shouldRedrawInventory = true;
 								continue;
 							}
@@ -5700,6 +5793,7 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (!isMenu && hasWelcomeText && !hasBeenWelcomed) {
 				UE_LOG(LogTemp, Display, TEXT("Getting initial list of things..."));
+				writeCommandQueued("CLEAR");
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -5765,6 +5859,7 @@ void Adcss::Tick(float DeltaTime) {
 				// Send the commands to list everything
 				if (!isMenu) {
 					UE_LOG(LogTemp, Display, TEXT("Getting list of things..."));
+					writeCommandQueued("CLEAR");
 					writeCommandQueued("ctrl-X");
 					writeCommandQueued(">");
 					writeCommandQueued(">");

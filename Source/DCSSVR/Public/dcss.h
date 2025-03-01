@@ -131,6 +131,7 @@ public:
 	void loadEverything();
 	void saveEverything();
 	void init();
+	void clearThings();
 
 protected:
 
