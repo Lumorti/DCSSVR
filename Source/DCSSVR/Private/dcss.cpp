@@ -3,12 +3,10 @@
 // TODO
 //
 // 0.1 Initial Release
-// - report bug button
-// - altars
 // - shops
 // - gates
-// - menu settings
 // - typing
+// - report bug button
 // - enable VR
 // - check all the branches
 // - check all the monsters
@@ -18,9 +16,8 @@
 // 0.2 First update, hopefully filled with community suggestions
 // - map?
 // - footstep/attacking/casting/monster sounds
-// - nearest stairs indicator
-// - morgue
-// - find/search
+// - nearest stairs indicator?
+// - find/search?
 // - multiplayer
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
@@ -135,9 +132,11 @@ FString overviewText;
 FString religionText;
 bool shouldRedrawOverview;
 bool shouldRedrawReligion;
+bool settingsOpen;
 bool hasReturnedToMainMenu;
 FString saveFile;
 TMap<int, TArray<FVector>> itemLocs;
+FString currentType;
 bool justUsedAScroll;
 FString currentBranch;
 bool skipNextFullDescription;
@@ -233,6 +232,14 @@ struct HotbarInfo {
 TArray<HotbarInfo> hotbarInfos;
 bool shouldRedrawHotbar;
 
+// Altar stuff
+FString altarOverview;
+FString altarPowers;
+FString altarWrath;
+bool showingAltar;
+int nextAltar;
+bool showNextAltar;
+
 // For selecting things
 struct SelectedThing {
 	int x = -1;
@@ -257,7 +264,7 @@ UTexture2D* Adcss::getTexture(FString name) {
 			allMissingTextures += Elem + TEXT(", ");
 		}
 		UE_LOG(LogTemp, Warning, TEXT("Missing textures: %s"), *allMissingTextures);
-		return textures[FString("Unknown")];
+		textures.Add(name, textures[FString("Unknown")]);
 	}
 	return textures[name];
 }
@@ -598,16 +605,15 @@ void Adcss::init() {
 	exePath = binaryPath + TEXT("crawl.exe");
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
 	args += TEXT(" -extra-opt-first bad_item_prompt=false ");
-	args += TEXT(" -extra-opt-first monster_item_view_features+=water ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=cloud ");
-	args += TEXT(" -extra-opt-first monster_item_view_features+=here ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=(here) ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=statue ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=gate ");
-	args += TEXT(" -extra-opt-first wiz_mode=yes");
-	args += TEXT(" -extra-opt-first char_set=ascii");
+	args += TEXT(" -extra-opt-first wiz_mode=yes ");
+	args += TEXT(" -extra-opt-first char_set=ascii ");
 	args += TEXT(" -extra-opt-first crawl_dir=\"") + binaryPath + TEXT("\" ");
 	UE_LOG(LogTemp, Display, TEXT("Executable loc: %s"), *exePath);
 	UE_LOG(LogTemp, Display, TEXT("Args: %s"), *args);
@@ -622,10 +628,10 @@ void Adcss::init() {
 	effectUseCount = 0;
 	itemUseCount = 0;
 	gridWidth = 2 * LOS + 1;
-	maxEnemies = 30;
-	maxEffects = 30;
+	maxEnemies = 100;
+	maxEffects = 100;
+	maxItems = 100;
 	skipNextFullDescription = false;
-	maxItems = 30;
 	wallScaling = 4.0f;
 	hasBeenWelcomed = false;
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
@@ -633,8 +639,10 @@ void Adcss::init() {
 	thingsThatCountAsWalls = "#+' ";
 	thingsThatCountAsDoors = "+'";
 	thingsThatCountAsItems = "()|%[?O:/}!=\"";
+	currentType = TEXT("Monsters");
 	shiftOn = false;
 	numProcessed = 0;
+	listOfMissingThings.Empty();
 	locForBlink = FIntVector2(-1, -1);
 	prevProcessed = 0;
 	isChecking = false;
@@ -645,6 +653,12 @@ void Adcss::init() {
 	draggingInventory = false;
 	smallWallScaling = wallScaling / 2.0f;
 	prevOutput = TEXT("");
+	altarOverview = TEXT("");
+	altarPowers = TEXT("");
+	altarWrath = TEXT("");
+	showingAltar = false;
+	showNextAltar = true;
+	nextAltar = 0;
 	selected = SelectedThing();
 	numHotbarSlots = 5;
 	thingBeingDragged = selected;
@@ -688,6 +702,7 @@ void Adcss::init() {
 	refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
 	spellLetters.Empty();
 	abilityLetters.Empty();
+	settingsOpen = false;
 	spellLetterToInfo.Empty();
 	abilityLetterToInfo.Empty();
 	passives.Empty();
@@ -1193,6 +1208,18 @@ void Adcss::init() {
 		refToDeathActor->SetActorHiddenInGame(true);
 		refToDeathActor->SetActorEnableCollision(false);
 	}
+	if (refToAltarActor != nullptr) {
+		refToAltarActor->SetActorHiddenInGame(true);
+		refToAltarActor->SetActorEnableCollision(false);
+	}
+	if (refToShopActor != nullptr) {
+		refToShopActor->SetActorHiddenInGame(true);
+		refToShopActor->SetActorEnableCollision(false);
+	}
+	if (refToSettingsActor != nullptr) {
+		refToSettingsActor->SetActorHiddenInGame(true);
+		refToSettingsActor->SetActorEnableCollision(false);
+	}
 
 	// Load the global save game
 	saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot("globalsavefile", 0));
@@ -1352,6 +1379,10 @@ void Adcss::updateLevel() {
 			floor->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), 0.0f));
 			UStaticMeshComponent* mesh = floor->FindComponentByClass<UStaticMeshComponent>();
 			UTexture2D* texture = getTexture("Floor" + currentBranch);
+			if (currentBranch == "Abyss") {
+				int randNum = FMath::Abs((i + j) % 6);
+				texture = getTexture("WallAbyss" + FString::FromInt(randNum));
+			}
 			if (levelInfo[i][j].floorChar == TEXT("H")) {
 				texture = getTexture("WaterDeep");
 			} else if (levelInfo[i][j].floorChar == TEXT("~")) {
@@ -1366,7 +1397,7 @@ void Adcss::updateLevel() {
 			if (levelInfo[i][j].effect.Len() > 0) {
 			
 				// Create the effect
-				if (enemyUseCount < maxEnemies) {
+				if (enemyUseCount < maxEffects) {
 
 					// Set up the effect
 					effectArray[effectUseCount]->SetActorHiddenInGame(false);
@@ -1386,6 +1417,8 @@ void Adcss::updateLevel() {
 					// No collision
 					effectArray[effectUseCount]->SetActorEnableCollision(false);
 
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Effect count exceeded"));
 				}
 
 			}
@@ -1416,6 +1449,10 @@ void Adcss::updateLevel() {
 				UStaticMeshComponent* wallMeshEast = wallEast->FindComponentByClass<UStaticMeshComponent>();
 				UStaticMeshComponent* wallMeshWest = wallWest->FindComponentByClass<UStaticMeshComponent>();
 				UTexture2D* texture2 = getTexture("Wall" + currentBranch);
+				if (currentBranch == "Abyss") {
+					int randNum = FMath::Abs((i + j) % 6);
+					texture2 = getTexture("WallAbyss" + FString::FromInt(randNum));
+				}
 				UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)wallMeshNorth->GetMaterial(0);
 				material2->SetTextureParameterValue("TextureImage", texture2);
 				material2 = (UMaterialInstanceDynamic*)wallMeshSouth->GetMaterial(0);
@@ -1610,24 +1647,26 @@ void Adcss::updateLevel() {
 				material2->SetTextureParameterValue("TextureImage", texture2);
 
 			// If it's a plant
-            } else if (ascii == TEXT("P") || ascii == TEXT("c") || ascii == TEXT("C")) {
+            } else if (ascii == TEXT("P") || ascii == TEXT("7")  || ascii == TEXT("c") || ascii == TEXT("C")) {
 
 				// Add an enemy
 				if (enemyUseCount < maxEnemies) {
 					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
-					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 4.0f));
+					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + 1, floorHeight * (j - LOS) + 1, floorWidth / 4.0f));
 					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
                     if (ascii == TEXT("P")) {
 						UTexture2D* texture2 = getTexture("Plant");
 						UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
 						material2->SetTextureParameterValue("TextureImage", texture2);
-                    } else if (ascii == TEXT("C") || ascii == TEXT("c")) {
+                    } else if (ascii == TEXT("C") || ascii == TEXT("c") || ascii == TEXT("7")) {
                         UTexture2D* texture2 = getTexture("Tree");
 						UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
 						material2->SetTextureParameterValue("TextureImage", texture2);
                     }
 					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
 					enemyUseCount++;
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Enemy count exceeded"));
 				}
 
 			// If it's an staircase down
@@ -1643,6 +1682,8 @@ void Adcss::updateLevel() {
 					material2->SetTextureParameterValue("TextureImage", texture2);
 					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "LadderDown", 0));
 					enemyUseCount++;
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Enemy count exceeded"));
 				}
 
 			// If it's an staircase up
@@ -1658,6 +1699,8 @@ void Adcss::updateLevel() {
 					material2->SetTextureParameterValue("TextureImage", texture2);
 					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "LadderUp", 0));
 					enemyUseCount++;
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Enemy count exceeded"));
 				}
 
 			}
@@ -1670,7 +1713,7 @@ void Adcss::updateLevel() {
 
 					// Set up the enemy
 					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
-					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f));
+					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + 1, floorHeight * (j - LOS) + 1, floorWidth / 3.0f));
 					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
 					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
 
@@ -1682,6 +1725,8 @@ void Adcss::updateLevel() {
 					material2->SetTextureParameterValue("TextureImage", texture2);
 					enemyUseCount++;
 
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Enemy count exceeded"));
 				}
 
 			}
@@ -1691,7 +1736,7 @@ void Adcss::updateLevel() {
 
 				// Add each item
 				for (int k = 0; k < levelInfo[i][j].items.Num(); k++) {
-					if (itemUseCount < maxEnemies) {
+					if (itemUseCount < maxItems) {
 
 						// Setup the item
 						itemArray[itemUseCount]->SetActorHiddenInGame(false);
@@ -1734,6 +1779,8 @@ void Adcss::updateLevel() {
 						// Update the item count
 						itemUseCount++;
 
+					} else {
+						UE_LOG(LogTemp, Warning, TEXT("Item count exceeded"));
 					}
 				}
 
@@ -1963,7 +2010,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			int choiceIndex = FCString::Atoi(*choiceName)-1;
 			if (choiceIndex >= 0 && choiceIndex < choiceLetters.Num() && choiceIndex < choiceNames.Num() && choiceNames[choiceIndex].Len() > 0) {
 				UE_LOG(LogTemp, Display, TEXT("Writing choice: %s"), *choiceLetters[choiceIndex]);
-				writeCommandQueued(choiceLetters[choiceIndex]);
+				for (int i = 0; i < choiceLetters[choiceIndex].Len(); i++) {
+					writeCommandQueued(choiceLetters[choiceIndex].Mid(i, 1));
+				}
 				if (choiceType == "acquirement") {
 					writeCommandQueued("y");
 					writeCommandQueued("CLEAR");
@@ -1972,6 +2021,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
 				} else {
+					writeCommandQueued("enter");
 					writeCommandQueued("enter");
 				}
 			}
@@ -2020,12 +2070,67 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 
-		// If it's an altar TODO
+		// If it's the altar cancel button
+		} else if (selected.thingIs.Contains(TEXT("ButtonAltarCancel"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Altar cancel button clicked"));
+			if (refToAltarActor != nullptr && showingAltar) {
+				showingAltar = false;
+				refToAltarActor->SetActorHiddenInGame(true);
+				refToAltarActor->SetActorEnableCollision(false);
+			}
+
+		// If it's the altar pray button
+		} else if (selected.thingIs.Contains(TEXT("ButtonAltarPray"))) {
+			showNextAltar = false;
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Altar pray button clicked"));
+			writeCommandQueued(">");
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
+			if (refToAltarActor != nullptr && showingAltar) {
+				showingAltar = false;
+				refToAltarActor->SetActorHiddenInGame(true);
+				refToAltarActor->SetActorEnableCollision(false);
+			}
+
+		// If it's an altar button
+		} else if (selected.thingIs.Contains(TEXT("ButtonAltar"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Altar button clicked: %s"), *selected.thingIs);
+
+			// Which text to show
+			FString textToChangeTo = altarOverview;
+			if (selected.thingIs.Contains(TEXT("Power"))) {
+				textToChangeTo = altarPowers;
+			} else if (selected.thingIs.Contains(TEXT("Wrath"))) {
+				textToChangeTo = altarWrath;
+			}
+
+			// Show the altar actor and set the text
+			showNextAltar = true;
+			if (refToAltarActor != nullptr && showingAltar) {
+				UWidgetComponent* WidgetComponentAltar = Cast<UWidgetComponent>(refToAltarActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponentAltar != nullptr) {
+					UUserWidget* UserWidgetAltar = WidgetComponentAltar->GetUserWidgetObject();
+					if (UserWidgetAltar != nullptr) {
+						UTextBlock* AltarText = Cast<UTextBlock>(UserWidgetAltar->GetWidgetFromName(TEXT("TextAltar")));
+						if (AltarText != nullptr) {
+							AltarText->SetText(FText::FromString(textToChangeTo));
+						}
+					}
+				}
+			}
+
+		// If it's an altar
 		} else if (thingBeingDragged.thingIs.Contains(TEXT("Altar")) || selected.thingIs.Contains(TEXT("Altar"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Altar clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
+			showNextAltar = true;
 			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
 				writeCommandQueued(">");
 				writeCommandQueued("enter");
+				writeCommandQueued("!");
+				writeCommandQueued("!");
+				writeCommandQueued("escape");
+				nextAltar = 0;
 			}
 		
 		// If it's an shop TODO
@@ -2033,7 +2138,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Shop clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
 			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
 				writeCommandQueued(">");
-				writeCommandQueued("enter");
+				writeCommandQueued("escape");
 			}
 
 		// Volume buttons
@@ -2177,6 +2282,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(letter);
 			writeCommandQueued(useType);
 			if (useType != "r") {
+				inventoryLetterToName.Empty();
 				writeCommandQueued("i");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -2302,6 +2408,22 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					keyPressed("lmb", FVector2D(0.0f, 0.0f));
 					selected.thingIs = "OpenButton";
 				}
+			}
+
+		// If the settings open button
+		} else if (selected.thingIs == "ButtonSettings") {
+			settingsOpen = !settingsOpen;
+			if (refToSettingsActor != nullptr) {
+				refToSettingsActor->SetActorHiddenInGame(!settingsOpen);
+				refToSettingsActor->SetActorEnableCollision(settingsOpen);
+			}
+
+		// If the settings close button
+		} else if (selected.thingIs == "ButtonSettingsClose") {
+			settingsOpen = false;
+			if (refToSettingsActor != nullptr) {
+				refToSettingsActor->SetActorHiddenInGame(!settingsOpen);
+				refToSettingsActor->SetActorEnableCollision(settingsOpen);
 			}
 
 		// If it's the main play button
@@ -2645,6 +2767,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					// For each of the top buttons
 					if (selected.thingIs == "ButtonInventory") {
 						UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory button clicked"));
+						inventoryLetterToName.Empty();
 						writeCommandQueued("i");
 						writeCommandQueued(">");
 						writeCommandQueued(">");
@@ -3243,6 +3366,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("d");
 			writeCommandQueued(inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x]);
 			writeCommandQueued("enter");
+			inventoryLetterToName.Empty();
 			writeCommandQueued("i");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -3261,6 +3385,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("!");
 			writeCommandQueued(levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex]);
 			writeCommandQueued("g");
+			inventoryLetterToName.Empty();
 			writeCommandQueued("i");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -3293,6 +3418,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(letter);
 
 				// Refresh the inventory
+				inventoryLetterToName.Empty();
 				writeCommandQueued("i");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -3389,6 +3515,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// writeCommandQueued("o");
 		// writeCommandQueued("0");
 
+		// god mollification
+		// writeCommandQueued("&");
+		// writeCommandQueued("w");
+
 		// change level TODO
 		TArray<TTuple<FString, FString>> branches = {
 			{"Dungeon", "D"},
@@ -3396,11 +3526,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			{"Lair", "L"},
 			{"Swamp", "S"},
 			{"Shoals", "A"},
-			{"Snake Pit", "P"},
-			{"Spider Nest", "N"},
-			{"Slime Pits", "M"},
-			{"Orcish Mines", "O"},
-			{"Elven Halls", "E"},
+			{"SnakePit", "P"},
+			{"SpiderNest", "N"},
+			{"SlimePits", "M"},
+			{"OrcishMines", "O"},
+			{"ElvenHalls", "E"},
 			{"Vaults", "V"},
 			{"Crypt", "C"},
 			{"Tomb", "W"},
@@ -3435,6 +3565,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				break;
 			}
 		}
+		writeCommandQueued("enter");
 
 		// all scrolls
 		// TArray<FString> scrollNames = {
@@ -4513,6 +4644,7 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 			if (scrollFinished && justUsedAScroll) {
+				inventoryLetterToName.Empty();
 				writeCommandQueued("i");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -4820,8 +4952,15 @@ void Adcss::Tick(float DeltaTime) {
 				abilityPage = 0;
 
 				// Add abilities
-				for (int i = 2; i < charArray.Num(); i++) {
-					if (charArray[i].Contains("-") && !charArray[i].Contains(TEXT("do what"))) {
+				for (int i = 1; i < charArray.Num(); i++) {
+					if (charArray[i].Contains("-") 
+						&& !charArray[i].Contains(TEXT("do what"))
+						&& !charArray[i].Contains(TEXT("Ability -"))
+						&& !charArray[i].Contains(TEXT("Invocations -"))
+						&& !charArray[i].Contains(TEXT("Build terrain"))
+						&& !charArray[i].Contains(TEXT("Set terrain to build"))
+						&& !charArray[i].Contains(TEXT("Clear terrain to floor"))
+					) {
 
 						// Get the letter
 						FString letter = charArray[i].TrimStart().Mid(0, 1);
@@ -4978,6 +5117,8 @@ void Adcss::Tick(float DeltaTime) {
 						|| charArray[i].Contains(TEXT("indicates the spell")) 
 						|| charArray[i].Contains(TEXT("prefixes")) 
 						|| charArray[i].Contains(TEXT("(i)nscribe")) 
+						|| charArray[i].Contains(TEXT("Pray here with > to learn more")) 
+						|| charArray[i].Contains(TEXT("(>)pray")) 
 						|| (charArray[i].Contains(TEXT("{")) && i > 1) 
 						|| charArray[i].Contains(TEXT("(g)o")) 
 						|| charArray[i].Contains(TEXT("sum of A"))) {
@@ -5120,6 +5261,57 @@ void Adcss::Tick(float DeltaTime) {
 
 			}
 
+			// If it's the altar menu
+			bool isAltarMenu = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("Overview|Powers|Wrath"))) {
+					isAltarMenu = true;
+					break;
+				}
+			}
+			if (isAltarMenu && currentUI != "religion" && showNextAltar) {
+
+				// Get the text
+				FString textToSet = TEXT("");
+				for (int i = 0; i < charArray.Num(); i++) {
+					textToSet += charArray[i] + TEXT("\n");
+				}
+
+				// Depending on the index, add to the corresponding text
+				if (nextAltar == 0) {
+					altarOverview = textToSet;
+					UE_LOG(LogTemp, Display, TEXT("Setting altar overview: %s"), *altarOverview);
+				} else if (nextAltar == 1) {
+					altarPowers = textToSet;
+					UE_LOG(LogTemp, Display, TEXT("Setting altar powers: %s"), *altarPowers);
+				} else if (nextAltar == 2) {
+					altarWrath = textToSet;
+					UE_LOG(LogTemp, Display, TEXT("Setting altar wrath: %s"), *altarWrath);
+				}
+				nextAltar++;
+				nextAltar = nextAltar % 3;
+
+				// Show the altar actor and set the text
+				if (refToAltarActor != nullptr && !showingAltar) {
+					UWidgetComponent* WidgetComponentAltar = Cast<UWidgetComponent>(refToAltarActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+					if (WidgetComponentAltar != nullptr) {
+						UUserWidget* UserWidgetAltar = WidgetComponentAltar->GetUserWidgetObject();
+						if (UserWidgetAltar != nullptr) {
+							UTextBlock* AltarText = Cast<UTextBlock>(UserWidgetAltar->GetWidgetFromName(TEXT("TextAltar")));
+							if (AltarText != nullptr) {
+								AltarText->SetText(FText::FromString(altarOverview));
+							}
+						}
+					}
+					UE_LOG(LogTemp, Display, TEXT("Showing altar menu"));
+					refToAltarActor->SetActorHiddenInGame(false);
+					refToAltarActor->SetActorEnableCollision(true);
+					showingAltar = true;
+					currentUI = TEXT("altar");
+				}
+
+			}
+
 			// If it's the inventory menu
 			bool isInventory = false;
 			for (int i = 0; i < charArray.Num(); i++) {
@@ -5152,7 +5344,19 @@ void Adcss::Tick(float DeltaTime) {
 						}
 						UE_LOG(LogTemp, Display, TEXT("INVENTORY - Added to inventory: {%s} %s"), *hotkey, *description);
 						inventoryLetterToName.Add(hotkey, description);
-						if (!inventoryLetterToNamePrev.Contains(hotkey)) {
+						bool alreadyHasLoc = false;
+						for (int j = 0; j < inventoryLocToLetter.Num(); j++) {
+							for (int k = 0; k < inventoryLocToLetter[j].Num(); k++) {
+								if (inventoryLocToLetter[j][k].Equals(hotkey, ESearchCase::CaseSensitive)) {
+									alreadyHasLoc = true;
+									break;
+								}
+							}
+							if (alreadyHasLoc) {
+								break;
+							}
+						}
+						if (!inventoryLetterToNamePrev.Contains(hotkey) && !alreadyHasLoc) {
 							if (inventoryNextSpot.X != -1 && inventoryNextSpot.Y != -1) {
 								inventoryLocToLetter[inventoryNextSpot.X][inventoryNextSpot.Y] = hotkey;
 								UE_LOG(LogTemp, Display, TEXT("INVENTORY - put %s at specific loc (%d, %d)"), *hotkey, inventoryNextSpot.X, inventoryNextSpot.Y);
@@ -5268,7 +5472,7 @@ void Adcss::Tick(float DeltaTime) {
 								for (int l = 0; l < inventoryLocToLetter[k].Num(); l++) {
 									if (i != k || j != l) {
 										if (inventoryLocToLetter[i][j].Equals(inventoryLocToLetter[k][l], ESearchCase::CaseSensitive)) {
-											UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, removed duplicate letter %s at loc (%d, %d)"), *inventoryLocToLetter[i][j], i, j);
+											UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, removed duplicate letter %s at loc (%d, %d)"), *inventoryLocToLetter[k][l], k, l);
 											inventoryLocToLetter[k][l] = TEXT("");
 										}
 									}
@@ -5395,8 +5599,32 @@ void Adcss::Tick(float DeltaTime) {
 				isChoiceOpen = true;				
 			}
 
+			// If it's a Yes/No confirmation
+			bool isYesNo = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("Are you sure you want to"))
+				|| charArray[i].Contains(TEXT("Really renounce your faith"))
+			) {
+					isYesNo = true;
+				}
+				if (isYesNo && (charArray[i].Contains(TEXT("Okay")) || charArray[i].Contains(TEXT("You have lost your religion")))) {
+					isYesNo = false;
+				}
+			}
+			if (isYesNo) {
+				UE_LOG(LogTemp, Display, TEXT("Found yes/no confirmation"));
+				choiceLetters.Empty();
+				choiceNames.Empty();
+				choiceLetters.Add(TEXT("YY"));
+				choiceNames.Add(TEXT("Yes"));
+				choiceLetters.Add(TEXT("N"));
+				choiceNames.Add(TEXT("No"));
+				choiceTitle = TEXT("Are you sure?");
+				isChoiceOpen = true;
+			}
+
 			// Otherwise hide the window and reset
-			if (isChoiceOpen && !isChoice && !isAttributeChoice && !isItemOrEnemy) {
+			if (isChoiceOpen && !isChoice && !isAttributeChoice && !isItemOrEnemy && !isYesNo) {
 				choiceLetters.Empty();
 				choiceNames.Empty();
 				isChoiceOpen = false;
@@ -5404,7 +5632,7 @@ void Adcss::Tick(float DeltaTime) {
 				refToChoiceActor->SetActorEnableCollision(isChoiceOpen);
 
 			// If we should show the choice window
-			} else if (isChoiceOpen && (isChoice || isAttributeChoice)) { 
+			} else if (isChoiceOpen && (isChoice || isAttributeChoice || isYesNo)) {
 
 				// Set up the window
 				UWidgetComponent* WidgetComponentChoice = Cast<UWidgetComponent>(refToChoiceActor->GetComponentByClass(UWidgetComponent::StaticClass()));
@@ -5474,16 +5702,17 @@ void Adcss::Tick(float DeltaTime) {
 				}
 
 				// Parse the full description
-				FString currentType = TEXT("Monsters");
 				for (int i = 0; i < charArray.Num(); i++) {
 
 					// The section headings
-					if (charArray[i].Contains(TEXT("Items"))) {
-						currentType = TEXT("Items");
-					} else if (charArray[i].Contains(TEXT("Monsters"))) {
-						currentType = TEXT("Monsters");
-					} else if (charArray[i].Contains(TEXT("Features"))) {
-						currentType = TEXT("Features");
+					if (!charArray[i].Contains(TEXT("Visible"))) {
+						if (charArray[i].Contains(TEXT("Items"))) {
+							currentType = TEXT("Items");
+						} else if (charArray[i].Contains(TEXT("Monsters"))) {
+							currentType = TEXT("Monsters");
+						} else if (charArray[i].Contains(TEXT("Features"))) {
+							currentType = TEXT("Features");
+						}
 					}
 
 					// If we have a thing
@@ -5536,12 +5765,12 @@ void Adcss::Tick(float DeltaTime) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
-								// Statues TODO
+								// Statues
 								} else if (description.Contains(TEXT("statue"))) {
 									levelInfo[yCoord][xCoord].enemy = description;
 									levelInfo[yCoord][xCoord].enemyHotkey = hotkey;
 								
-								// Altars TODO
+								// Altars
 								} else if (description.Contains(TEXT("altar"))) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
@@ -5648,6 +5877,9 @@ void Adcss::Tick(float DeltaTime) {
 						branchLine = branchLine.Mid(0, colonIndex);
 					}
 					currentBranch = itemNameToTextureName(branchLine);
+					if (branchLine.Len() > 0 && branchLine[branchLine.Len()-1] == TEXT('s')) {
+						currentBranch += TEXT("s");
+					}
 					UE_LOG(LogTemp, Display, TEXT("STATUS - branch -> %s"), *currentBranch);
 
 					// Extract the left/right/status lines
@@ -5733,6 +5965,8 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("DCSS"))
 								|| newLine.Contains(TEXT("Unknown command"))
 								|| newLine.Contains(TEXT("Blink to where?"))
+								|| newLine.Contains(TEXT("Really renounce your faith"))
+								|| newLine.Contains(TEXT("Are you sure?"))
 								|| newLine.Contains(TEXT("Wizard Command"))
 								|| newLine.Contains(TEXT("Aiming:"))
 								|| newLine.Contains(TEXT("Casting:"))
@@ -5745,6 +5979,7 @@ void Adcss::Tick(float DeltaTime) {
 
 							UE_LOG(LogTemp, Display, TEXT("LOG - adding: %s"), *newLine);
 							logText.Add(newLine);
+
 						}
 					}
 					UWidgetComponent* WidgetComponentDesc = Cast<UWidgetComponent>(refToUIActor->GetComponentByClass(UWidgetComponent::StaticClass()));
@@ -5816,7 +6051,7 @@ void Adcss::Tick(float DeltaTime) {
 					for (int j = 0; j < gridWidth; j++) {
 						if (thingsThatCountAsWalls.Contains(levelAscii[i][j], ESearchCase::CaseSensitive) || thingsThatCountAsFloors.Contains(levelAscii[i][j], ESearchCase::CaseSensitive)) {
 							levelInfo[i][j].currentChar = levelAscii[i][j];
-						} else if (levelInfo[i][j].enemy.Len() == 0 && (levelAscii[i][j] == TEXT("c") || levelAscii[i][j] == TEXT("C"))) {
+						} else if (levelInfo[i][j].enemy.Len() == 0 && (levelAscii[i][j] == TEXT("c") || levelAscii[i][j] == TEXT("C") || levelAscii[i][j] == TEXT("7"))) {
 							levelInfo[i][j].currentChar = levelAscii[i][j];
 							levelInfo[i][j].floorChar = TEXT(".");
 						} else if (levelAscii[i][j] == TEXT("<") || levelAscii[i][j] == TEXT(">")) {

@@ -67,6 +67,18 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToDeathActor;
 
+	// The reference to the altar panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToAltarActor;
+
+	// The reference to the shop panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToShopActor;
+
+	// The reference to the settings panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToSettingsActor;
+
 	// The reference to the choice panel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToChoiceActor;
