@@ -240,6 +240,18 @@ bool showingAltar;
 int nextAltar;
 bool showNextAltar;
 
+// Shop stuff
+struct ShopItem {
+	FString name;
+	FString letter;
+	int price;
+	bool selected;
+};
+TArray<ShopItem> shopItems;
+FString shopTitle;
+bool showingShop;
+bool showNextShop;
+
 // For selecting things
 struct SelectedThing {
 	int x = -1;
@@ -461,7 +473,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 
 	// Determine the actual name of the item
 	FString itemName = name;
-	itemName = itemName.Replace(TEXT("The"), TEXT(""));
+	itemName = itemName.Replace(TEXT("the "), TEXT(""));
 	int32 labelledIndex = itemName.Find(TEXT("labelled"));
 	if (labelledIndex != INDEX_NONE) {
 		itemName = itemName.Left(labelledIndex);
@@ -482,6 +494,9 @@ FString Adcss::itemNameToTextureName(FString name) {
 	}
 	itemName = itemName.Replace(TEXT("-"), TEXT(" "));
 	itemName = itemName.Replace(TEXT("glowing"), TEXT(""));
+	itemName = itemName.Replace(TEXT("runed"), TEXT(""));
+	itemName = itemName.Replace(TEXT("heavily"), TEXT(""));
+	itemName = itemName.Replace(TEXT("masterwork"), TEXT(""));
 
 	// Remove any text in brackets using Regex
 	FRegexPattern pattern(TEXT("\\(.*?\\)"));
@@ -506,6 +521,16 @@ FString Adcss::itemNameToTextureName(FString name) {
 	// If it's a potion
 	if (itemName.Contains(TEXT("potion"))) {
 		return "Potion";
+	}
+
+	// If it's an arch
+	if (itemName.Contains(TEXT("arch"))) {
+		return "Arch";
+	}
+
+	// If it's a shop
+	if (itemName.Contains(TEXT("shop"))) {
+		return "Shop";
 	}
 
 	// Capitalize the item name
@@ -608,6 +633,7 @@ void Adcss::init() {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=cloud ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=(here) ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=arch ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=statue ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
@@ -658,6 +684,10 @@ void Adcss::init() {
 	altarWrath = TEXT("");
 	showingAltar = false;
 	showNextAltar = true;
+	showNextShop = true;
+	shopItems.Empty();
+	shopTitle = TEXT("");
+	showingShop = false;
 	nextAltar = 0;
 	selected = SelectedThing();
 	numHotbarSlots = 5;
@@ -1746,6 +1776,10 @@ void Adcss::updateLevel() {
 						FString typeName = "Item";
 						if (levelInfo[i][j].items[k].Contains(TEXT("altar"))) {
 							typeName = "Altar";
+						} else if (levelInfo[i][j].items[k].Contains(TEXT("arch"))) {
+							typeName = "Arch";
+						} else if (levelInfo[i][j].items[k].Contains(TEXT("Shop"))) {
+							typeName = "Shop";
 						}
 						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, typeName, k));
 
@@ -1771,6 +1805,18 @@ void Adcss::updateLevel() {
 							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 0.0f));
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, 2*epsilon));
+						
+						// Arches are also bigger
+						} else if (itemName.Contains(TEXT("arch"))) {
+							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
+							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.33f));
+						
+						// Altars and shop are a bit bigger
+						} else if (itemName.Contains(TEXT("altar")) || itemName.Contains(TEXT("shop"))) {
+						itemArray[itemUseCount]->SetActorScale3D(FVector(0.6f*wallScaling, 0.6f*wallScaling, 1.0f));
+						itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.3f));
+					
+						// Otherwise reset it
 						} else {
 							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 90.0f));
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.3f*wallScaling, 0.3f*wallScaling, 1.0f));
@@ -2132,10 +2178,121 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("escape");
 				nextAltar = 0;
 			}
+
+		// Shop buy button
+		} else if (selected.thingIs.Contains(TEXT("ButtonShopBuy"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Shop buy button clicked"));
+			showNextShop = false;
+			writeCommandQueued(">");
+			for (int i = 0; i < shopItems.Num(); i++) {
+				if (shopItems[i].selected) {
+					writeCommandQueued(shopItems[i].letter);
+				}
+			}
+			writeCommandQueued("enter");
+			writeCommandQueued("y");
+			writeCommandQueued("escape");
+			writeCommandQueued("i");
+			writeCommandQueued(">");
+			writeCommandQueued(">");
+			writeCommandQueued("escape");
+
+			// Trigger the cancel button
+			if (refToShopActor != nullptr && showingShop) {
+				showingShop = false;
+				refToShopActor->SetActorHiddenInGame(true);
+				refToShopActor->SetActorEnableCollision(false);
+			}
+			FString meshName = TEXT("");
+			for (auto& Elem : meshNameToThing) {
+				if (Elem.Value.thingIs.Contains(TEXT("Shop")) && Elem.Value.x == LOS && Elem.Value.y == LOS) {
+					meshName = Elem.Key;
+					break;
+				}
+			}
+			if (meshName.Len() > 0) {
+				UE_LOG(LogTemp, Display, TEXT("Showing shop mesh %s"), *meshName);
+				for (int i=0; i<itemArray.Num(); i++) {
+					if (itemArray[i]->GetName() == meshName) {
+						itemArray[i]->SetActorHiddenInGame(false);
+						itemArray[i]->SetActorEnableCollision(true);
+						break;
+					}
+				}
+			}
+
+		// Shop cancel button
+		} else if (selected.thingIs.Contains(TEXT("ButtonShopCancel"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Shop cancel button clicked"));
+			if (refToShopActor != nullptr && showingShop) {
+				showingShop = false;
+				refToShopActor->SetActorHiddenInGame(true);
+				refToShopActor->SetActorEnableCollision(false);
+			}
+			FString meshName = TEXT("");
+			for (auto& Elem : meshNameToThing) {
+				if (Elem.Value.thingIs.Contains(TEXT("Shop")) && Elem.Value.x == LOS && Elem.Value.y == LOS) {
+					meshName = Elem.Key;
+					break;
+				}
+			}
+			if (meshName.Len() > 0) {
+				UE_LOG(LogTemp, Display, TEXT("Showing shop mesh %s"), *meshName);
+				for (int i=0; i<itemArray.Num(); i++) {
+					if (itemArray[i]->GetName() == meshName) {
+						itemArray[i]->SetActorHiddenInGame(false);
+						itemArray[i]->SetActorEnableCollision(true);
+						break;
+					}
+				}
+			}
+
+		// Shop item button
+		} else if (selected.thingIs.Contains(TEXT("ButtonShop"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Shop item clicked: %s"), *selected.thingIs);
+
+			// Change item's selected state
+			int itemIndex = FCString::Atoi(*selected.thingIs.Replace(TEXT("ButtonShop"), TEXT("")))-1;
+			if (itemIndex >= 0 && itemIndex < shopItems.Num()) {
+				shopItems[itemIndex].selected = !shopItems[itemIndex].selected;
+			}
+
+			// Get the widget component
+			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToShopActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			if (WidgetComponent != nullptr) {
+
+				// If it's selected, the text should be green
+				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+				if (UserWidget != nullptr) {
+					FString textName = "TextShop" + FString::FromInt(itemIndex+1);
+					UTextBlock* ItemText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(*textName));
+					if (ItemText != nullptr) {
+						if (shopItems[itemIndex].selected) {
+							ItemText->SetColorAndOpacity(FLinearColor(0.0f, 1.0f, 0.0f, 1.0f));
+						} else {
+							ItemText->SetColorAndOpacity(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f));
+						}
+					}
+				}
+
+				// Set the total cost
+				int totalCost = 0;
+				UTextBlock* ShopTotal = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextShopCost")));
+				if (ShopTotal != nullptr) {
+					for (int i = 0; i < shopItems.Num(); i++) {
+						if (shopItems[i].selected) {
+							totalCost += shopItems[i].price;
+						}
+					}
+					ShopTotal->SetText(FText::FromString(FString::Printf(TEXT("Total: %d gold"), totalCost)));
+				}
+
+			}
 		
-		// If it's an shop TODO
+		// If it's an shop
 		} else if (thingBeingDragged.thingIs.Contains(TEXT("Shop")) || selected.thingIs.Contains(TEXT("Shop"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Shop clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
+			showNextShop = true;
 			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
@@ -3008,6 +3165,48 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			}
 
+		// If right clicking on one of the shop slots
+		} else if (selected.thingIs.Contains(TEXT("ButtonShop")) && showingShop) {
+
+			// Get the index and make sure it's valid
+			FString choiceIndex = selected.thingIs.Replace(TEXT("ButtonShop"), TEXT(""));
+			int itemNum = FCString::Atoi(*choiceIndex)-1;
+			if (itemNum >= 0 && itemNum < shopItems.Num()) {
+				FString letter = shopItems[itemNum].letter;
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Right clicking on shop item %s"), *letter);
+
+				// Write the commands
+				showNextShop = false;
+				writeCommandQueued(">");
+				writeCommandQueued("!");
+				writeCommandQueued(letter);
+				writeCommandQueued(">");
+				writeCommandQueued(">");
+				writeCommandQueued("escape");
+				writeCommandQueued("!");
+				thingBeingDragged = SelectedThing(-1, -1, "Choice", itemNum);
+
+				// Show the description
+				currentDescription = TEXT("");
+				currentUsage = TEXT("");
+				UWidgetComponent* WidgetComponentDesc = Cast<UWidgetComponent>(refToDescriptionActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponentDesc != nullptr) {
+					UUserWidget* UserWidgetDesc = WidgetComponentDesc->GetUserWidgetObject();
+					if (UserWidgetDesc != nullptr) {
+						UTextBlock* TextBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Description")));
+						if (TextBox != nullptr) {
+							TextBox->SetText(FText::FromString(currentDescription));
+						}
+						UTextBlock* UsageBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Usage")));
+						if (UsageBox != nullptr) {
+							UsageBox->SetText(FText::FromString(currentUsage));
+						}
+					}
+				}
+				refToDescriptionActor->SetActorHiddenInGame(false);
+
+			}
+
 		// If right clicking on one of the equipped slots
 		} else if (selected.thingIs.Contains(TEXT("EquippedButton")) && inventoryOpen) {
 
@@ -3317,12 +3516,19 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
+			} else if (selected.thingIs == "Shop" && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
+				writeCommandQueued("SKIP");
+				writeCommandQueued("ctrl-X");
+				writeCommandQueued("!");
+				writeCommandQueued(levelInfo[selected.y][selected.x].itemHotkeys[selected.thingIndex]);
+				writeCommandQueued("escape");
+				writeCommandQueued("escape");
 			} else if (selected.thingIs == "Item" && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
 				writeCommandQueued("SKIP");
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued("!");
 				writeCommandQueued(levelInfo[selected.y][selected.x].itemHotkeys[selected.thingIndex]);
-				if (!levelInfo[selected.y][selected.x].items[selected.thingIndex].Contains("altar")) {
+				if (!levelInfo[selected.y][selected.x].items[selected.thingIndex].Contains("altar") && !levelInfo[selected.y][selected.x].items[selected.thingIndex].Contains("shop")) {
 					writeCommandQueued(">");
 				}
 				writeCommandQueued("escape");
@@ -5066,6 +5272,169 @@ void Adcss::Tick(float DeltaTime) {
 
 				}
 
+			}
+
+			// If it's the shop menu TODO
+			// 			Welcome to Quirharo's Antique Armour Shop! What would you like to do?           
+			//  a -   81 gold   a chain mail                                                   
+			//  b -   36 gold   a leather armour                                               
+			//  c -   90 gold   a runed leather armour                                         
+			//  d -  468 gold   a glowing plate armour                                         
+			//  e -  504 gold   a heavily runed plate armour                                   
+			//  f -  414 gold   a plate armour                                                 
+			//  g -   72 gold   a ring mail                                                    
+			//  h -   12 gold   a robe                                                         
+			//  i -   66 gold   a runed robe                                                   
+			//  j -  162 gold   a masterwork scale mail                                        
+			// You have 0 gold pieces.                                                         
+			// [Esc] exit          [!] buy|examine items       [a-j] mark item for purchase    
+			// [/] sort (type)                                 [A-J] put item on shopping list 
+			bool isShopMenu = false;
+			for (int i = 0; i < charArray.Num(); i++) {
+				if (charArray[i].Contains(TEXT("mark item for purchase"))) {
+					isShopMenu = true;
+					break;
+				}
+			}
+			if (isShopMenu && showNextShop) {
+
+				// Reset the shop list
+				UE_LOG(LogTemp, Display, TEXT("Found shop menu"));
+				shopItems.Empty();
+				shopTitle = TEXT("");
+
+				// For each line in the text
+				for (int i = 1; i < charArray.Num(); i++) {
+
+					// If it's the line stating the player's gold
+					if (charArray[i].Contains(TEXT("you have"))) {
+
+						// Split into words
+						TArray<FString> parts;
+						charArray[i].ParseIntoArray(parts, TEXT(" "), true);
+						gold = FCString::Atoi(*parts[2]);
+
+					// If it's an item being sold
+					} else if (charArray[i].Contains("gold")) {
+
+						// Get the letter
+						FString letter = charArray[i].TrimStart().Mid(0, 1);
+
+						// Get the cost
+						FString cost = charArray[i].Mid(4, 10).TrimStartAndEnd();;
+						int costInt = FCString::Atoi(*cost);
+
+						// Get the name
+						FString name = charArray[i].Mid(15, 30).TrimStartAndEnd();;
+
+						// Add to the map
+						UE_LOG(LogTemp, Display, TEXT("Shop: {%s} %s %s"), *letter, *cost, *name);
+						ShopItem item;
+						item.name = name;
+						item.price = costInt;
+						item.letter = letter;
+						item.selected = false;
+						shopItems.Add(item);
+
+					// If it's the title
+					} else if (charArray[i].Contains(TEXT("Welcome to"))) {
+						shopTitle = charArray[i].Replace(TEXT("What would you like to do?"), TEXT("")).TrimStartAndEnd();
+					}
+
+				}
+
+				// Show the shop actor and set the text
+				if (refToShopActor != nullptr) {
+					UWidgetComponent* WidgetComponentShop = Cast<UWidgetComponent>(refToShopActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+					if (WidgetComponentShop != nullptr) {
+						UUserWidget* UserWidgetShop = WidgetComponentShop->GetUserWidgetObject();
+						if (UserWidgetShop != nullptr) {
+
+							// Set the shop title
+							UTextBlock* ShopTitle = Cast<UTextBlock>(UserWidgetShop->GetWidgetFromName(TEXT("TextShopTitle")));
+							if (ShopTitle != nullptr) {
+								ShopTitle->SetText(FText::FromString(shopTitle));
+							}
+
+							// Set each item
+							for (int i = 0; i < shopItems.Num(); i++) {
+
+								// Set the text
+								FString itemName = TEXT("TextShop") + FString::FromInt(i+1);
+								UTextBlock* ShopItem = Cast<UTextBlock>(UserWidgetShop->GetWidgetFromName(*itemName));
+								if (ShopItem != nullptr) {
+									FString itemLine = TEXT("[") + FString::FromInt(shopItems[i].price) + TEXT("g] ") + shopItems[i].name;
+									ShopItem->SetText(FText::FromString(itemLine));
+								}
+
+								// Also set the image
+								FString matName = itemNameToTextureName(shopItems[i].name);
+								UTexture2D* tex2D = getTexture(matName);
+								FString imageName = "ImageShop" + FString::FromInt(i+1);
+								UImage* ShopImage = Cast<UImage>(UserWidgetShop->GetWidgetFromName(*imageName));
+								if (ShopImage != nullptr) {
+									ShopImage->SetBrushFromTexture(tex2D);
+									ShopImage->SetVisibility(ESlateVisibility::Visible);
+								}
+							}
+
+							// Clear the rest
+							for (int i = shopItems.Num(); i < 12; i++) {
+								FString itemName = TEXT("TextShop") + FString::FromInt(i+1);
+								UTextBlock* ShopItem = Cast<UTextBlock>(UserWidgetShop->GetWidgetFromName(*itemName));
+								if (ShopItem != nullptr) {
+									ShopItem->SetText(FText::FromString(TEXT("")));
+								}
+								FString imageName = "ImageShop" + FString::FromInt(i+1);
+								UImage* ShopImage = Cast<UImage>(UserWidgetShop->GetWidgetFromName(*imageName));
+								if (ShopImage != nullptr) {
+									ShopImage->SetVisibility(ESlateVisibility::Hidden);
+								}
+							}
+
+							// Set the total cost
+							int totalCost = 0;
+							UTextBlock* ShopTotal = Cast<UTextBlock>(UserWidgetShop->GetWidgetFromName(TEXT("TextShopCost")));
+							if (ShopTotal != nullptr) {
+								for (int i = 0; i < shopItems.Num(); i++) {
+									if (shopItems[i].selected) {
+										totalCost += shopItems[i].price;
+									}
+								}
+								ShopTotal->SetText(FText::FromString(FString::Printf(TEXT("Total: %d gold"), totalCost)));
+							}
+
+							// Set the player's gold count
+							UTextBlock* ShopGold = Cast<UTextBlock>(UserWidgetShop->GetWidgetFromName(TEXT("TextShopGold")));
+							if (ShopGold != nullptr) {
+								ShopGold->SetText(FText::FromString(FString::Printf(TEXT("(you have %dg)"), gold)));
+							}
+
+						}
+					}
+					refToShopActor->SetActorHiddenInGame(false);
+					refToShopActor->SetActorEnableCollision(true);
+					showingShop = true;
+				}
+
+				// When this is open, hide the shop itself
+				FString meshName = TEXT("");
+				for (auto& Elem : meshNameToThing) {
+					if (Elem.Value.thingIs.Contains(TEXT("Shop")) && Elem.Value.x == LOS && Elem.Value.y == LOS) {
+						meshName = Elem.Key;
+						break;
+					}
+				}
+				if (meshName.Len() > 0) {
+					UE_LOG(LogTemp, Display, TEXT("Hiding shop mesh %s"), *meshName);
+					for (int i=0; i<itemArray.Num(); i++) {
+						if (itemArray[i]->GetName() == meshName) {
+							itemArray[i]->SetActorHiddenInGame(true);
+							itemArray[i]->SetActorEnableCollision(false);
+							break;
+						}
+					}
+				}
 
 			}
 
@@ -5076,6 +5445,8 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("prefixes"))
 				|| charArray[i].Contains(TEXT("trap."))
 				|| charArray[i].Contains(TEXT("Pray here with"))
+				|| charArray[i].Contains(TEXT("shop in the dungeon"))
+				|| charArray[i].Contains(TEXT("A stone archway that seems to"))
 				|| charArray[i].Contains(TEXT("It can be dug through"))
 				|| charArray[i].Contains(TEXT("Range:"))
 				) {
@@ -5083,7 +5454,7 @@ void Adcss::Tick(float DeltaTime) {
 					break;
 				}
 			}
-			if (isItemOrEnemy) {
+			if (isItemOrEnemy && !isShopMenu) {
 				bool foundNew = false;
 				FString typeOfThing = TEXT("Item");
 				FString toAdd = TEXT("");
@@ -5107,8 +5478,12 @@ void Adcss::Tick(float DeltaTime) {
 						typeOfThing = TEXT("Trap");
 					} else if (charArray[i].Contains(TEXT("altar"))) {
 						typeOfThing = TEXT("Altar");
+					} else if (charArray[i].Contains(TEXT("arch"))) {
+						typeOfThing = TEXT("Arch");
 					} else if (charArray[i].Contains(TEXT("statue"))) {
 						typeOfThing = TEXT("Statue");
+					} else if (charArray[i].Contains(TEXT("shop"))) {
+						typeOfThing = TEXT("Shop");
 					}
 
 					// Ignore some lines
@@ -5117,8 +5492,13 @@ void Adcss::Tick(float DeltaTime) {
 						|| charArray[i].Contains(TEXT("indicates the spell")) 
 						|| charArray[i].Contains(TEXT("prefixes")) 
 						|| charArray[i].Contains(TEXT("(i)nscribe")) 
+						|| charArray[i].Contains(TEXT("While standing here")) 
+						|| charArray[i].Contains(TEXT("armor}")) 
+						|| charArray[i].Contains(TEXT("key. ")) 
+						|| charArray[i].Contains(TEXT("You are here.")) 
 						|| charArray[i].Contains(TEXT("Pray here with > to learn more")) 
 						|| charArray[i].Contains(TEXT("(>)pray")) 
+						|| charArray[i].Contains(TEXT("(>)enter")) 
 						|| (charArray[i].Contains(TEXT("{")) && i > 1) 
 						|| charArray[i].Contains(TEXT("(g)o")) 
 						|| charArray[i].Contains(TEXT("sum of A"))) {
@@ -5237,8 +5617,8 @@ void Adcss::Tick(float DeltaTime) {
 					currentUsage = TEXT("Press USE whilst HELD to drink the potion.\nRELEASE onto a slot or the floor to move it.");
 				} else if (typeOfThing == TEXT("Altar")) {
 					currentUsage = TEXT("Press USE whilst on the same tile to view the altar menu.");
-				} else if (typeOfThing == TEXT("Statue")) {
-					currentUsage = TEXT("");
+				} else if (typeOfThing == TEXT("Shop")) {
+					currentUsage = TEXT("Press USE whilst on the same tile to view the shop menu.");
 				} else if (typeOfThing == TEXT("Scroll")) {
 					currentUsage = TEXT("Press USE whilst HELD to read the scroll.\nRELEASE onto a slot or the floor to move it.");
 				}
@@ -5769,13 +6149,18 @@ void Adcss::Tick(float DeltaTime) {
 								} else if (description.Contains(TEXT("statue"))) {
 									levelInfo[yCoord][xCoord].enemy = description;
 									levelInfo[yCoord][xCoord].enemyHotkey = hotkey;
+
+								// Arches
+								} else if (description.Contains(TEXT("arch"))) {
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 								
 								// Altars
 								} else if (description.Contains(TEXT("altar"))) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
-								// Shops TODO
+								// Shops
 								} else if (description.Contains(TEXT("shop"))) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
