@@ -1,18 +1,17 @@
 #include "dcss.h"
 
 // TODO
-//
+
 // 0.1 Initial Release
-// - shops
 // - gates
 // - typing
 // - report bug button
 // - enable VR
-// - check all the branches
-// - check all the monsters
-// - add all the items
+// - all the monsters
+// - all the items
+// - all the spells
+// - all the abilities
 
-//
 // 0.2 First update, hopefully filled with community suggestions
 // - map?
 // - footstep/attacking/casting/monster sounds
@@ -2255,36 +2254,37 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			int itemIndex = FCString::Atoi(*selected.thingIs.Replace(TEXT("ButtonShop"), TEXT("")))-1;
 			if (itemIndex >= 0 && itemIndex < shopItems.Num()) {
 				shopItems[itemIndex].selected = !shopItems[itemIndex].selected;
-			}
 
-			// Get the widget component
-			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToShopActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-			if (WidgetComponent != nullptr) {
+				// Get the widget component
+				UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToShopActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponent != nullptr) {
 
-				// If it's selected, the text should be green
-				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
-				if (UserWidget != nullptr) {
-					FString textName = "TextShop" + FString::FromInt(itemIndex+1);
-					UTextBlock* ItemText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(*textName));
-					if (ItemText != nullptr) {
-						if (shopItems[itemIndex].selected) {
-							ItemText->SetColorAndOpacity(FLinearColor(0.0f, 1.0f, 0.0f, 1.0f));
-						} else {
-							ItemText->SetColorAndOpacity(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f));
+					// If it's selected, the text should be green
+					UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+					if (UserWidget != nullptr) {
+						FString textName = "TextShop" + FString::FromInt(itemIndex+1);
+						UTextBlock* ItemText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(*textName));
+						if (ItemText != nullptr) {
+							if (shopItems[itemIndex].selected) {
+								ItemText->SetColorAndOpacity(FLinearColor(0.0f, 1.0f, 0.0f, 1.0f));
+							} else {
+								ItemText->SetColorAndOpacity(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f));
+							}
 						}
 					}
-				}
 
-				// Set the total cost
-				int totalCost = 0;
-				UTextBlock* ShopTotal = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextShopCost")));
-				if (ShopTotal != nullptr) {
-					for (int i = 0; i < shopItems.Num(); i++) {
-						if (shopItems[i].selected) {
-							totalCost += shopItems[i].price;
+					// Set the total cost
+					int totalCost = 0;
+					UTextBlock* ShopTotal = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextShopCost")));
+					if (ShopTotal != nullptr) {
+						for (int i = 0; i < shopItems.Num(); i++) {
+							if (shopItems[i].selected) {
+								totalCost += shopItems[i].price;
+							}
 						}
+						ShopTotal->SetText(FText::FromString(FString::Printf(TEXT("Total: %d gold"), totalCost)));
 					}
-					ShopTotal->SetText(FText::FromString(FString::Printf(TEXT("Total: %d gold"), totalCost)));
+
 				}
 
 			}
@@ -3183,7 +3183,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(">");
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
-				writeCommandQueued("!");
+				writeCommandQueued("escape");
 				thingBeingDragged = SelectedThing(-1, -1, "Choice", itemNum);
 
 				// Show the description
@@ -5307,7 +5307,7 @@ void Adcss::Tick(float DeltaTime) {
 				for (int i = 1; i < charArray.Num(); i++) {
 
 					// If it's the line stating the player's gold
-					if (charArray[i].Contains(TEXT("you have"))) {
+					if (charArray[i].Contains(TEXT("You have"))) {
 
 						// Split into words
 						TArray<FString> parts;
@@ -5327,7 +5327,7 @@ void Adcss::Tick(float DeltaTime) {
 						// Get the name
 						FString name = charArray[i].Mid(15, 30).TrimStartAndEnd();;
 
-						// Add to the map
+						// Add to the list
 						UE_LOG(LogTemp, Display, TEXT("Shop: {%s} %s %s"), *letter, *cost, *name);
 						ShopItem item;
 						item.name = name;
@@ -5361,10 +5361,12 @@ void Adcss::Tick(float DeltaTime) {
 
 								// Set the text
 								FString itemName = TEXT("TextShop") + FString::FromInt(i+1);
+								UE_LOG(LogTemp, Display, TEXT("Setting shop item %s to %s"), *itemName, *shopItems[i].name);
 								UTextBlock* ShopItem = Cast<UTextBlock>(UserWidgetShop->GetWidgetFromName(*itemName));
 								if (ShopItem != nullptr) {
 									FString itemLine = TEXT("[") + FString::FromInt(shopItems[i].price) + TEXT("g] ") + shopItems[i].name;
 									ShopItem->SetText(FText::FromString(itemLine));
+									ShopItem->SetColorAndOpacity(FLinearColor(1.0f, 1.0f, 1.0f, 1.0f));
 								}
 
 								// Also set the image
