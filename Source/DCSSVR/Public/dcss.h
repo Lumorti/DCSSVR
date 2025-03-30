@@ -59,6 +59,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToDescriptionActor;
 
+	// The reference to the keyboard panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToKeyboardActor;
+
 	// The reference to the inventory panel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToInventoryActor;
@@ -144,6 +148,7 @@ public:
 	void saveEverything();
 	void init();
 	void clearThings();
+	void shiftLetters();
 
 protected:
 

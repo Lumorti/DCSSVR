@@ -3,10 +3,10 @@
 // TODO
 
 // 0.1 Initial Release
-// - gates
-// - typing
+// - coglins
 // - report bug button
 // - enable VR
+// - gates
 // - all the monsters
 // - all the items
 // - all the spells
@@ -14,10 +14,10 @@
 
 // 0.2 First update, hopefully filled with community suggestions
 // - map?
-// - footstep/attacking/casting/monster sounds
+// - footstep/attacking/casting/monster sounds?
 // - nearest stairs indicator?
 // - find/search?
-// - multiplayer
+// - multiplayer?
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
@@ -117,6 +117,7 @@ int currentHP;
 int maxHP;
 int currentMP;
 int maxMP;
+bool inMainMenu;
 FString leftText;
 FString rightText;
 FString statusText;
@@ -132,7 +133,6 @@ FString religionText;
 bool shouldRedrawOverview;
 bool shouldRedrawReligion;
 bool settingsOpen;
-bool hasReturnedToMainMenu;
 FString saveFile;
 TMap<int, TArray<FVector>> itemLocs;
 FString currentType;
@@ -169,6 +169,13 @@ FIntVector2 inventoryNextSpot;
 TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> inventoryLetterToNamePrev;
 int gold;
 FIntVector2 locForBlink;
+
+// Keyboard stuff
+bool isKeyboardOpen;
+bool isShifted;
+FString editting;
+FString defaultNameText;
+FString defaultSeedText;
 
 // For choices
 TArray<FString> choiceNames;
@@ -527,6 +534,21 @@ FString Adcss::itemNameToTextureName(FString name) {
 		return "Arch";
 	}
 
+	// If it's a statue
+	if (itemName.Contains(TEXT("statue"))) {
+		return "Statue";
+	}
+
+	// If it's an idol
+	if (itemName.Contains(TEXT("idol"))) {
+		return "Idol";
+	}
+
+	// If it's a fountain
+	if (itemName.Contains(TEXT("fountain"))) {
+		return "Fountain";
+	}
+
 	// If it's a shop
 	if (itemName.Contains(TEXT("shop"))) {
 		return "Shop";
@@ -615,6 +637,39 @@ void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
 }
 
+// Depending on whether the shift key is pressed, shift the letters
+void Adcss::shiftLetters() {
+	UE_LOG(LogTemp, Display, TEXT("Shifting letters, isShifted: %d"), isShifted);
+
+	// Check the reference to the keyboard
+	if (refToKeyboardActor != nullptr) {
+		UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToKeyboardActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		if (WidgetComponent != nullptr) {
+			UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+			if (UserWidget != nullptr) {
+
+				// For each letter key (e.g. ButtonKeyboardQ)
+				for (int i = 0; i < 26; i++) {
+					FString letter = FString::Chr(i + 65);
+					FString textName = "TextKeyboard" + letter;
+					UTextBlock* TextBlock = Cast<UTextBlock>(UserWidget->GetWidgetFromName(*textName));
+					if (TextBlock != nullptr) {
+						FString text = TextBlock->GetText().ToString();
+						if (isShifted) {
+							text = text.ToUpper();
+						} else {
+							text = text.ToLower();
+						}
+						TextBlock->SetText(FText::FromString(text));
+					}
+				}
+				
+			}
+		}
+	}
+	
+}
+
 // Wrapped function
 void Adcss::init() {
 
@@ -633,7 +688,9 @@ void Adcss::init() {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=(here) ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=arch ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=idol ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=statue ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=fountain ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=gate ");
@@ -661,6 +718,7 @@ void Adcss::init() {
 	hasBeenWelcomed = false;
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
 	halfDiagWallScaling = sqrt(0.5 * wallScaling * wallScaling);
+	inMainMenu = true;
 	thingsThatCountAsWalls = "#+' ";
 	thingsThatCountAsDoors = "+'";
 	thingsThatCountAsItems = "()|%[?O:/}!=\"";
@@ -684,6 +742,11 @@ void Adcss::init() {
 	showingAltar = false;
 	showNextAltar = true;
 	showNextShop = true;
+	isKeyboardOpen = false;
+	isShifted = false;
+	editting = TEXT("");
+	defaultNameText = TEXT("(random name)");
+	defaultSeedText = TEXT("(random seed)");
 	shopItems.Empty();
 	shopTitle = TEXT("");
 	showingShop = false;
@@ -697,7 +760,6 @@ void Adcss::init() {
 	currentDescription = TEXT("");
 	currentUsage = TEXT("");
 	memorizing = false;
-	hasReturnedToMainMenu = false;
 	rmbOn = false;
 	logText.Empty();
 	spellPage = 0;
@@ -705,8 +767,8 @@ void Adcss::init() {
 	passivePage = 0;
 	savesPage = 0;
 	inventoryGrabDistance = 0.0f;
-	currentName = "*";
-	currentSeed = "0";
+	currentName = defaultNameText;
+	currentSeed = defaultSeedText;
 	currentSpecies = "Minotaur";
 	currentBackground = "Fighter";
 	inventoryGrabPoint = FVector(0.0f, 0.0f, 0.0f);
@@ -1248,6 +1310,10 @@ void Adcss::init() {
 	if (refToSettingsActor != nullptr) {
 		refToSettingsActor->SetActorHiddenInGame(true);
 		refToSettingsActor->SetActorEnableCollision(false);
+	}
+	if (refToKeyboardActor != nullptr) {
+		refToKeyboardActor->SetActorHiddenInGame(true);
+		refToKeyboardActor->SetActorEnableCollision(false);
 	}
 
 	// Load the global save game
@@ -1805,15 +1871,15 @@ void Adcss::updateLevel() {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, 2*epsilon));
 						
-						// Arches are also bigger
-						} else if (itemName.Contains(TEXT("arch"))) {
+						// Somethings are also bigger
+						} else if (itemName.Contains(TEXT("arch")) || itemName.Contains(TEXT("idol")) || itemName.Contains(TEXT("statue")) || itemName.Contains(TEXT("fountain"))) {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.33f));
 						
 						// Altars and shop are a bit bigger
 						} else if (itemName.Contains(TEXT("altar")) || itemName.Contains(TEXT("shop"))) {
-						itemArray[itemUseCount]->SetActorScale3D(FVector(0.6f*wallScaling, 0.6f*wallScaling, 1.0f));
-						itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.3f));
+							itemArray[itemUseCount]->SetActorScale3D(FVector(0.6f*wallScaling, 0.6f*wallScaling, 1.0f));
+							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.3f));
 					
 						// Otherwise reset it
 						} else {
@@ -2112,6 +2178,124 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				} else {
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
+				}
+			}
+		
+		// Clicking on the name input box
+		} else if (selected.thingIs.Contains(TEXT("ButtonEditName")) || selected.thingIs.Contains(TEXT("ButtonEditSeed"))) {
+			if (selected.thingIs.Contains(TEXT("ButtonEditName"))) {
+				editting = "name";
+			} else if (selected.thingIs.Contains(TEXT("ButtonEditSeed"))) {
+				editting = "seed";
+			}
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Edit button clicked: %s"), *selected.thingIs);
+
+			// Initial shift if the current name is empty or the default
+			if ((currentName == defaultNameText || currentName == TEXT("")) && editting == "name") {
+				isShifted = true;
+				shiftLetters();
+			} else if ((currentSeed == defaultSeedText || currentSeed == TEXT("")) && editting == "seed") {
+				isShifted = true;
+				shiftLetters();
+			}
+
+			// Open the keyboard if it isn't already
+			isKeyboardOpen = true;
+			if (refToKeyboardActor != nullptr) {
+				if (isKeyboardOpen) {
+					UE_LOG(LogTemp, Display, TEXT("Showing keyboard actor"));
+					refToKeyboardActor->SetActorHiddenInGame(false);
+					refToKeyboardActor->SetActorEnableCollision(true);
+				}
+			}
+
+		// Keyboard close
+		} else if (selected.thingIs.Contains(TEXT("ButtonKeyboardClose"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Keyboard close button clicked"));
+			isKeyboardOpen = false;
+			if (refToKeyboardActor != nullptr) {
+				refToKeyboardActor->SetActorHiddenInGame(true);
+				refToKeyboardActor->SetActorEnableCollision(false);
+			}
+
+		// Keyboard shift
+		} else if (selected.thingIs.Contains(TEXT("ButtonKeyboardShift"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Keyboard shift button clicked"));
+			isShifted = !isShifted;
+			shiftLetters();
+
+		// Keyboard keys
+		} else if (selected.thingIs.Contains(TEXT("ButtonKeyboard"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Keyboard key clicked: %s"), *selected.thingIs);
+
+			// Get the letter
+			FString letter = selected.thingIs.Replace(TEXT("ButtonKeyboard"), TEXT(""));
+			
+			// Handle is shifted
+			if (letter != "Backspace") {
+				if (isShifted) {
+					letter = letter.ToUpper();
+				} else {
+					letter = letter.ToLower();
+				}
+				if (isShifted) {
+					isShifted = false;
+					shiftLetters();
+				}
+			}
+
+			// If it's the default text, for now empty it
+			if (currentName == defaultNameText && editting == "name") {
+				currentName = TEXT("");
+			} else if (currentSeed == defaultSeedText && editting == "seed") {
+				currentSeed = TEXT("");
+			}
+
+			// Add this to the corresponding string
+			if (letter == "Backspace") {
+				if (editting == "name" && currentName.Len() > 0) {
+					currentName = currentName.LeftChop(1);
+				} else if (editting == "seed" && currentSeed.Len() > 0) {
+					currentSeed = currentSeed.LeftChop(1);
+				}
+			} else {
+				if (editting == "name") {
+					currentName += letter;
+				} else if (editting == "seed") {
+					currentSeed += letter;
+				}
+			}
+
+			// If they're empty, reset to the hint text
+			if (currentName.Len() == 0 && editting == "name") {
+				currentName = defaultNameText;
+				isShifted = true;
+				shiftLetters();
+			}
+			if (currentSeed.Len() == 0 && editting == "seed") {
+				currentSeed = defaultSeedText;
+				isShifted = true;
+				shiftLetters();
+			}
+
+			// Update the UI element
+			if (refToNameActor != nullptr) {
+				UWidgetComponent* WidgetComponentName = Cast<UWidgetComponent>(refToNameActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponentName != nullptr) {
+					UUserWidget* UserWidgetName = WidgetComponentName->GetUserWidgetObject();
+					if (UserWidgetName != nullptr) {
+						if (editting == "name") {
+							UTextBlock* NameText = Cast<UTextBlock>(UserWidgetName->GetWidgetFromName(TEXT("EditableName")));
+							if (NameText != nullptr) {
+								NameText->SetText(FText::FromString(currentName));
+							}
+						} else if (editting == "seed") {
+							UTextBlock* SeedText = Cast<UTextBlock>(UserWidgetName->GetWidgetFromName(TEXT("EditableSeed")));
+							if (SeedText != nullptr) {
+								SeedText->SetText(FText::FromString(currentSeed));
+							}
+						}
+					}
 				}
 			}
 
@@ -2878,20 +3062,33 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							backgroundLetter = backgroundToLetterNoGods[currentBackground];
 						}
 
-						// Write all the commands
-						for (int i = 0; i < currentName.Len(); i++) {
-							writeCommandQueued(currentName.Mid(i, 1));
+						// Write the name
+						if (currentName.Len() == 0 || currentName == defaultNameText) {
+							writeCommandQueued("*");
+						} else {
+							for (int i = 0; i < currentName.Len(); i++) {
+								writeCommandQueued("backspace");
+							}
+							for (int i = 0; i < currentName.Len(); i++) {
+								writeCommandQueued(currentName.Mid(i, 1));
+							}
 						}
+						
+						// Select seed run
 						for (int i = 0; i < 10; i++) {
 							writeCommandQueued("up");
 						}
 						writeCommandQueued("down");
 						writeCommandQueued("enter");
-						if (currentSeed != "0") {
+
+						// Write the seed
+						if (currentSeed != defaultSeedText) {
 							for (int i = 0; i < currentSeed.Len(); i++) {
 								writeCommandQueued(currentSeed.Mid(i, 1));
 							}
 						}
+
+						// Start the run
 						writeCommandQueued("enter");
 						writeCommandQueued(speciesLetter);
 						writeCommandQueued(backgroundLetter);
@@ -3208,7 +3405,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 		// If right clicking on one of the equipped slots
-		} else if (selected.thingIs.Contains(TEXT("EquippedButton")) && inventoryOpen) {
+		} else if (selected.thingIs.Contains(TEXT("EquippedButton"))) {
 
 			// If we have something equipped
 			if (rightText != "Nothing wielded") {
@@ -3217,9 +3414,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				bool found = false;
 				for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 					for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
-						if (inventoryLocToLetter[i][j].Len() > 0 && inventoryLetterToName[inventoryLocToLetter[i][j]].Contains(TEXT("(weapon)"))) {
+						if (inventoryLocToLetter[i][j].Len() > 0 && inventoryLetterToName.Contains(inventoryLocToLetter[i][j]) && inventoryLetterToName[inventoryLocToLetter[i][j]].Contains(TEXT("(weapon)"))) {
 							writeCommandQueued("i");
 							writeCommandQueued(inventoryLocToLetter[i][j]);
+							writeCommandQueued(">");
 							writeCommandQueued(">");
 							writeCommandQueued("escape");
 							writeCommandQueued("escape");
@@ -3365,6 +3563,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					if (hotbarInfos[hotbarIndex].type == "InventoryItem") {
 						writeCommandQueued("i");
 						writeCommandQueued(hotbarInfos[hotbarIndex].letter);
+						writeCommandQueued(">");
 						writeCommandQueued(">");
 						writeCommandQueued("escape");
 						writeCommandQueued("escape");
@@ -3616,7 +3815,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			FString letter = inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x];
 
 			// If the name is different
-			if (!rightText.Contains(inventoryLetterToName[letter])) {
+			if (!rightText.Contains(inventoryLetterToName[letter]) && !inventoryLetterToName[letter].Contains(TEXT("(weapon)"))) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Equipping item via drag onto equip slot %s"), *inventoryLetterToName[letter]);
 
 				// Try to equip it
@@ -3659,7 +3858,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					hotbarInfos[hotbarIndex].name = spellLetterToInfo[spellLetters[thingBeingDragged.thingIndex]].name;
 				}
 
+				// We need to redraw the hotbar
 				shouldRedrawHotbar = true;
+
 			}
 
 		// If we're dragging something in the inventory
@@ -3688,10 +3889,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		refToDescriptionActor->SetActorHiddenInGame(true);
 		thingBeingDragged = SelectedThing();
 
+	// TODO
 	} else if (key == "debug") {
 
 		// show everything
-		// writeCommandQueued("ctrl-X");
+		writeCommandQueued("ctrl-X");
 
 		// level up
 		// writeCommandQueued("&");
@@ -3725,53 +3927,53 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// writeCommandQueued("&");
 		// writeCommandQueued("w");
 
-		// change level TODO
-		TArray<TTuple<FString, FString>> branches = {
-			{"Dungeon", "D"},
-			{"Temple", "T"},
-			{"Lair", "L"},
-			{"Swamp", "S"},
-			{"Shoals", "A"},
-			{"SnakePit", "P"},
-			{"SpiderNest", "N"},
-			{"SlimePits", "M"},
-			{"OrcishMines", "O"},
-			{"ElvenHalls", "E"},
-			{"Vaults", "V"},
-			{"Crypt", "C"},
-			{"Tomb", "W"},
-			{"Depths", "U"},
-			{"Hell", "H"},
-			{"Dis", "I"},
-			{"Gehenna", "G"},
-			{"Cocytus", "X"},
-			{"Tartarus", "Y"},
-			{"Zot", "Z"},
-			{"Abyss", "J"},
-			{"Pandemonium", "R"},
-			{"Ziggurat", "Q"},
-			{"Bazaar", "1"},
-			{"Trove", "2"},
-			{"Sewer", "3"},
-			{"Ossuary", "4"},
-			{"Bailey", "5"},
-			{"Ice Cave", "6"},
-			{"Volcano", "7"},
-			{"Wizlab", "8"},
-			{"Desolation", "9"},
-			{"Gauntlet", "!"},
-			{"Arena", "\""},
-			{"Crucible", "@"},
-		};
-		writeCommandQueued("&");
-		writeCommandQueued("~");
-		for (int i = 0; i < branches.Num(); i++) {
-			if (currentBranch == branches[i].Key) {
-				writeCommandQueued(branches[i+1 % branches.Num()].Value);
-				break;
-			}
-		}
-		writeCommandQueued("enter");
+		// change level
+		// TArray<TTuple<FString, FString>> branches = {
+		// 	{"Dungeon", "D"},
+		// 	{"Temple", "T"},
+		// 	{"Lair", "L"},
+		// 	{"Swamp", "S"},
+		// 	{"Shoals", "A"},
+		// 	{"SnakePit", "P"},
+		// 	{"SpiderNest", "N"},
+		// 	{"SlimePits", "M"},
+		// 	{"OrcishMines", "O"},
+		// 	{"ElvenHalls", "E"},
+		// 	{"Vaults", "V"},
+		// 	{"Crypt", "C"},
+		// 	{"Tomb", "W"},
+		// 	{"Depths", "U"},
+		// 	{"Hell", "H"},
+		// 	{"Dis", "I"},
+		// 	{"Gehenna", "G"},
+		// 	{"Cocytus", "X"},
+		// 	{"Tartarus", "Y"},
+		// 	{"Zot", "Z"},
+		// 	{"Abyss", "J"},
+		// 	{"Pandemonium", "R"},
+		// 	{"Ziggurat", "Q"},
+		// 	{"Bazaar", "1"},
+		// 	{"Trove", "2"},
+		// 	{"Sewer", "3"},
+		// 	{"Ossuary", "4"},
+		// 	{"Bailey", "5"},
+		// 	{"Ice Cave", "6"},
+		// 	{"Volcano", "7"},
+		// 	{"Wizlab", "8"},
+		// 	{"Desolation", "9"},
+		// 	{"Gauntlet", "!"},
+		// 	{"Arena", "\""},
+		// 	{"Crucible", "@"},
+		// };
+		// writeCommandQueued("&");
+		// writeCommandQueued("~");
+		// for (int i = 0; i < branches.Num(); i++) {
+		// 	if (currentBranch == branches[i].Key) {
+		// 		writeCommandQueued(branches[i+1 % branches.Num()].Value);
+		// 		break;
+		// 	}
+		// }
+		// writeCommandQueued("enter");
 
 		// all scrolls
 		// TArray<FString> scrollNames = {
@@ -3874,7 +4076,7 @@ void Adcss::Tick(float DeltaTime) {
 		selected = SelectedThing();
 	}
 	FCollisionResponseParams CollRes;
-	if (GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, COQP, CollRes)) {
+	if (!inMainMenu && GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, COQP, CollRes)) {
 		if (HitResult.bBlockingHit) {
 			AActor* hitActor = HitResult.GetActor();
 			if (hitActor != nullptr) {
@@ -4714,19 +4916,24 @@ void Adcss::Tick(float DeltaTime) {
 					break;
 				}
 			}
-			if (hasSaves && !hasReturnedToMainMenu) {
+			if (hasSaves) {
+				inMainMenu = true;
 
 				// Get the saves in the current menu
 				FString quickLoad = TEXT("");
 				for (int i = 2; i < charArray.Num(); i++) {
 					if (charArray[i].Contains(TEXT("a level"))) {
-						FString name = charArray[i].Mid(17, 80-17).TrimStartAndEnd();
+						FString name = charArray[i].Mid(17, 80-17);
+						name = name.Replace(TEXT("[Seeded]"), TEXT(""));
+						name = name.TrimStartAndEnd();
 						if (!saveNames.Contains(name)) {
 							UE_LOG(LogTemp, Display, TEXT("Found save: %s"), *name);
 							saveNames.Emplace(name);
 						}
 					} else if (charArray[i].Contains(TEXT("quick-load"))) {
-						quickLoad = charArray[i].Mid(28, 80-28).TrimStartAndEnd();
+						quickLoad = charArray[i].Mid(28, 80-28);
+						quickLoad = quickLoad.Replace(TEXT("[Seeded]"), TEXT(""));
+						quickLoad = quickLoad.TrimStartAndEnd();
 						quickLoad = quickLoad.Replace(TEXT("the"), TEXT("")).Replace(TEXT(" "), TEXT("")).Replace(TEXT(" "), TEXT(""));
 						UE_LOG(LogTemp, Display, TEXT("Quick load: %s"), *quickLoad);
 					}
@@ -4788,6 +4995,8 @@ void Adcss::Tick(float DeltaTime) {
 					}
 				}
 
+			} else {
+				inMainMenu = false;
 			}
 
 			// If we just used a scroll and it's asking us where to blink to
@@ -5274,7 +5483,7 @@ void Adcss::Tick(float DeltaTime) {
 
 			}
 
-			// If it's the shop menu TODO
+			// If it's the shop menu
 			// 			Welcome to Quirharo's Antique Armour Shop! What would you like to do?           
 			//  a -   81 gold   a chain mail                                                   
 			//  b -   36 gold   a leather armour                                               
@@ -5449,6 +5658,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Pray here with"))
 				|| charArray[i].Contains(TEXT("shop in the dungeon"))
 				|| charArray[i].Contains(TEXT("A stone archway that seems to"))
+				|| charArray[i].Contains(TEXT("A decorative fountain"))
 				|| charArray[i].Contains(TEXT("It can be dug through"))
 				|| charArray[i].Contains(TEXT("Range:"))
 				) {
@@ -5476,15 +5686,19 @@ void Adcss::Tick(float DeltaTime) {
 						typeOfThing = TEXT("Potion");
 					} else if (charArray[i].Contains(TEXT("To read a")) || charArray[i].Contains(TEXT("disposable arcane formula"))) {
 						typeOfThing = TEXT("Scroll");
-					} else if (charArray[i].Contains(TEXT("trap."))) {
+					} else if (charArray[i].Contains(TEXT(" trap"))) {
 						typeOfThing = TEXT("Trap");
-					} else if (charArray[i].Contains(TEXT("altar"))) {
+					} else if (charArray[i].Contains(TEXT(" altar"))) {
 						typeOfThing = TEXT("Altar");
-					} else if (charArray[i].Contains(TEXT("arch"))) {
+					} else if (charArray[i].Contains(TEXT(" arch"))) {
 						typeOfThing = TEXT("Arch");
-					} else if (charArray[i].Contains(TEXT("statue"))) {
+					} else if (charArray[i].Contains(TEXT(" statue"))) {
 						typeOfThing = TEXT("Statue");
-					} else if (charArray[i].Contains(TEXT("shop"))) {
+					} else if (charArray[i].Contains(TEXT(" idol"))) {
+						typeOfThing = TEXT("Idol");
+					} else if (charArray[i].Contains(TEXT(" fountain"))) {
+						typeOfThing = TEXT("Fountain");
+					} else if (charArray[i].Contains(TEXT(" shop"))) {
 						typeOfThing = TEXT("Shop");
 					}
 
@@ -5493,16 +5707,15 @@ void Adcss::Tick(float DeltaTime) {
 						|| charArray[i].Contains(TEXT("To read a")) 
 						|| charArray[i].Contains(TEXT("indicates the spell")) 
 						|| charArray[i].Contains(TEXT("prefixes")) 
-						|| charArray[i].Contains(TEXT("(i)nscribe")) 
+						|| charArray[i].Contains(TEXT("(i)")) 
 						|| charArray[i].Contains(TEXT("While standing here")) 
 						|| charArray[i].Contains(TEXT("armor}")) 
 						|| charArray[i].Contains(TEXT("key. ")) 
 						|| charArray[i].Contains(TEXT("You are here.")) 
 						|| charArray[i].Contains(TEXT("Pray here with > to learn more")) 
-						|| charArray[i].Contains(TEXT("(>)pray")) 
-						|| charArray[i].Contains(TEXT("(>)enter")) 
+						|| charArray[i].Contains(TEXT("(>)")) 
 						|| (charArray[i].Contains(TEXT("{")) && i > 1) 
-						|| charArray[i].Contains(TEXT("(g)o")) 
+						|| charArray[i].Contains(TEXT("(g)")) 
 						|| charArray[i].Contains(TEXT("sum of A"))) {
 						continue;
 					}
@@ -5532,6 +5745,10 @@ void Adcss::Tick(float DeltaTime) {
 						toAdd[i] = TEXT(' ');
 					}
 				}
+
+				// Get rid of some other phrases
+				toAdd = toAdd.Replace(TEXT(" (target"), TEXT(""));
+				toAdd = toAdd.Replace(TEXT("with [v])."), TEXT(""));
 
 				// Remove until the first period
 				int32 periodIndex = toAdd.Find(TEXT("."));
@@ -5577,6 +5794,7 @@ void Adcss::Tick(float DeltaTime) {
 				}
 
 				// Set the usage based on the type of object
+				UE_LOG(LogTemp, Display, TEXT("Type of thing: %s"), *typeOfThing);
 				currentUsage = TEXT("");
 				if (typeOfThing == TEXT("Enemy")) {
 					currentUsage = TEXT("Press USE on a adjacent monster to attack with your equipped weapon.");
@@ -5762,7 +5980,6 @@ void Adcss::Tick(float DeltaTime) {
 						} else {
 							UE_LOG(LogTemp, Display, TEXT("INVENTORY - already contains %s"), *hotkey);
 						}
-						shouldRedrawInventory = true;
 					}
 				}
 				inventoryLetterToNamePrev = inventoryLetterToName;
@@ -5780,6 +5997,9 @@ void Adcss::Tick(float DeltaTime) {
 						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
 							UE_LOG(LogTemp, Display, TEXT("INVENTORY - loc (%d, %d) %s"), i, j, *inventoryLocToLetter[i][j]);
 						}
+					}
+					for (int i = 0; i < numHotbarSlots; i++) {
+						UE_LOG(LogTemp, Display, TEXT("INVENTORY - hotbar slot %d: %s"), i, *hotbarInfos[i].letter);
 					}
 
 					// Make sure all of locs to letter are valid
@@ -5877,6 +6097,10 @@ void Adcss::Tick(float DeltaTime) {
 							}
 						}
 					}
+
+					// We should redraw
+					shouldRedrawInventory = true;
+					shouldRedrawHotbar = true;
 
 				}
 
@@ -6149,8 +6373,18 @@ void Adcss::Tick(float DeltaTime) {
 
 								// Statues
 								} else if (description.Contains(TEXT("statue"))) {
-									levelInfo[yCoord][xCoord].enemy = description;
-									levelInfo[yCoord][xCoord].enemyHotkey = hotkey;
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
+
+								// Idols
+								} else if (description.Contains(TEXT("idol"))) {
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
+
+								// Fountains
+								} else if (description.Contains(TEXT("fountain"))) {
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
 								// Arches
 								} else if (description.Contains(TEXT("arch"))) {
@@ -6391,8 +6625,6 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 			
-			// When we kill something, do a ctrl-X TODO
-
 			// If trying to attack unarmed, let them
 			FString lastLine = charArray[charArray.Num()-1];
 			int lastLineInd = 2;
