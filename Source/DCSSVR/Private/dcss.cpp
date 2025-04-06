@@ -3,10 +3,12 @@
 // TODO
 
 // 0.1 Initial Release
-// - coglins
-// - report bug button
-// - enable VR
+// - bug data dump
+// - enable desktop VR
+// - enable quest VR
+// - disable coglins for now
 // - gates
+// - putting on a ring when we already have two equipped
 // - all the monsters
 // - all the items
 // - all the spells
@@ -183,6 +185,11 @@ TArray<FString> choiceLetters;
 bool isChoiceOpen;
 FString choiceType;
 
+// Bug reporting TODO
+FString currentBug;
+FString defaultBugText;
+float lastBugSubmitted;
+
 // Music/audio stuff
 int trackInd;
 TArray<FString> musicListNames;
@@ -301,6 +308,109 @@ void Adcss::writeCommand(FString input) {
 void Adcss::writeCommandQueued(FString input) {
 	UE_LOG(LogTemp, Display, TEXT("Adding command to queue: %s"), *input);
 	commandQueue.Add(input);
+}
+
+// From https://dev.epicgames.com/community/learning/tutorials/R6rv/unreal-engine-upload-an-image-using-http-post-request-c
+TArray<uint8> FStringToUint8(const FString& InString)
+{
+	TArray<uint8> OutBytes;
+ 
+	// Handle empty strings
+	if (InString.Len() > 0)
+	{
+		FTCHARToUTF8 Converted(*InString); // Convert to UTF8
+		OutBytes.Append(reinterpret_cast<const uint8*>(Converted.Get()), Converted.Length());
+	}
+ 
+	return OutBytes;
+}
+
+// Submit a bug report with a message
+void Adcss::submitBug(FString message) {
+
+	// If it's the default message, clear it
+	if (message == defaultBugText || message == TEXT("")) {
+		message = TEXT("no message");
+	}
+
+	// Generate the data dump TODO
+	FString dump = TEXT("");
+	dump += TEXT("this is an example data dump");
+
+	// Metadata
+	FString app = TEXT("DCSSVR");
+	FString version = TEXT("0.1");
+	FString label = TEXT("bug report");
+
+	// Debugging output
+	UE_LOG(LogTemp, Display, TEXT("Bug report message: %s"), *message);
+	UE_LOG(LogTemp, Display, TEXT("Bug report dump: %s"), *dump);
+
+	// Build the response
+	FString boundary = TEXT("AaB03x");
+	FString messageContent = TEXT("");
+
+	// The user's message
+	messageContent += TEXT("--") + boundary + TEXT("\r\n");
+	messageContent += TEXT("Content-Disposition: form-data; name=\"text\"\r\n");
+	messageContent += TEXT("Content-Type: text/plain\r\n");
+	messageContent += "\r\n";
+	messageContent += message + TEXT("\r\n");
+
+	// Metadata
+	messageContent += TEXT("--") + boundary + TEXT("\r\n");
+	messageContent += TEXT("Content-Disposition: form-data; name=\"app\"\r\n");
+	messageContent += TEXT("Content-Type: text/plain\r\n");
+	messageContent += "\r\n";
+	messageContent += app + TEXT("\r\n");
+	messageContent += TEXT("--") + boundary + TEXT("\r\n");
+	messageContent += TEXT("Content-Disposition: form-data; name=\"version\"\r\n");
+	messageContent += TEXT("Content-Type: text/plain\r\n");
+	messageContent += "\r\n";
+	messageContent += version + TEXT("\r\n");
+	messageContent += TEXT("--") + boundary + TEXT("\r\n");
+	messageContent += TEXT("Content-Disposition: form-data; name=\"label\"\r\n");
+	messageContent += TEXT("Content-Type: text/plain\r\n");
+	messageContent += "\r\n";
+	messageContent += label + TEXT("\r\n");
+
+	// The dump
+	messageContent += TEXT("--") + boundary + TEXT("\r\n");
+	messageContent += TEXT("Content-Disposition: form-data; name=\"log\"; filename=\"dump.txt\"\r\n");
+	messageContent += TEXT("Content-Type: text/plain\r\n");
+	messageContent += "\r\n";
+	messageContent += dump + TEXT("\r\n");
+
+	// The end of the message
+	messageContent += TEXT("--") + boundary + TEXT("--\r\n");
+
+	// Get rid of the extra spaces
+	messageContent = messageContent.Replace(TEXT("    "), TEXT(""));
+
+	// Send it (hard-coded URL because it's just a shitty little VPS with nothing)
+	UE_LOG(LogTemp, Display, TEXT("Sending request to server: %s"), *messageContent);
+	TArray<uint8> messageEncoded = FStringToUint8(messageContent);
+	TSharedRef<IHttpRequest> FileUploadRequest = (&FHttpModule::Get())->CreateRequest();
+	FileUploadRequest->SetVerb("POST");
+	FileUploadRequest->SetHeader("Content-Type", "multipart/form-data; boundary=" + boundary);
+	FileUploadRequest->SetContent(messageEncoded);
+	FileUploadRequest->SetURL("http://146.59.228.169:9110/api/submit");
+	FileUploadRequest->OnProcessRequestComplete().BindLambda(
+		[this](
+			FHttpRequestPtr pRequest,
+			FHttpResponsePtr pResponse,
+			bool connectedSuccessfully) mutable {
+				if (connectedSuccessfully) {
+					UE_LOG(LogTemp, Display, TEXT("Request completed successfully."));
+					UE_LOG(LogTemp, Display, TEXT("Response code: %d"), pResponse->GetResponseCode());
+					UE_LOG(LogTemp, Display, TEXT("Response content: %s"), *pResponse->GetContentAsString());
+				} else {
+					UE_LOG(LogTemp, Error, TEXT("Request failed."));
+				}
+		});
+	FileUploadRequest->ProcessRequest();
+	UE_LOG(LogTemp, Display, TEXT("Request sent"));
+
 }
 
 // Clear all items and enemies in info
@@ -747,6 +857,9 @@ void Adcss::init() {
 	editting = TEXT("");
 	defaultNameText = TEXT("(random name)");
 	defaultSeedText = TEXT("(random seed)");
+	defaultBugText = TEXT("(click to type)");
+	currentBug = defaultBugText;
+ 	lastBugSubmitted = -100000;
 	shopItems.Empty();
 	shopTitle = TEXT("");
 	showingShop = false;
@@ -2230,6 +2343,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Get the letter
 			FString letter = selected.thingIs.Replace(TEXT("ButtonKeyboard"), TEXT(""));
+			if (letter == "Space") {
+				letter = " ";
+			}
 			
 			// Handle is shifted
 			if (letter != "Backspace") {
@@ -2245,10 +2361,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 			// If it's the default text, for now empty it
-			if (currentName == defaultNameText && editting == "name") {
-				currentName = TEXT("");
-			} else if (currentSeed == defaultSeedText && editting == "seed") {
-				currentSeed = TEXT("");
+			if (editting == "name") {
+				currentName = currentName.Replace(*defaultNameText, TEXT(""));
+			} else if (editting == "seed") {
+				currentSeed = currentSeed.Replace(*defaultSeedText, TEXT(""));
+			} else if (editting == "bug") {
+				currentBug = currentBug.Replace(*defaultBugText, TEXT(""));
 			}
 
 			// Add this to the corresponding string
@@ -2257,12 +2375,16 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					currentName = currentName.LeftChop(1);
 				} else if (editting == "seed" && currentSeed.Len() > 0) {
 					currentSeed = currentSeed.LeftChop(1);
+				} else if (editting == "bug" && currentBug.Len() > 0) {
+					currentBug = currentBug.LeftChop(1);
 				}
 			} else {
 				if (editting == "name") {
 					currentName += letter;
 				} else if (editting == "seed") {
 					currentSeed += letter;
+				} else if (editting == "bug") {
+					currentBug += letter;
 				}
 			}
 
@@ -2277,9 +2399,14 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				isShifted = true;
 				shiftLetters();
 			}
+			if (currentBug.Len() == 0 && editting == "bug") {
+				currentBug = defaultBugText;
+				isShifted = true;
+				shiftLetters();
+			}
 
 			// Update the UI element
-			if (refToNameActor != nullptr) {
+			if (refToNameActor != nullptr && (editting == "name" || editting == "seed")) { 
 				UWidgetComponent* WidgetComponentName = Cast<UWidgetComponent>(refToNameActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 				if (WidgetComponentName != nullptr) {
 					UUserWidget* UserWidgetName = WidgetComponentName->GetUserWidgetObject();
@@ -2296,6 +2423,75 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							}
 						}
 					}
+				}
+			} else if (refToSettingsActor != nullptr && editting == "bug") {
+				UWidgetComponent* WidgetComponentBug = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponentBug != nullptr) {
+					UUserWidget* UserWidgetBug = WidgetComponentBug->GetUserWidgetObject();
+					if (UserWidgetBug != nullptr) {
+						UTextBlock* BugText = Cast<UTextBlock>(UserWidgetBug->GetWidgetFromName(TEXT("EditableBug")));
+						if (BugText != nullptr) {
+							BugText->SetText(FText::FromString(currentBug));
+						}
+					}
+				}
+			}
+
+		// If it's the submit bug button
+		} else if (selected.thingIs.Contains(TEXT("ButtonSettingsBug"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Submit bug button clicked"));
+
+			// Make sure it's been long enough
+			double currentTime = FPlatformTime::Seconds();
+			if (currentTime - lastBugSubmitted > 300.0) {
+
+				// Submit the bug
+				submitBug(currentBug);
+
+				// Reset the text
+				currentBug = defaultBugText;
+				if (refToSettingsActor != nullptr && editting == "bug") {
+					UWidgetComponent* WidgetComponentBug = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+					if (WidgetComponentBug != nullptr) {
+						UUserWidget* UserWidgetBug = WidgetComponentBug->GetUserWidgetObject();
+						if (UserWidgetBug != nullptr) {
+							UTextBlock* BugText = Cast<UTextBlock>(UserWidgetBug->GetWidgetFromName(TEXT("EditableBug")));
+							if (BugText != nullptr) {
+								BugText->SetText(FText::FromString(currentBug));
+							}
+						}
+					}
+				}
+
+				// Close the settings
+				settingsOpen = false;
+				if (refToSettingsActor != nullptr) {
+					refToSettingsActor->SetActorHiddenInGame(!settingsOpen);
+					refToSettingsActor->SetActorEnableCollision(settingsOpen);
+				}
+
+				// Update the last submitted time
+				lastBugSubmitted = currentTime;
+
+			// Otherwise, just log it
+			} else {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Bug already submitted recently"));
+			}
+
+		// If it's the edit bug button
+		} else if (selected.thingIs.Contains(TEXT("ButtonEditBug"))) {
+			editting = "bug";
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Edit bug button clicked"));
+			if (currentBug == defaultBugText || currentBug == TEXT("")) {
+				isShifted = true;
+				shiftLetters();
+			}
+			isKeyboardOpen = true;
+			if (refToKeyboardActor != nullptr) {
+				if (isKeyboardOpen) {
+					UE_LOG(LogTemp, Display, TEXT("Showing keyboard actor"));
+					refToKeyboardActor->SetActorHiddenInGame(false);
+					refToKeyboardActor->SetActorEnableCollision(true);
 				}
 			}
 

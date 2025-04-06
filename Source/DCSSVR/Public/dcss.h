@@ -19,6 +19,9 @@
 #include "Components/Image.h"
 #include "Components/Button.h"
 #include "Components/Border.h"
+#include "Interfaces/IHttpRequest.h"
+#include "Interfaces/IHttpResponse.h"
+#include "HttpModule.h"
 #include "Kismet/GameplayStatics.h"
 #include "RHIFeatureLevel.h"
 #include "dcss.generated.h"
@@ -149,6 +152,7 @@ public:
 	void init();
 	void clearThings();
 	void shiftLetters();
+	void submitBug(FString message);
 
 protected:
 

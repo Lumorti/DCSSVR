@@ -11,5 +11,9 @@ public class DCSSVRTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V5;
 
 		ExtraModuleNames.AddRange( new string[] { "DCSSVR" } );
+
+		// BuildEnvironment = TargetBuildEnvironment.Unique;
+	    // bUseLoggingInShipping = true;
+
 	}
 }
