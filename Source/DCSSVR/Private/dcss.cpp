@@ -1,20 +1,18 @@
 #include "dcss.h"
 
-// TODO
+// TODO list
+FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - bug data dump
 // - enable desktop VR
 // - enable quest VR
-// - disable coglins for now
 // - gates
-// - putting on a ring when we already have two equipped
 // - all the monsters
 // - all the items
 // - all the spells
 // - all the abilities
 
-// 0.2 First update, hopefully filled with community suggestions
+// 0.2 First update, hopefully with community suggestions
 // - map?
 // - footstep/attacking/casting/monster sounds?
 // - nearest stairs indicator?
@@ -23,9 +21,7 @@
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
-// Which developer thought that was a good idea? 
 // Who ever compares two objects and wants a transformation on them first?
-// "A" == "a" is true? What? Should "101" be equal to "5" just because it is if you convert it to binary? 
 template<typename TValueType>
 struct FCaseSensitiveLookupKeyFuncs : BaseKeyFuncs<TValueType, FString>
 {
@@ -74,6 +70,7 @@ TArray<FString> commandQueue;
 double oldTime;
 int numProcessed;
 int prevProcessed;
+bool crawlHasStarted;
 
 // Tile info type
 struct TileInfo {
@@ -185,7 +182,7 @@ TArray<FString> choiceLetters;
 bool isChoiceOpen;
 FString choiceType;
 
-// Bug reporting TODO
+// Bug reporting
 FString currentBug;
 FString defaultBugText;
 float lastBugSubmitted;
@@ -333,13 +330,159 @@ void Adcss::submitBug(FString message) {
 		message = TEXT("no message");
 	}
 
-	// Generate the data dump TODO
+	// Generate the data dump
 	FString dump = TEXT("");
-	dump += TEXT("this is an example data dump");
+
+	// Also put the message at the top
+	dump += TEXT("Bug report message: ") + message + TEXT("\n");
+
+	// The whole inventory
+	dump += TEXT("\nInventory letter to name:\n");
+	for (auto& Elem : inventoryLetterToName) {
+		dump += Elem.Key + TEXT(": ") + Elem.Value + TEXT("\n");
+	}
+
+	// The inventory locations
+	dump += TEXT("\nInventory loc to letter: \n");
+	for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+		for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+			if (inventoryLocToLetter[i][j] != TEXT("")) {
+				dump += FString::Printf(TEXT("%d %d %s "), i, j, *inventoryLocToLetter[i][j]) + TEXT("\n");
+			}
+		}
+	}
+
+	// The hotbar info
+	dump += TEXT("\nHotbar info:\n");
+	for (int i = 0; i < hotbarInfos.Num(); i++) {
+		dump += FString::Printf(TEXT("%d %s %s %s "), i, *hotbarInfos[i].letter, *hotbarInfos[i].name, *hotbarInfos[i].type) + TEXT("\n");
+	}
+
+	// Status stuff
+	dump += FString::Printf(TEXT("\nLeft text: %s\n"), *leftText);
+	dump += FString::Printf(TEXT("Right text: %s\n"), *rightText);
+	dump += FString::Printf(TEXT("Status text: %s\n"), *statusText);
+	dump += TEXT("Gold: ") + FString::FromInt(gold) + TEXT("\n");
+
+	// Command queue
+	dump += TEXT("\nCommand queue:\n");
+	for (int i = 0; i < commandQueue.Num(); i++) {
+		dump += FString::Printf(TEXT("%d %s\n"), i, *commandQueue[i]);
+	}
+
+	// Passives list
+	dump += TEXT("\nPassives:\n");
+	for (int i = 0; i < passives.Num(); i++) {
+		dump += passives[i] + TEXT("\n");
+	}
+
+	// Abilities list
+	dump += TEXT("\nAbilities:\n");
+	for (auto& Elem : abilityLetterToInfo) {
+		dump += Elem.Key + TEXT(": ") + Elem.Value.name + TEXT(" ") + FString::FromInt(Elem.Value.failure) + TEXT("\n");
+	}
+
+	// Spells list
+	dump += TEXT("\nSpells:\n");
+	for (auto& Elem : spellLetterToInfo) {
+		dump += Elem.Key + TEXT(": ") + Elem.Value.name + TEXT(" ") + FString::FromInt(Elem.Value.failure) + TEXT("\n");
+	}
+
+	// Output buffer
+	dump += TEXT("\nMost recent output buffer: ") + outputBuffer + TEXT("\n");
+
+	// The char array
+	dump += TEXT("\nChar array:\n");
+	for (int i = 0; i < charArray.Num(); i++) {
+		dump += FString::Printf(TEXT("%s\n"), *charArray[i]);
+	}
+	// Level ascii
+	dump += TEXT("\nLevel ascii:\n");
+	for (int i = 0; i < levelAscii.Num(); i++) {
+		for (int j = 0; j < levelAscii[i].Num(); j++) {
+			dump += levelAscii[i][j] + TEXT(" ");
+		}
+		dump += TEXT("\n");
+	}
+
+	// Level info
+	dump += TEXT("\nCurrent chars:\n");
+	for (int i = 0; i < levelInfo.Num(); i++) {
+		for (int j = 0; j < levelInfo[i].Num(); j++) {
+			dump += levelInfo[i][j].currentChar + TEXT(" ");
+		}
+		dump += TEXT("\n");
+	}
+	dump += TEXT("\nFloor chars:\n");
+	for (int i = 0; i < levelInfo.Num(); i++) {
+		for (int j = 0; j < levelInfo[i].Num(); j++) {
+			dump += levelInfo[i][j].floorChar + TEXT(" ");
+		}
+		dump += TEXT("\n");
+	}
+	dump += TEXT("\nItems:\n");
+	for (int i = 0; i < levelInfo.Num(); i++) {
+		for (int j = 0; j < levelInfo[i].Num(); j++) {
+			for (int k = 0; k < levelInfo[i][j].items.Num(); k++) {
+				if (levelInfo[i][j].items[k] != TEXT("")) {
+					dump += FString::Printf(TEXT("%d %d %s %s "), i, j, *levelInfo[i][j].items[k], *levelInfo[i][j].itemHotkeys[k]) + TEXT("\n");
+				}
+			}
+		}
+	}
+	dump += TEXT("\nEffects:\n");
+	for (int i = 0; i < levelInfo.Num(); i++) {
+		for (int j = 0; j < levelInfo[i].Num(); j++) {
+			if (levelInfo[i][j].effect != TEXT("")) {
+				dump += FString::Printf(TEXT("%d %d %s "), i, j, *levelInfo[i][j].effect) + TEXT("\n");
+			}
+		}
+	}
+	dump += TEXT("\nEnemies:\n");
+	for (int i = 0; i < levelInfo.Num(); i++) {
+		for (int j = 0; j < levelInfo[i].Num(); j++) {
+			if (levelInfo[i][j].enemy != TEXT("")) {
+				dump += FString::Printf(TEXT("%d %d %s "), i, j, *levelInfo[i][j].enemy) + TEXT("\n");
+			}
+		}
+	}
+
+	// Current description
+	dump += FString::Printf(TEXT("\nCurrent description:\n%s\n"), *currentDescription);
+	dump += FString::Printf(TEXT("Current usage: %s\n"), *currentUsage);
+	dump += FString::Printf(TEXT("Current type: %s\n"), *currentType);
+
+	// Most recent overview text
+	dump += FString::Printf(TEXT("\nMost recent overview text:\n%s\n"), *overviewText);
+
+	// Currently selected
+	dump += FString::Printf(TEXT("\nCurrent UI: %s\n"), *currentUI);
+	dump += FString::Printf(TEXT("Currently selected: %d %d %s %d\n"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
+	dump += FString::Printf(TEXT("Currently dragging: %d %d %s %d\n"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
+
+	// Skills
+	dump += TEXT("\nSkills: \n");
+	for (auto& Elem : skillNameToInfo) {
+		dump += Elem.Key + TEXT(": ") + FString::Printf(TEXT("%f %d %d %d\n"), Elem.Value.level, Elem.Value.focussed, Elem.Value.train, Elem.Value.apt);
+	}
+
+	// Log text
+	dump += TEXT("\nLog text: \n");
+	for (int i = 0; i < logText.Num(); i++) {
+		dump += FString::Printf(TEXT("%d %s\n"), i, *logText[i]);
+	}
+
+	// List of missing things
+	dump += TEXT("\nList of missing things: ");
+	for (auto& Elem : listOfMissingThings) {
+		if (Elem.Len() > 0) {
+			dump += Elem + TEXT(", ");
+		}
+	}
+	dump += TEXT("\n");
 
 	// Metadata
 	FString app = TEXT("DCSSVR");
-	FString version = TEXT("0.1");
 	FString label = TEXT("bug report");
 
 	// Debugging output
@@ -825,6 +968,7 @@ void Adcss::init() {
 	maxItems = 100;
 	skipNextFullDescription = false;
 	wallScaling = 4.0f;
+	crawlHasStarted = false;
 	hasBeenWelcomed = false;
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
 	halfDiagWallScaling = sqrt(0.5 * wallScaling * wallScaling);
@@ -2244,6 +2388,15 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
+				} else if (choiceType == "removal") {
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					inventoryLetterToName.Empty();
+					writeCommandQueued("i");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued("escape");
+					writeCommandQueued("escape");
 				} else {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
@@ -2470,6 +2623,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					refToSettingsActor->SetActorEnableCollision(settingsOpen);
 				}
 
+				// Close the keyboard
+				isKeyboardOpen = false;
+				if (refToKeyboardActor != nullptr) {
+					refToKeyboardActor->SetActorHiddenInGame(true);
+					refToKeyboardActor->SetActorEnableCollision(false);
+				}
+
 				// Update the last submitted time
 				lastBugSubmitted = currentTime;
 
@@ -2571,6 +2731,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("enter");
 			writeCommandQueued("y");
 			writeCommandQueued("escape");
+			inventoryLetterToName.Empty();
 			writeCommandQueued("i");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -2801,25 +2962,55 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			FString useType = "w";
 			FString letter = inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x];
 			FString itemName = inventoryLetterToName[letter];
+			bool isRing = false;
+			bool isScroll = false;
 			if (currentDescription.Contains(TEXT("(worn)"))) {
 				useType = "t";
 			} else if (currentDescription.Contains(TEXT("(weapon)"))) {
 				useType = "u";
 			} else if (currentDescription.Contains(TEXT(" scroll ")) || currentDescription.Contains(TEXT(" scrolls "))) {
 				useType = "r";
+				isScroll = true;
 			} else if (currentDescription.Contains(TEXT(" potion ")) || currentDescription.Contains(TEXT(" potions "))) {
 				useType = "q";
 			} else if (currentDescription.Contains(TEXT(" ring "))) {
-				useType = "p";
+				isRing = true;
+				if (currentDescription.Contains(TEXT("(left hand)")) || currentDescription.Contains(TEXT("(right hand)"))) {
+					useType = "r";
+				} else {
+					useType = "p";
+				}
+			} else if (currentDescription.Contains(TEXT(" amulet "))) {
+				if (currentDescription.Contains(TEXT("(around neck)"))) {
+					useType = "r";
+				} else {
+					useType = "p";
+				}
 			}
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Using item %s with command %s"), *inventoryLetterToName[letter], *useType);
+
+			// If it's a ring, check if we already have two equipped
+			FString leftFound = TEXT("");
+			FString rightFound = TEXT("");
+			if (isRing) {
+				for (auto& Elem : inventoryLetterToName) {
+					if (Elem.Value.Contains(TEXT(" ring ")) && Elem.Value.Contains(TEXT("(left hand)"))) {
+						leftFound = Elem.Value.Replace(TEXT("(left hand)"), TEXT("")).TrimStartAndEnd();
+					} else if (Elem.Value.Contains(TEXT(" ring ")) && Elem.Value.Contains(TEXT("(right hand)"))) {
+						rightFound = Elem.Value.Replace(TEXT("(right hand)"), TEXT("")).TrimStartAndEnd();
+					}
+				}
+			}
+			bool twoUniqueRings = leftFound.Len() > 0 && rightFound.Len() > 0 && leftFound != rightFound;
 
 			// Use the item
 			writeCommandQueued("i");
 			writeCommandQueued(letter);
 			writeCommandQueued(useType);
-			if (useType != "r") {
+			if (!isScroll && !(twoUniqueRings && isRing && useType == "p")) {
 				inventoryLetterToName.Empty();
+				writeCommandQueued("escape");
+				writeCommandQueued("escape");
 				writeCommandQueued("i");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -2828,11 +3019,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
-			} else {
+			} else if (isScroll) {
 				justUsedAScroll = true;
 				locForBlink = FIntVector2(selected.x, selected.y);
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used a scroll"));
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Blink location: (%d, %d)"), locForBlink.X, locForBlink.Y);
+			} else if (isRing) {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Two rings already equipped"));
 			}
 
    			// Reset some things if we used the item
@@ -2965,6 +3158,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 		// If it's the main play button
 		} else if (selected.thingIs == "ButtonMainPlay") {
+
+			// Don't allow until loaded
+			if (!crawlHasStarted) {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu play button clicked, but not loaded yet"));
+				return;
+			}
 
 			// Get the main menu widget
 			UWidgetComponent* WidgetComponentMain = Cast<UWidgetComponent>(refToMainMenuActor->GetComponentByClass(UWidgetComponent::StaticClass()));
@@ -5114,6 +5313,7 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (hasSaves) {
 				inMainMenu = true;
+				crawlHasStarted = true;
 
 				// Get the saves in the current menu
 				FString quickLoad = TEXT("");
@@ -5856,6 +6056,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("A stone archway that seems to"))
 				|| charArray[i].Contains(TEXT("A decorative fountain"))
 				|| charArray[i].Contains(TEXT("It can be dug through"))
+				|| charArray[i].Contains(TEXT("(i)nscribe"))
 				|| charArray[i].Contains(TEXT("Range:"))
 				) {
 					isItemOrEnemy = true;
@@ -5911,6 +6112,7 @@ void Adcss::Tick(float DeltaTime) {
 						|| charArray[i].Contains(TEXT("Pray here with > to learn more")) 
 						|| charArray[i].Contains(TEXT("(>)")) 
 						|| (charArray[i].Contains(TEXT("{")) && i > 1) 
+						|| (charArray[i].Contains(TEXT("}")) && i > 1) 
 						|| charArray[i].Contains(TEXT("(g)")) 
 						|| charArray[i].Contains(TEXT("sum of A"))) {
 						continue;
@@ -5949,6 +6151,7 @@ void Adcss::Tick(float DeltaTime) {
 				// Remove until the first period
 				int32 periodIndex = toAdd.Find(TEXT("."));
 				FString withoutFirst = toAdd.Mid(periodIndex+1);
+				FString newFirst = toAdd.Left(periodIndex+1).TrimStartAndEnd();
 
 				// Determine where to add the new section
 				FString searchString = TEXT("");
@@ -5973,6 +6176,11 @@ void Adcss::Tick(float DeltaTime) {
 				} else {
 					currentDescription += toAdd;
 				}
+
+				// Update the first line
+				int firstLineEnd = currentDescription.Find(TEXT("."));
+				FString descWithoutFirst = currentDescription.Mid(firstLineEnd+1);
+				currentDescription = newFirst + descWithoutFirst;
 
 				// If the last line is a blank line, remove it
 				while (currentDescription.EndsWith(TEXT("\n"))) {
@@ -6122,12 +6330,13 @@ void Adcss::Tick(float DeltaTime) {
 				inventoryLetterToNamePrev = inventoryLetterToName; 
 				int numBlankLines = 0;
 				for (int i = 0; i < charArray.Num(); i++) {
-					UE_LOG(LogTemp, Display, TEXT("INVENTORY -> %s"), *charArray[i]);
 
 					// If it's a blank line
 					if (charArray[i].TrimStartAndEnd().Len() == 0) {
 						numBlankLines++;
+						continue;
 					}
+					UE_LOG(LogTemp, Display, TEXT("INVENTORY -> %s"), *charArray[i]);
 
 					// If it's a line with an item
 					if (charArray[i].Contains(TEXT(" - "))) {
@@ -6191,7 +6400,9 @@ void Adcss::Tick(float DeltaTime) {
 					}
 					for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
-							UE_LOG(LogTemp, Display, TEXT("INVENTORY - loc (%d, %d) %s"), i, j, *inventoryLocToLetter[i][j]);
+							if (inventoryLocToLetter[i][j].Len() > 0) {
+								UE_LOG(LogTemp, Display, TEXT("INVENTORY - loc (%d, %d) %s"), i, j, *inventoryLocToLetter[i][j]);
+							}
 						}
 					}
 					for (int i = 0; i < numHotbarSlots; i++) {
@@ -6317,7 +6528,7 @@ void Adcss::Tick(float DeltaTime) {
 			// [!] acquire|examine items  [a-d] select item for acquirement         [Esc] exit                  
 			bool isChoice = false;
 			FString choiceTitle = "";
-			choiceType = "default";
+			FString newChoiceType = "default";
 			for (int i = 0; i < charArray.Num(); i++) {
 				if (charArray[i].Contains(TEXT("You have a choice of")) 
 				|| charArray[i].Contains(TEXT("Choose an item to acquire"))
@@ -6325,6 +6536,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Enchant which weapon?"))
 				|| charArray[i].Contains(TEXT("Identify which item?"))
 				|| charArray[i].Contains(TEXT("Enchant which item?"))
+				|| charArray[i].Contains(TEXT("Remove which one?"))
 				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
 					choiceTitle = charArray[i].TrimStartAndEnd();
@@ -6332,12 +6544,16 @@ void Adcss::Tick(float DeltaTime) {
 						choiceTitle += TEXT(" ") + charArray[i+1].TrimStartAndEnd();
 					}
 					if (choiceTitle.Contains(TEXT("to acquire"))) {
-						choiceType = "acquirement";
+						newChoiceType = "acquirement";
+					}
+					if (choiceTitle.Contains(TEXT("Remove which one?"))) {
+						newChoiceType = "removal";
 					}
 					break;
 				}
 			}
 			if (isChoice) {
+				choiceType = newChoiceType;
 				choiceLetters.Empty();
 				choiceNames.Empty();
 				isChoiceOpen = true;
@@ -6349,6 +6565,7 @@ void Adcss::Tick(float DeltaTime) {
 						if (charArray[i].Contains(TEXT("random choice")) 
 							|| charArray[i].Contains(TEXT("Help"))
 							|| charArray[i].Contains(TEXT("[!]"))
+							|| charArray[i].Contains(TEXT("Jewelry"))
 							|| charArray[i].Contains(TEXT("List aptitudes"))) {
 							continue;
 						}

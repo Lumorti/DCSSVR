@@ -1,8 +1,9 @@
 type = normal
-name = Xyovioso
+name = Luke
 species = Coglin
 background = Fighter
 weapon = rapier
+game_seed = 6346747349347847081
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false
