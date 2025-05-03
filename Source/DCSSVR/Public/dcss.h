@@ -19,6 +19,7 @@
 #include "Components/Image.h"
 #include "Components/Button.h"
 #include "Components/Border.h"
+#include "MotionControllerComponent.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
 #include "HttpModule.h"

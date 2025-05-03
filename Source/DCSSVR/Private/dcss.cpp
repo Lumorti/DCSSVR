@@ -4,7 +4,9 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - enable desktop VR
+// - bottom bar moving with head rotation
+// - inventory opens relative to camera
+// - hand switching
 // - enable quest VR
 // - gates
 // - all the monsters
@@ -71,6 +73,7 @@ double oldTime;
 int numProcessed;
 int prevProcessed;
 bool crawlHasStarted;
+bool vrEnabled;
 
 // Tile info type
 struct TileInfo {
@@ -931,6 +934,16 @@ void Adcss::init() {
 		UE_LOG(LogTemp, Error, TEXT("Templates not set"));
 		return;
 	}
+
+	// Determine if vr is enabled TODO
+	// if (GEditor && GEditor->IsVRPreviewActive()) {
+	// 	UE_LOG(LogTemp, Display, TEXT("VR is enabled"));
+	// 	vrEnabled = true;
+	// } else {
+	// 	UE_LOG(LogTemp, Display, TEXT("VR is not enabled"));
+	// 	vrEnabled = false;
+	// }
+	vrEnabled = true;
 
 	// Set params
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
@@ -4460,10 +4473,32 @@ void Adcss::Tick(float DeltaTime) {
 	if (currentDescription.Contains(TEXT("blink")) || currentDescription.Contains(TEXT("disposable arcane formula"))) {
 		isBlinkOrUnknown = true;
 	}
+
+	// If in VR, get the location and direction of the right hand
+	FVector handLocation = FVector(0.0f, 0.0f, 0.0f);
+	FVector handForward = FVector(0.0f, 0.0f, 0.0f);
+	FVector handRight = FVector(0.0f, 0.0f, 0.0f);
+	FVector handUp = FVector(0.0f, 0.0f, 0.0f);
+	if (vrEnabled) {
+		TArray<UMotionControllerComponent*> motionControllers;
+		GetWorld()->GetFirstPlayerController()->GetPawn()->GetComponents(UMotionControllerComponent::StaticClass(), motionControllers);
+		for (UMotionControllerComponent* motionController : motionControllers) {
+			if (motionController->MotionSource == "RightAim") {
+				handLocation = motionController->GetComponentLocation();
+				handForward = motionController->GetForwardVector();
+				handRight = motionController->GetRightVector();
+				handUp = motionController->GetUpVector();
+			}
+		}
+	}
 	
-	// Checking what the player is looking at
+	// Checking what the player is looking at TODO
 	FVector Start = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetCameraLocation();
 	FVector End = Start + GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetActorForwardVector() * 3000.0f;
+	if (vrEnabled) {
+		Start = handLocation;
+		End = Start + handForward * 3000.0f;
+	}
 	FHitResult HitResult;
 	FCollisionQueryParams COQP;			
 	COQP.AddIgnoredActor(GetWorld()->GetFirstPlayerController()->GetPawn());
@@ -4563,13 +4598,38 @@ void Adcss::Tick(float DeltaTime) {
 
 		// Move it to the right location
 		FVector descriptionLocation = playerLocation + playerForward * 150.0f + playerRight * 30.0f;
-		refToDescriptionActor->SetActorLocation(descriptionLocation);
 
 		// Set the rotation towards the player
 		FRotator descriptionRotation = playerForward.Rotation();
 		descriptionRotation.Pitch = 0.0f;
 		descriptionRotation.Yaw += 190.0f;
 		descriptionRotation.Roll = 0.0f;
+
+		// If in VR
+		if (vrEnabled) {
+
+			// The vector from the player to the hand
+			FVector handToHead = handLocation - playerLocation;
+			double handToHeadLength = handToHead.Size();
+			handToHead.Normalize();
+
+			// Get the vectors perpendicular to this one
+			FVector handToHeadRight = -FVector(handToHead.Y, -handToHead.X, 0.0f);
+			FVector handToHeadUp = FVector(0.0f, 0.0f, 1.0f);
+
+			// The location
+			descriptionLocation = playerLocation + handToHead * (100.0f + handToHeadLength * 2) + handToHeadRight * 50.0f + handToHeadUp * 50.0f;
+
+			// The rotation
+			FRotator handToHeadRotation = handToHead.Rotation();
+			handToHeadRotation.Pitch = 0.0f;
+			handToHeadRotation.Yaw += 190.0f;
+			handToHeadRotation.Roll = 0.0f;
+			descriptionRotation = handToHeadRotation;
+
+		}
+
+		refToDescriptionActor->SetActorLocation(descriptionLocation);
 		refToDescriptionActor->SetActorRotation(descriptionRotation);
 
 	}
