@@ -19,6 +19,8 @@
 #include "Components/Image.h"
 #include "Components/Button.h"
 #include "Components/Border.h"
+#include "Runtime/HeadMountedDisplay/Public/IHeadMountedDisplay.h"
+#include "IXRTrackingSystem.h"
 #include "MotionControllerComponent.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
@@ -126,6 +128,10 @@ public:
 	// Debug angles
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector debugAngles;
+
+	// Keep track of the current active hand
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FString activeHand = "right";
 
 	// The function called when a key is pressed
 	UFUNCTION(BlueprintCallable, Category = "DCSSVR")

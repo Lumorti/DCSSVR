@@ -935,16 +935,6 @@ void Adcss::init() {
 		return;
 	}
 
-	// Determine if vr is enabled TODO
-	// if (GEditor && GEditor->IsVRPreviewActive()) {
-	// 	UE_LOG(LogTemp, Display, TEXT("VR is enabled"));
-	// 	vrEnabled = true;
-	// } else {
-	// 	UE_LOG(LogTemp, Display, TEXT("VR is not enabled"));
-	// 	vrEnabled = false;
-	// }
-	vrEnabled = true;
-
 	// Set params
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
 	exePath = binaryPath + TEXT("crawl.exe");
@@ -4454,6 +4444,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 void Adcss::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
+	// Determine if vr is enabled TODO
+	IHeadMountedDisplay* hmd = GEngine->XRSystem->GetHMDDevice();
+	vrEnabled = hmd != nullptr && hmd->IsHMDConnected() && hmd->IsHMDEnabled();
+
 	// Reset highlight on everything
 	for (int i = 0; i < enemyUseCount; i++) {
 		enemyArray[i]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(false);
@@ -4474,7 +4468,7 @@ void Adcss::Tick(float DeltaTime) {
 		isBlinkOrUnknown = true;
 	}
 
-	// If in VR, get the location and direction of the right hand
+	// If in VR, get the location and direction of the hand
 	FVector handLocation = FVector(0.0f, 0.0f, 0.0f);
 	FVector handForward = FVector(0.0f, 0.0f, 0.0f);
 	FVector handRight = FVector(0.0f, 0.0f, 0.0f);
@@ -4483,7 +4477,7 @@ void Adcss::Tick(float DeltaTime) {
 		TArray<UMotionControllerComponent*> motionControllers;
 		GetWorld()->GetFirstPlayerController()->GetPawn()->GetComponents(UMotionControllerComponent::StaticClass(), motionControllers);
 		for (UMotionControllerComponent* motionController : motionControllers) {
-			if (motionController->MotionSource == "RightAim") {
+			if ((motionController->MotionSource == "RightAim" && activeHand == "right") || (motionController->MotionSource == "LeftAim" && activeHand == "left")) {
 				handLocation = motionController->GetComponentLocation();
 				handForward = motionController->GetForwardVector();
 				handRight = motionController->GetRightVector();
@@ -4593,6 +4587,33 @@ void Adcss::Tick(float DeltaTime) {
 		refToChoiceActor->SetActorRotation(choiceRotation);
 	}
 
+	// The bottom bar should vaguely following the player TODO
+	FVector dir(0.0f, 0.0f, 0.0f);
+	if (playerForwardProjected.X > 0 && std::abs(playerForwardProjected.Y) < std::abs(playerForwardProjected.X)) {
+		dir = FVector(1.0f, 0.0f, 0.0f);
+	} else if (playerForwardProjected.X < 0 && std::abs(playerForwardProjected.Y) < std::abs(playerForwardProjected.X)) {
+		dir = FVector(-1.0f, 0.0f, 0.0f);
+	} else if (playerForwardProjected.Y > 0 && std::abs(playerForwardProjected.Y) > std::abs(playerForwardProjected.X)) {
+		dir = FVector(0.0f, 1.0f, 0.0f);
+	} else if (playerForwardProjected.Y < 0 && std::abs(playerForwardProjected.Y) > std::abs(playerForwardProjected.X)) {
+		dir = FVector(0.0f, -1.0f, 0.0f);
+	}
+	if (refToUIActor != nullptr) {
+
+		// Set the location
+		FVector newLoc = playerLocation + dir * 125.0f;
+		newLoc.Z = 100.0f;
+		refToUIActor->SetActorLocation(newLoc);
+
+		// Set the rotation towards dir
+		FRotator uiRotation = dir.Rotation();
+		uiRotation.Pitch = 40.0f;
+		uiRotation.Yaw += 180.0f;
+		uiRotation.Roll = 0.0f;
+		refToUIActor->SetActorRotation(uiRotation);
+
+	}
+
 	// Keep the description panel following the player rotation
 	if (rmbOn) {
 
@@ -4615,6 +4636,9 @@ void Adcss::Tick(float DeltaTime) {
 
 			// Get the vectors perpendicular to this one
 			FVector handToHeadRight = -FVector(handToHead.Y, -handToHead.X, 0.0f);
+			if (activeHand == "left") {
+				handToHeadRight *= -1.0f;
+			}
 			FVector handToHeadUp = FVector(0.0f, 0.0f, 1.0f);
 
 			// The location
@@ -4623,7 +4647,11 @@ void Adcss::Tick(float DeltaTime) {
 			// The rotation
 			FRotator handToHeadRotation = handToHead.Rotation();
 			handToHeadRotation.Pitch = 0.0f;
-			handToHeadRotation.Yaw += 190.0f;
+			if (activeHand == "left") {
+				handToHeadRotation.Yaw += 170.0f;
+			} else {
+				handToHeadRotation.Yaw += 190.0f;
+			}
 			handToHeadRotation.Roll = 0.0f;
 			descriptionRotation = handToHeadRotation;
 
