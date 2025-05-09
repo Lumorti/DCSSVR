@@ -128,6 +128,8 @@ public:
 	// Debug angles
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector debugAngles;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	FVector debugAngles2;
 
 	// Keep track of the current active hand
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -146,6 +148,10 @@ public:
 	UDCSSSaveGame* saveGame;
 	UPROPERTY(VisibleAnywhere, Category = Basic)
 	UDCSSSaveGame* saveGameGlobal;
+
+	// Called from both blueprints and C++
+	UFUNCTION(BlueprintCallable, Category = "DCSSVR")
+	void toggleInventory();
 
 	// Various functions
 	void updateLevel();

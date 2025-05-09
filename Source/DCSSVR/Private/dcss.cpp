@@ -4,9 +4,9 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - bottom bar moving with head rotation
-// - inventory opens relative to camera
-// - hand switching
+// - BUG drinking potion finishing stack
+// - settings should follow inventory
+// - test packaged windows VR
 // - enable quest VR
 // - gates
 // - all the monsters
@@ -23,7 +23,7 @@ FString version = TEXT("0.1");
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
-// Who ever compares two objects and wants a transformation on them first?
+// "A" == "a"? Are you kidding me?
 template<typename TValueType>
 struct FCaseSensitiveLookupKeyFuncs : BaseKeyFuncs<TValueType, FString>
 {
@@ -171,6 +171,8 @@ FIntVector2 inventoryNextSpot;
 TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> inventoryLetterToNamePrev;
 int gold;
 FIntVector2 locForBlink;
+FVector inventoryRelLoc;
+FRotator inventoryRelRot;
 
 // Keyboard stuff
 bool isKeyboardOpen;
@@ -308,6 +310,43 @@ void Adcss::writeCommand(FString input) {
 void Adcss::writeCommandQueued(FString input) {
 	UE_LOG(LogTemp, Display, TEXT("Adding command to queue: %s"), *input);
 	commandQueue.Add(input);
+}
+
+// Toggle the inventory open/closed TODO
+void Adcss::toggleInventory() {
+
+	// Toggle it
+	inventoryOpen = !inventoryOpen;
+	if (refToInventoryActor != nullptr) {
+		refToInventoryActor->SetActorHiddenInGame(!inventoryOpen);
+		refToInventoryActor->SetActorEnableCollision(inventoryOpen);
+	}
+
+	// Depending on the current tab
+	if (inventoryOpen) {
+		UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory opened, current UI: %s"), *currentUI);
+		if (currentUI == "inventory") {
+			selected.thingIs = "ButtonInventory";
+			keyPressed("lmb", FVector2D(0.0f, 0.0f));
+			selected.thingIs = "OpenButton";
+		} else if (currentUI == "spells") {
+			selected.thingIs = "ButtonSpells";
+			keyPressed("lmb", FVector2D(0.0f, 0.0f));
+			selected.thingIs = "OpenButton";
+		} else if (currentUI == "abilities") {
+			selected.thingIs = "ButtonAbilities";
+			keyPressed("lmb", FVector2D(0.0f, 0.0f));
+			selected.thingIs = "OpenButton";
+		} else if (currentUI == "skills") {
+			selected.thingIs = "ButtonSkills";
+			keyPressed("lmb", FVector2D(0.0f, 0.0f));
+			selected.thingIs = "OpenButton";
+		} else if (currentUI == "character") {
+			selected.thingIs = "ButtonCharacter";
+			keyPressed("lmb", FVector2D(0.0f, 0.0f));
+			selected.thingIs = "OpenButton";
+		}
+	}
 }
 
 // From https://dev.epicgames.com/community/learning/tutorials/R6rv/unreal-engine-upload-an-image-using-http-post-request-c
@@ -973,6 +1012,8 @@ void Adcss::init() {
 	wallScaling = 4.0f;
 	crawlHasStarted = false;
 	hasBeenWelcomed = false;
+	inventoryRelLoc = FVector(0.0f, 150.0f, 200.0f);
+	inventoryRelRot = FRotator(0.0f, -90.0f, 0.0f);
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
 	halfDiagWallScaling = sqrt(0.5 * wallScaling * wallScaling);
 	inMainMenu = true;
@@ -2233,7 +2274,11 @@ void Adcss::buttonHovered(FString buttonName, bool hovered) {
 			// Get the description
 			FString description = backgroundDescriptions[backgroundName];
 			if (!hovered) {
-				description = defaultBackgroundDescription;
+				if (currentBackground == "none" || !backgroundDescriptions.Contains(currentBackground)) {
+					description = defaultBackgroundDescription;
+				} else {
+					description = backgroundDescriptions[currentBackground];
+				}
 			}
 
 			// Set the description text
@@ -2261,7 +2306,11 @@ void Adcss::buttonHovered(FString buttonName, bool hovered) {
 			// Get the description
 			FString description = speciesDescriptions[speciesName];
 			if (!hovered) {
-				description = defaultSpeciesDescription;
+				if (currentSpecies == "none" || !speciesDescriptions.Contains(currentSpecies)) {
+					description = defaultSpeciesDescription;
+				} else {
+					description = speciesDescriptions[currentSpecies];
+				}
 			}
 
 			// Set the description text
@@ -2958,7 +3007,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
 			UKismetSystemLibrary::QuitGame(myWorldRef, UGameplayStatics::GetPlayerController(myWorldRef, 0), QuitPreference, true);		
 
-		// If we're holding an item, equip or use it
+		// If we're holding an item, equip or use it TODO using the last potion
 		} else if (thingBeingDragged.thingIs == "InventoryItem"  && currentDescription.Len() > 0 && thingBeingDragged.x !=	-1  && thingBeingDragged.y != -1) {
 
 			// Determine what type of item it is
@@ -3032,6 +3081,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
    			// Reset some things if we used the item
+			// if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("") || useType == "q" || isScroll) {
 			if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("")) {
 				refToDescriptionActor->SetActorHiddenInGame(true);
 				thingBeingDragged = SelectedThing();
@@ -3113,35 +3163,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 		// If trying to show/hide the inventory
 		} else if (selected.thingIs == "OpenButton") {
-			inventoryOpen = !inventoryOpen;
-			refToInventoryActor->SetActorHiddenInGame(!inventoryOpen);
-			refToInventoryActor->SetActorEnableCollision(inventoryOpen);
-
-			// Depending on the current tab
-			if (inventoryOpen) {
-				UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory opened, current UI: %s"), *currentUI);
-				if (currentUI == "inventory") {
-					selected.thingIs = "ButtonInventory";
-					keyPressed("lmb", FVector2D(0.0f, 0.0f));
-					selected.thingIs = "OpenButton";
-				} else if (currentUI == "spells") {
-					selected.thingIs = "ButtonSpells";
-					keyPressed("lmb", FVector2D(0.0f, 0.0f));
-					selected.thingIs = "OpenButton";
-				} else if (currentUI == "abilities") {
-					selected.thingIs = "ButtonAbilities";
-					keyPressed("lmb", FVector2D(0.0f, 0.0f));
-					selected.thingIs = "OpenButton";
-				} else if (currentUI == "skills") {
-					selected.thingIs = "ButtonSkills";
-					keyPressed("lmb", FVector2D(0.0f, 0.0f));
-					selected.thingIs = "OpenButton";
-				} else if (currentUI == "character") {
-					selected.thingIs = "ButtonCharacter";
-					keyPressed("lmb", FVector2D(0.0f, 0.0f));
-					selected.thingIs = "OpenButton";
-				}
-			}
+			toggleInventory();
 
 		// If the settings open button
 		} else if (selected.thingIs == "ButtonSettings") {
@@ -4287,7 +4309,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		refToDescriptionActor->SetActorHiddenInGame(true);
 		thingBeingDragged = SelectedThing();
 
-	// TODO
+	// The debug key
 	} else if (key == "debug") {
 
 		// show everything
@@ -4444,7 +4466,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 void Adcss::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
-	// Determine if vr is enabled TODO
+	// Determine if vr is enabled
 	IHeadMountedDisplay* hmd = GEngine->XRSystem->GetHMDDevice();
 	vrEnabled = hmd != nullptr && hmd->IsHMDConnected() && hmd->IsHMDEnabled();
 
@@ -4486,7 +4508,7 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 	
-	// Checking what the player is looking at TODO
+	// Checking what the player is looking at
 	FVector Start = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetCameraLocation();
 	FVector End = Start + GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetActorForwardVector() * 3000.0f;
 	if (vrEnabled) {
@@ -4587,21 +4609,28 @@ void Adcss::Tick(float DeltaTime) {
 		refToChoiceActor->SetActorRotation(choiceRotation);
 	}
 
-	// The bottom bar should vaguely following the player TODO
+	// Keep track of which way the player is looking
 	FVector dir(0.0f, 0.0f, 0.0f);
+	FString dirString = "none";
 	if (playerForwardProjected.X > 0 && std::abs(playerForwardProjected.Y) < std::abs(playerForwardProjected.X)) {
 		dir = FVector(1.0f, 0.0f, 0.0f);
+		dirString = "right";
 	} else if (playerForwardProjected.X < 0 && std::abs(playerForwardProjected.Y) < std::abs(playerForwardProjected.X)) {
 		dir = FVector(-1.0f, 0.0f, 0.0f);
+		dirString = "left";
 	} else if (playerForwardProjected.Y > 0 && std::abs(playerForwardProjected.Y) > std::abs(playerForwardProjected.X)) {
 		dir = FVector(0.0f, 1.0f, 0.0f);
+		dirString = "up";
 	} else if (playerForwardProjected.Y < 0 && std::abs(playerForwardProjected.Y) > std::abs(playerForwardProjected.X)) {
 		dir = FVector(0.0f, -1.0f, 0.0f);
+		dirString = "down";
 	}
+
+	// The bottom bar should vaguely following the player
 	if (refToUIActor != nullptr) {
 
 		// Set the location
-		FVector newLoc = playerLocation + dir * 125.0f;
+		FVector newLoc = dir * 125.0f;
 		newLoc.Z = 100.0f;
 		refToUIActor->SetActorLocation(newLoc);
 
@@ -4642,7 +4671,7 @@ void Adcss::Tick(float DeltaTime) {
 			FVector handToHeadUp = FVector(0.0f, 0.0f, 1.0f);
 
 			// The location
-			descriptionLocation = playerLocation + handToHead * (100.0f + handToHeadLength * 2) + handToHeadRight * 50.0f + handToHeadUp * 50.0f;
+			descriptionLocation = playerLocation + handToHead * (100.0f + handToHeadLength * 2) + handToHeadRight * 60.0f + handToHeadUp * 70.0f;
 
 			// The rotation
 			FRotator handToHeadRotation = handToHead.Rotation();
@@ -4657,6 +4686,7 @@ void Adcss::Tick(float DeltaTime) {
 
 		}
 
+		// Set the location and rotation of the description
 		refToDescriptionActor->SetActorLocation(descriptionLocation);
 		refToDescriptionActor->SetActorRotation(descriptionRotation);
 
@@ -4666,16 +4696,45 @@ void Adcss::Tick(float DeltaTime) {
 	if (draggingInventory) {
 
 		// Move it to the right location
-		FVector inventoryLocation = playerLocation + playerForward * inventoryGrabDistance + playerRight * inventoryGrabPoint.X + playerUp * inventoryGrabPoint.Y;
-		refToInventoryActor->SetActorLocation(inventoryLocation);
+		inventoryRelLoc = playerLocation + playerForward * inventoryGrabDistance + playerRight * inventoryGrabPoint.X + playerUp * inventoryGrabPoint.Y;
+		if (vrEnabled) {
+			inventoryRelLoc = handLocation + handForward * inventoryGrabDistance + handRight * inventoryGrabPoint.X + handUp * inventoryGrabPoint.Y;
+		}
 
 		// Set the rotation towards the player
-		FRotator inventoryRotation = playerForward.Rotation();
-		inventoryRotation.Pitch *= -1.0f;
-		inventoryRotation.Yaw += 180.0f;
-		refToInventoryActor->SetActorRotation(inventoryRotation);
+		inventoryRelRot = (inventoryRelLoc - playerLocation).Rotation();
+		inventoryRelRot.Pitch *= -1.0f;
+		inventoryRelRot.Yaw += 180.0f;
+
+		// These should always be as though the player is facing up
+		if (dirString == "right") {
+			inventoryRelLoc = inventoryRelLoc.RotateAngleAxis(90.0f, playerUp);
+			inventoryRelRot.Yaw += 90.0f;
+		} else if (dirString == "left") {
+			inventoryRelLoc = inventoryRelLoc.RotateAngleAxis(-90.0f, playerUp);
+			inventoryRelRot.Yaw -= 90.0f;
+		} else if (dirString == "down") {
+			inventoryRelLoc = inventoryRelLoc.RotateAngleAxis(180.0f, playerUp);
+			inventoryRelRot.Yaw += 180.0f;
+		}
 
 	}
+
+	// Inventory should snap to the right quarter
+	FVector inventoryRelLocRotated = inventoryRelLoc;
+	FRotator inventoryRelRotRotated = inventoryRelRot;
+	if (dirString == "right") {
+		inventoryRelLocRotated = inventoryRelLoc.RotateAngleAxis(-90.0f, playerUp);
+		inventoryRelRotRotated.Yaw -= 90.0f;
+	} else if (dirString == "left") {
+		inventoryRelLocRotated = inventoryRelLoc.RotateAngleAxis(90.0f, playerUp);
+		inventoryRelRotRotated.Yaw += 90.0f;
+	} else if (dirString == "down") {
+		inventoryRelLocRotated = inventoryRelLoc.RotateAngleAxis(180.0f, playerUp);
+		inventoryRelRotRotated.Yaw -= 180.0f;
+	}
+	refToInventoryActor->SetActorLocation(inventoryRelLocRotated);
+	refToInventoryActor->SetActorRotation(inventoryRelRotRotated);
 
 	// If told to redraw the inventory
 	if (shouldRedrawInventory) {
