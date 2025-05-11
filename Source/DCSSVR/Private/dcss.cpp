@@ -4,8 +4,6 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - BUG drinking potion finishing stack
-// - settings should follow inventory
 // - test packaged windows VR
 // - enable quest VR
 // - gates
@@ -312,7 +310,7 @@ void Adcss::writeCommandQueued(FString input) {
 	commandQueue.Add(input);
 }
 
-// Toggle the inventory open/closed TODO
+// Toggle the inventory open/closed
 void Adcss::toggleInventory() {
 
 	// Toggle it
@@ -1107,7 +1105,7 @@ void Adcss::init() {
 	religionText = TEXT("You are not religious.");
 	overviewText = TEXT("");
 	skillNameToInfo.Empty();
-	defaultSkillDescription = TEXT("Hover over a skill to see a description, interact to change priority.\nThe training percent is auto-adjusted based on the skills you use most.");
+	defaultSkillDescription = "Hover over a skill to see a description, interact to change priority.\nThe training percent is auto-adjusted based on the skills you use most.";
 	menuOutput = ""
 "===START==="
 "                                                                                \n"
@@ -1615,6 +1613,10 @@ void Adcss::init() {
 	if (refToKeyboardActor != nullptr) {
 		refToKeyboardActor->SetActorHiddenInGame(true);
 		refToKeyboardActor->SetActorEnableCollision(false);
+	}
+	if (refToTutorialActor != nullptr) {
+		refToTutorialActor->SetActorHiddenInGame(true);
+		refToTutorialActor->SetActorEnableCollision(false);
 	}
 
 	// Load the global save game
@@ -2388,10 +2390,14 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 			refToUIActor->SetActorHiddenInGame(true);
 			refToUIActor->SetActorEnableCollision(false);
+			refToTutorialActor->SetActorHiddenInGame(true);
+			refToTutorialActor->SetActorEnableCollision(false);
 			refToInventoryActor->SetActorHiddenInGame(true);
 			refToInventoryActor->SetActorEnableCollision(false);
 			refToMainMenuActor->SetActorHiddenInGame(false);
 			refToMainMenuActor->SetActorEnableCollision(true);
+			refToMainInfoActor->SetActorHiddenInGame(false);
+			refToMainInfoActor->SetActorEnableCollision(true);
 			inventoryOpen = false;
 
 			// Close the process
@@ -2443,7 +2449,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				} else if (choiceType == "removal") {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
-					inventoryLetterToName.Empty();
+					writeCommandQueued("CLEARINV");
 					writeCommandQueued("i");
 					writeCommandQueued(">");
 					writeCommandQueued(">");
@@ -2783,7 +2789,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("enter");
 			writeCommandQueued("y");
 			writeCommandQueued("escape");
-			inventoryLetterToName.Empty();
+			writeCommandQueued("CLEARINV");
 			writeCommandQueued("i");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -3007,13 +3013,21 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
 			UKismetSystemLibrary::QuitGame(myWorldRef, UGameplayStatics::GetPlayerController(myWorldRef, 0), QuitPreference, true);		
 
-		// If we're holding an item, equip or use it TODO using the last potion
+		// If we're holding an item, equip or use it
 		} else if (thingBeingDragged.thingIs == "InventoryItem"  && currentDescription.Len() > 0 && thingBeingDragged.x !=	-1  && thingBeingDragged.y != -1) {
+
+			// Get the letter and item name
+			FString letter = inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x];
+			if (letter == TEXT("") || !inventoryLetterToName.Contains(letter)) {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Item not valid"));
+				refToDescriptionActor->SetActorHiddenInGame(true);
+				thingBeingDragged = SelectedThing();
+				return;
+			}
+			FString itemName = inventoryLetterToName[letter];
 
 			// Determine what type of item it is
 			FString useType = "w";
-			FString letter = inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x];
-			FString itemName = inventoryLetterToName[letter];
 			bool isRing = false;
 			bool isScroll = false;
 			if (currentDescription.Contains(TEXT("(worn)"))) {
@@ -3060,9 +3074,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(letter);
 			writeCommandQueued(useType);
 			if (!isScroll && !(twoUniqueRings && isRing && useType == "p")) {
-				inventoryLetterToName.Empty();
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
+				writeCommandQueued("CLEARINV");
 				writeCommandQueued("i");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -3081,8 +3095,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
    			// Reset some things if we used the item
-			// if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("") || useType == "q" || isScroll) {
-			if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("")) {
+			if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("") || useType == "q" || isScroll) {
 				refToDescriptionActor->SetActorHiddenInGame(true);
 				thingBeingDragged = SelectedThing();
 			}
@@ -3200,6 +3213,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					refToSaveActor->SetActorEnableCollision(true);
 					refToMainMenuActor->SetActorHiddenInGame(true);
 					refToMainMenuActor->SetActorEnableCollision(false);
+					refToMainInfoActor->SetActorHiddenInGame(true);
+					refToMainInfoActor->SetActorEnableCollision(false);
 					
 					// Populate the save list
 					savesPage = 0;
@@ -3248,6 +3263,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToSaveActor->SetActorEnableCollision(false);
 						refToMainMenuActor->SetActorHiddenInGame(false);
 						refToMainMenuActor->SetActorEnableCollision(true);
+						refToMainInfoActor->SetActorHiddenInGame(false);
+						refToMainInfoActor->SetActorEnableCollision(true);
 					} else if (selected.thingIs.Contains(TEXT("ButtonNewGame"))) {
 						refToBackgroundActor->SetActorHiddenInGame(false);
 						refToBackgroundActor->SetActorEnableCollision(true);
@@ -3292,6 +3309,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToUIActor->SetActorEnableCollision(true);
 						refToSaveActor->SetActorHiddenInGame(true);
 						refToSaveActor->SetActorEnableCollision(false);
+						refToTutorialActor->SetActorHiddenInGame(false);
+						refToTutorialActor->SetActorEnableCollision(true);
 						hasBeenWelcomed = false;
 
 					} else if (selected.thingIs.Contains(TEXT("ButtonDelete"))) {
@@ -3353,6 +3372,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 				}
 			}
+
+		// If it's the close tutorial button
+		} else if (selected.thingIs == "ButtonCloseTutorial") {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Tutorial close button clicked"));
+			refToTutorialActor->SetActorHiddenInGame(true);
+			refToTutorialActor->SetActorEnableCollision(false);
 
 		// If it's something in the species select
 		} else if (selected.thingIs.Contains(TEXT("ButtonBackground"))) {
@@ -3541,7 +3566,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					// For each of the top buttons
 					if (selected.thingIs == "ButtonInventory") {
 						UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory button clicked"));
-						inventoryLetterToName.Empty();
+						writeCommandQueued("CLEARINV");
 						writeCommandQueued("i");
 						writeCommandQueued(">");
 						writeCommandQueued(">");
@@ -4191,7 +4216,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("d");
 			writeCommandQueued(inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x]);
 			writeCommandQueued("enter");
-			inventoryLetterToName.Empty();
+			writeCommandQueued("CLEARINV");
 			writeCommandQueued("i");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -4210,7 +4235,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("!");
 			writeCommandQueued(levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex]);
 			writeCommandQueued("g");
-			inventoryLetterToName.Empty();
+			writeCommandQueued("CLEARINV");
 			writeCommandQueued("i");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -4243,7 +4268,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(letter);
 
 				// Refresh the inventory
-				inventoryLetterToName.Empty();
+				writeCommandQueued("CLEARINV");
 				writeCommandQueued("i");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -4313,6 +4338,17 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 	} else if (key == "debug") {
 
 		// show everything
+		// writeCommandQueued("ctrl-X");
+
+		// give a single potion
+		FString potionName = "potion of might";
+		writeCommandQueued("&");
+		writeCommandQueued("%");
+		for (int j = 0; j < potionName.Len(); j++) {
+			writeCommandQueued(potionName.Mid(j, 1));
+		}
+		writeCommandQueued("enter");
+		writeCommandQueued("enter");
 		writeCommandQueued("ctrl-X");
 
 		// level up
@@ -4466,9 +4502,29 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 void Adcss::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
+	// MAke sure all of the pointers are valid
+	if (refToDescriptionActor == nullptr 
+		|| refToInventoryActor == nullptr
+		|| refToUIActor == nullptr
+		|| refToDescriptionActor == nullptr
+		|| refToAltarActor == nullptr
+		|| refToSettingsActor == nullptr
+		|| refToDeathActor == nullptr
+		|| refToChoiceActor == nullptr
+		|| refToShopActor == nullptr
+		|| refToTutorialActor == nullptr
+		|| refToMainInfoActor == nullptr
+		|| refToKeyboardActor == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("One of the pointers is null"));
+		return;
+	}
+
 	// Determine if vr is enabled
-	IHeadMountedDisplay* hmd = GEngine->XRSystem->GetHMDDevice();
-	vrEnabled = hmd != nullptr && hmd->IsHMDConnected() && hmd->IsHMDEnabled();
+	if (GEngine != nullptr && GEngine->XRSystem != nullptr) {
+		IHeadMountedDisplay* hmd = GEngine->XRSystem->GetHMDDevice();
+		TSharedPtr<IStereoRendering, ESPMode::ThreadSafe> pStereo = GEngine->XRSystem->GetStereoRenderingDevice();
+		vrEnabled = hmd != nullptr && hmd->IsHMDConnected() && hmd->IsHMDEnabled() && pStereo->IsStereoEnabled();
+	}
 
 	// Reset highlight on everything
 	for (int i = 0; i < enemyUseCount; i++) {
@@ -4590,11 +4646,29 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 
-	// Things used for multiple things
-	FVector playerLocation = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetCameraLocation();
-	FVector playerForward = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetActorForwardVector();
-	FVector playerRight = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorRightVector();
-	FVector playerUp = GetWorld()->GetFirstPlayerController()->GetPawn()->GetActorUpVector();
+	// Get various pointers (world, player controller, etc)
+	APlayerController* playerController = GetWorld()->GetFirstPlayerController();
+	if (playerController == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Player controller is null"));
+		return;
+	}
+	APlayerCameraManager* playerCameraManager = playerController->PlayerCameraManager;
+	if (playerCameraManager == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Player camera manager is null"));
+		return;
+	}
+	APawn* playerPawn = playerController->GetPawn();
+	if (playerPawn == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Player pawn is null"));
+		return;
+	}
+
+
+	// Quantities used for various things
+	FVector playerLocation = playerCameraManager->GetCameraLocation();
+	FVector playerForward = playerCameraManager->GetActorForwardVector();
+	FVector playerRight = playerPawn->GetActorRightVector();
+	FVector playerUp = playerPawn->GetActorUpVector();
 	FVector playerForwardProjected = FVector(playerForward.X, playerForward.Y, 0.0f);
 	playerForwardProjected.Normalize();
 
@@ -4627,21 +4701,14 @@ void Adcss::Tick(float DeltaTime) {
 	}
 
 	// The bottom bar should vaguely following the player
-	if (refToUIActor != nullptr) {
-
-		// Set the location
-		FVector newLoc = dir * 125.0f;
-		newLoc.Z = 100.0f;
-		refToUIActor->SetActorLocation(newLoc);
-
-		// Set the rotation towards dir
-		FRotator uiRotation = dir.Rotation();
-		uiRotation.Pitch = 40.0f;
-		uiRotation.Yaw += 180.0f;
-		uiRotation.Roll = 0.0f;
-		refToUIActor->SetActorRotation(uiRotation);
-
-	}
+	FVector newLoc = dir * 125.0f;
+	newLoc.Z = 100.0f;
+	refToUIActor->SetActorLocation(newLoc);
+	FRotator uiRotation = dir.Rotation();
+	uiRotation.Pitch = 40.0f;
+	uiRotation.Yaw += 180.0f;
+	uiRotation.Roll = 0.0f;
+	refToUIActor->SetActorRotation(uiRotation);
 
 	// Keep the description panel following the player rotation
 	if (rmbOn) {
@@ -4692,7 +4759,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	}
 
-	// If dragging the inventory panel
+	// If dragging the inventory panel, set the relative location and rotation
 	if (draggingInventory) {
 
 		// Move it to the right location
@@ -4720,7 +4787,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	}
 
-	// Inventory should snap to the right quarter
+	// Inventory should snap to the correct quarter
 	FVector inventoryRelLocRotated = inventoryRelLoc;
 	FRotator inventoryRelRotRotated = inventoryRelRot;
 	if (dirString == "right") {
@@ -4735,6 +4802,26 @@ void Adcss::Tick(float DeltaTime) {
 	}
 	refToInventoryActor->SetActorLocation(inventoryRelLocRotated);
 	refToInventoryActor->SetActorRotation(inventoryRelRotRotated);
+
+	// The settings panel should also snap
+	FVector settingsLocation = dir * 125.0f;
+	settingsLocation.Z = 200.0f;
+	refToSettingsActor->SetActorLocation(settingsLocation);
+	FRotator settingsRotation = dir.Rotation();
+	settingsRotation.Pitch = 0.0f;
+	settingsRotation.Yaw += 180.0f;
+	settingsRotation.Roll = 0.0f;
+	refToSettingsActor->SetActorRotation(settingsRotation);
+
+	// The tutorial should also snap
+	FVector tutorialLocation = dir * 200.0f;
+	tutorialLocation.Z = 200.0f;
+	refToTutorialActor->SetActorLocation(tutorialLocation);
+	FRotator tutorialRotation = dir.Rotation();
+	tutorialRotation.Pitch = 0.0f;
+	tutorialRotation.Yaw += 180.0f;
+	tutorialRotation.Roll = 0.0f;
+	refToTutorialActor->SetActorRotation(tutorialRotation);
 
 	// If told to redraw the inventory
 	if (shouldRedrawInventory) {
@@ -5231,7 +5318,6 @@ void Adcss::Tick(float DeltaTime) {
 
 	// Keep the ui panel following the player
 	FVector uiLocation = playerLocation + FVector(100.0f, -20.0f, -50.0f);
-	//refToUIActor->SetActorLocation(uiLocation);
 
 	// Get the widget component of the ui actor
 	UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToUIActor->GetComponentByClass(UWidgetComponent::StaticClass()));
@@ -5290,6 +5376,8 @@ void Adcss::Tick(float DeltaTime) {
 		FString command = commandQueue[0];
 		if (command == "CLEAR") {
 			clearThings();
+		} else if (command == "CLEARINV") {
+			inventoryLetterToName.Empty();
 		} else if (command == "SKIP") {
 			skipNextFullDescription = true;
 		} else {
@@ -5602,7 +5690,7 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 			if (scrollFinished && justUsedAScroll) {
-				inventoryLetterToName.Empty();
+				writeCommandQueued("CLEARINV");
 				writeCommandQueued("i");
 				writeCommandQueued(">");
 				writeCommandQueued(">");

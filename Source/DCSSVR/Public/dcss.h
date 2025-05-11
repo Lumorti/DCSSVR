@@ -69,6 +69,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToKeyboardActor;
 
+	// The reference to the main info panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToMainInfoActor;
+
+	// The reference to the tutorial panel
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToTutorialActor;
+
 	// The reference to the inventory panel
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToInventoryActor;
