@@ -22,6 +22,12 @@ public:
 	TArray<FString> hotbarInfos;
 
 	UPROPERTY(VisibleAnywhere, Category = Basic)
+	FVector inventoryRelLoc;
+
+	UPROPERTY(VisibleAnywhere, Category = Basic)
+	FRotator inventoryRelRot;
+
+	UPROPERTY(VisibleAnywhere, Category = Basic)
 	float musicVolume;
 
 	UPROPERTY(VisibleAnywhere, Category = Basic)

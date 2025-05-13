@@ -4,16 +4,13 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - test packaged windows VR
-// - enable quest VR
-// - gates
-// - all the monsters
-// - all the items
-// - all the spells
-// - all the abilities
+// - BUG mana bar?
+// - FEATURE snap at 8 angles
+// - FEATURE map
+// - FEATURE gates
+// - FEATURE enable quest VR
 
 // 0.2 First update, hopefully with community suggestions
-// - map?
 // - footstep/attacking/casting/monster sounds?
 // - nearest stairs indicator?
 // - find/search?
@@ -655,6 +652,10 @@ void Adcss::saveEverything() {
 		saveGame->hotbarInfos.Add(hotbarInfos[i].name);
 		saveGame->hotbarInfos.Add(hotbarInfos[i].type);
 	}
+
+	// The inventory grab location TODO test
+	saveGame->inventoryRelLoc = inventoryRelLoc;
+	saveGame->inventoryRelRot = inventoryRelRot;
 
 	// The music volume
 	UAudioComponent* musicComponent = refToMusicActor->GetAudioComponent();
@@ -2654,7 +2655,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Make sure it's been long enough
 			double currentTime = FPlatformTime::Seconds();
-			if (currentTime - lastBugSubmitted > 300.0) {
+			if (currentTime - lastBugSubmitted > 30.0) {
 
 				// Submit the bug
 				submitBug(currentBug);
@@ -2693,7 +2694,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Otherwise, just log it
 			} else {
-				UE_LOG(LogTemp, Display, TEXT("INPUT - Bug already submitted recently"));
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Bug already submitted recently: %.2f seconds ago"), currentTime - lastBugSubmitted);
 			}
 
 		// If it's the edit bug button
@@ -4804,7 +4805,7 @@ void Adcss::Tick(float DeltaTime) {
 	refToInventoryActor->SetActorRotation(inventoryRelRotRotated);
 
 	// The settings panel should also snap
-	FVector settingsLocation = dir * 125.0f;
+	FVector settingsLocation = dir * 140.0f;
 	settingsLocation.Z = 200.0f;
 	refToSettingsActor->SetActorLocation(settingsLocation);
 	FRotator settingsRotation = dir.Rotation();
@@ -4822,6 +4823,16 @@ void Adcss::Tick(float DeltaTime) {
 	tutorialRotation.Yaw += 180.0f;
 	tutorialRotation.Roll = 0.0f;
 	refToTutorialActor->SetActorRotation(tutorialRotation);
+
+	// The keyboard should also snap TODO
+	FVector keyboardLoc = dir * 125.0f;
+	keyboardLoc.Z = 120.0f;
+	refToUIActor->SetActorLocation(keyboardLoc);
+	FRotator keyboardRotation = dir.Rotation();
+	keyboardRotation.Pitch = 40.0f;
+	keyboardRotation.Yaw += 180.0f;
+	keyboardRotation.Roll = 0.0f;
+	refToUIActor->SetActorRotation(keyboardRotation);
 
 	// If told to redraw the inventory
 	if (shouldRedrawInventory) {
