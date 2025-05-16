@@ -5,7 +5,6 @@ FString version = TEXT("0.1");
 
 // 0.1 Initial Release
 // - BUG mana bar?
-// - FEATURE snap at 8 angles
 // - FEATURE map
 // - FEATURE gates
 // - FEATURE enable quest VR
@@ -653,7 +652,7 @@ void Adcss::saveEverything() {
 		saveGame->hotbarInfos.Add(hotbarInfos[i].type);
 	}
 
-	// The inventory grab location TODO test
+	// The inventory grab location
 	saveGame->inventoryRelLoc = inventoryRelLoc;
 	saveGame->inventoryRelRot = inventoryRelRot;
 
@@ -1620,6 +1619,13 @@ void Adcss::init() {
 		refToTutorialActor->SetActorEnableCollision(false);
 	}
 
+	// Close the keyboard
+	isKeyboardOpen = false;
+	if (refToKeyboardActor != nullptr) {
+		refToKeyboardActor->SetActorHiddenInGame(true);
+		refToKeyboardActor->SetActorEnableCollision(false);
+	}
+
 	// Load the global save game
 	saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot("globalsavefile", 0));
 	if (saveGameGlobal == nullptr) {
@@ -1772,6 +1778,14 @@ void Adcss::updateLevel() {
 			wallSouth->SetActorHiddenInGame(true);
 			wallEast->SetActorHiddenInGame(true);
 			wallWest->SetActorHiddenInGame(true);
+			wallNorth->SetActorEnableCollision(false);
+			wallSouth->SetActorEnableCollision(false);
+			wallEast->SetActorEnableCollision(false);
+			wallWest->SetActorEnableCollision(false);
+			meshNameToThing.Add(wallNorth->GetName(), SelectedThing(j, i, "Wall", 0));
+			meshNameToThing.Add(wallSouth->GetName(), SelectedThing(j, i, "Wall", 1));
+			meshNameToThing.Add(wallEast->GetName(), SelectedThing(j, i, "Wall", 2));
+			meshNameToThing.Add(wallWest->GetName(), SelectedThing(j, i, "Wall", 3));
 
 			// The floor
 			AActor* floor = floorArray[i][j];
@@ -1831,6 +1845,10 @@ void Adcss::updateLevel() {
 				wallSouth->SetActorHiddenInGame(false);
 				wallEast->SetActorHiddenInGame(false);
 				wallWest->SetActorHiddenInGame(false);
+				wallNorth->SetActorEnableCollision(true);
+				wallSouth->SetActorEnableCollision(true);
+				wallEast->SetActorEnableCollision(true);
+				wallWest->SetActorEnableCollision(true);
 				wallNorth->SetActorLocation(FVector(xLoc + wallWidth / 2, yLoc, zLoc));
 				wallSouth->SetActorLocation(FVector(xLoc - wallWidth / 2, yLoc, zLoc));
 				wallEast->SetActorLocation(FVector(xLoc, yLoc + wallWidth / 2, zLoc));
@@ -4539,6 +4557,14 @@ void Adcss::Tick(float DeltaTime) {
 			floorArray[i][j]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(false);
 		}
 	}
+	for (int i = 0; i < gridWidth; i++) {
+		for (int j = 0; j < gridWidth; j++) {
+			wallArray[i][j][0]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(false);
+			wallArray[i][j][1]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(false);
+			wallArray[i][j][2]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(false);
+			wallArray[i][j][3]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(false);
+		}
+	}
 	floorArray[LOS][LOS]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(true);
 
 	// If the current scroll is a blink or unknown, we should show the targeting
@@ -4595,7 +4621,13 @@ void Adcss::Tick(float DeltaTime) {
 
 					// Highlight it
 					if (!rmbOn || isBlinkOrUnknown) {
-						hitMesh->SetRenderCustomDepth(true);
+
+						// If it's not a wall
+						if (selected.thingIs == TEXT("Wall")) {
+							selected = SelectedThing();
+						} else {
+							hitMesh->SetRenderCustomDepth(true);
+						}
 
 					// Or spell targeting
 					} else if (rmbOn && targetingRange >= 1) {
@@ -4703,10 +4735,10 @@ void Adcss::Tick(float DeltaTime) {
 
 	// The bottom bar should vaguely following the player
 	FVector newLoc = dir * 125.0f;
-	newLoc.Z = 100.0f;
+	newLoc.Z = 50.0f;
 	refToUIActor->SetActorLocation(newLoc);
 	FRotator uiRotation = dir.Rotation();
-	uiRotation.Pitch = 40.0f;
+	uiRotation.Pitch = 45.0f;
 	uiRotation.Yaw += 180.0f;
 	uiRotation.Roll = 0.0f;
 	refToUIActor->SetActorRotation(uiRotation);
@@ -4824,15 +4856,15 @@ void Adcss::Tick(float DeltaTime) {
 	tutorialRotation.Roll = 0.0f;
 	refToTutorialActor->SetActorRotation(tutorialRotation);
 
-	// The keyboard should also snap TODO
+	// The keyboard should also snap
 	FVector keyboardLoc = dir * 125.0f;
 	keyboardLoc.Z = 120.0f;
-	refToUIActor->SetActorLocation(keyboardLoc);
+	refToKeyboardActor->SetActorLocation(keyboardLoc);
 	FRotator keyboardRotation = dir.Rotation();
 	keyboardRotation.Pitch = 40.0f;
 	keyboardRotation.Yaw += 180.0f;
 	keyboardRotation.Roll = 0.0f;
-	refToUIActor->SetActorRotation(keyboardRotation);
+	refToKeyboardActor->SetActorRotation(keyboardRotation);
 
 	// If told to redraw the inventory
 	if (shouldRedrawInventory) {
