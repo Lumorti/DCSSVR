@@ -4,10 +4,8 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - BUG mana bar?
 // - FEATURE map
 // - FEATURE gates
-// - FEATURE enable quest VR
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -267,6 +265,13 @@ struct SelectedThing {
 	int y = -1;
 	FString thingIs = TEXT("");
 	int thingIndex = -1;
+	SelectedThing() {}
+	SelectedThing(int x, int y, FString thingIs, int thingIndex) {
+		this->x = x;
+		this->y = y;
+		this->thingIs = thingIs;
+		this->thingIndex = thingIndex;
+	}
 };
 SelectedThing selected;
 TMap<FString, SelectedThing, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<SelectedThing>> meshNameToThing;
@@ -972,9 +977,17 @@ void Adcss::init() {
 		return;
 	}
 
+	// Get the platform name TODO
+	FString platformName = UGameplayStatics::GetPlatformName();
+	UE_LOG(LogTemp, Display, TEXT("Platform name: %s"), *platformName);
+
 	// Set params
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
-	exePath = binaryPath + TEXT("crawl.exe");
+	if (platformName == TEXT("Windows")) {
+		exePath = binaryPath + TEXT("crawl.exe");
+	} else {
+		exePath = binaryPath + TEXT("crawl-arm");
+	}
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
 	args += TEXT(" -extra-opt-first bad_item_prompt=false ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=cloud ");
