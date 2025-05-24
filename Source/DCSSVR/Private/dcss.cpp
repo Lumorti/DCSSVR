@@ -66,6 +66,13 @@ int numProcessed;
 int prevProcessed;
 bool crawlHasStarted;
 bool vrEnabled;
+FString outText;
+
+// Server stuff
+bool useServer;
+bool serverConnected;
+bool needNewRequest;
+FString serverAddress;
 
 // Tile info type
 struct TileInfo {
@@ -302,7 +309,17 @@ Adcss::Adcss() {
 
 // Write a command to the process
 void Adcss::writeCommand(FString input) {
-	FPlatformProcess::WritePipe(StdInWriteHandle, input);
+	if (!useServer) {
+		FPlatformProcess::WritePipe(StdInWriteHandle, input);
+	} else { // TODO
+		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
+		req->SetVerb("GET");
+		input = input.Replace(TEXT("-"), TEXT(""));
+		FString url = "http://" + serverAddress + ":7777/put/" + input;
+		req->SetURL(url);
+		req->ProcessRequest();
+		UE_LOG(LogTemp, Display, TEXT("Sending command to server: %s"), *url);
+	}
 }
 
 // Write a command to the process queue
@@ -929,10 +946,12 @@ void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	UE_LOG(LogTemp, Display, TEXT("Closing process"));
 	writeCommand("exit");
 	writeCommand("escape");
-	FPlatformProcess::Sleep(0.5);
-	FPlatformProcess::TerminateProc(ProcHandle, true);
-	FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
-	FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+	if (!useServer) {
+		FPlatformProcess::Sleep(0.5);
+		FPlatformProcess::TerminateProc(ProcHandle, true);
+		FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
+		FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+	}
 }
 
 // Depending on whether the shift key is pressed, shift the letters
@@ -977,9 +996,14 @@ void Adcss::init() {
 		return;
 	}
 
-	// Get the platform name TODO
+	// Get the platform name
 	FString platformName = UGameplayStatics::GetPlatformName();
 	UE_LOG(LogTemp, Display, TEXT("Platform name: %s"), *platformName);
+
+	// Whether to use the server or not TODO
+	useServer = true;
+	serverConnected = false;
+	serverAddress = "localhost";
 
 	// Set params
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
@@ -1379,12 +1403,16 @@ void Adcss::init() {
 	}
 	whiteLine += TEXT("\n");
 
-    // Launch the process with the specified command and arguments
-	UE_LOG(LogTemp, Display, TEXT("Launching pipes..."));
-	FPlatformProcess::CreatePipe(StdOutReadHandle, StdOutWriteHandle);
-	FPlatformProcess::CreatePipe(StdInReadHandle, StdInWriteHandle, true);
-	UE_LOG(LogTemp, Display, TEXT("Launching process..."));
-	ProcHandle = FPlatformProcess::CreateProc(*exePath, *args, true, true, true, nullptr, 0, nullptr, StdOutWriteHandle, StdInReadHandle);
+    // If we're not using the server, launch the process
+	if (!useServer) {	
+		UE_LOG(LogTemp, Display, TEXT("Launching pipes..."));
+		FPlatformProcess::CreatePipe(StdOutReadHandle, StdOutWriteHandle);
+		FPlatformProcess::CreatePipe(StdInReadHandle, StdInWriteHandle, true);
+		UE_LOG(LogTemp, Display, TEXT("Launching process..."));
+		ProcHandle = FPlatformProcess::CreateProc(*exePath, *args, true, true, true, nullptr, 0, nullptr, StdOutWriteHandle, StdInReadHandle);
+	}
+	
+	// Search the saves list
 	int maxSaves = 50;
 	for (int i=0; i<maxSaves; i++) {
 		writeCommandQueued("down");
@@ -2436,10 +2464,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
 			writeCommand("exit");
 			writeCommand("escape");
-			FPlatformProcess::Sleep(0.5);
-			FPlatformProcess::TerminateProc(ProcHandle, true);
-			FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
-			FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+			if (!useServer) {
+				FPlatformProcess::Sleep(0.5);
+				FPlatformProcess::TerminateProc(ProcHandle, true);
+				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
+				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+			}
 
 			// Remove all the actors
 			for (int i = 0; i < maxEnemies; i++) {
@@ -4534,6 +4564,39 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 void Adcss::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
+	// If using the server, make sure we're connected TODO
+	if (useServer && !serverConnected) {
+
+		// Check that we get the right response
+		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
+		req->SetVerb("GET");
+		FString url = "http://" + serverAddress + ":7777";
+		req->SetURL(url);
+		req->OnProcessRequestComplete().BindLambda(
+			[this](
+				FHttpRequestPtr pRequest,
+				FHttpResponsePtr pResponse,
+				bool connectedSuccessfully) mutable {
+					if (connectedSuccessfully) {
+						int code = pResponse->GetResponseCode();
+						FString response = *pResponse->GetContentAsString();
+						if (code == 200 && response.Contains("===SERVER===")) {
+							serverConnected = true;
+							needNewRequest = true;
+							UE_LOG(LogTemp, Display, TEXT("Server connected!"));
+						} else {
+							UE_LOG(LogTemp, Display, TEXT("Response code: %d"), code);
+							UE_LOG(LogTemp, Display, TEXT("Response content: %s"), *response);
+						}
+					} else {
+						UE_LOG(LogTemp, Error, TEXT("Request failed."));
+						serverConnected = false;
+					}
+			});
+		req->ProcessRequest();
+
+	}
+
 	// MAke sure all of the pointers are valid
 	if (refToDescriptionActor == nullptr 
 		|| refToInventoryActor == nullptr
@@ -5480,8 +5543,42 @@ void Adcss::Tick(float DeltaTime) {
 		effectArray[i]->SetActorRotation(newRotation);
 	}
 
-	// Continuously read from the pipe
-	FString outText = FPlatformProcess::ReadPipe(StdOutReadHandle);
+	// Continuously read from the pipe TODO
+	outText = "";
+	if (!useServer) {
+		outText = FPlatformProcess::ReadPipe(StdOutReadHandle);
+	} else if (needNewRequest) {
+		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
+		req->SetVerb("GET");
+		FString url = "http://" + serverAddress + ":7777/get";
+		req->SetURL(url);
+		req->OnProcessRequestComplete().BindLambda(
+			[this](
+				FHttpRequestPtr pRequest,
+				FHttpResponsePtr pResponse,
+				bool connectedSuccessfully) mutable {
+					if (connectedSuccessfully) {
+						int code = pResponse->GetResponseCode();
+						FString response = *pResponse->GetContentAsString();
+						if (code == 200) {
+							outText = response;
+							FTimerHandle TimerHandle;
+							GetWorld()->GetTimerManager().SetTimer(TimerHandle, [this]() {
+								needNewRequest = true;
+							}, 0.5f, false);
+						} else {
+							UE_LOG(LogTemp, Warning, TEXT("Server returned error code %d: %s"), code, *response);
+							serverConnected = false;
+						}
+					} else {
+						UE_LOG(LogTemp, Warning, TEXT("Failed to connect to server"));
+						serverConnected = false;
+					}
+			});
+		needNewRequest = false;
+		req->ProcessRequest();
+		UE_LOG(LogTemp, Display, TEXT("Request sent to server at %s"), *url);
+	}
 	if (needMenu) {
 		outText = menuOutput;
 		needMenu = false;
