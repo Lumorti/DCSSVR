@@ -67,6 +67,9 @@ int prevProcessed;
 bool crawlHasStarted;
 bool vrEnabled;
 FString outText;
+TArray<FTimerHandle> timerHandles;
+TArray<TSharedRef<IHttpRequest>> httpRequests;
+bool isMenu;
 
 // Server stuff
 bool useServer;
@@ -119,6 +122,7 @@ int maxHP;
 int currentMP;
 int maxMP;
 bool inMainMenu;
+UWorld* worldRef;
 FString leftText;
 FString rightText;
 FString statusText;
@@ -318,6 +322,7 @@ void Adcss::writeCommand(FString input) {
 		FString url = "http://" + serverAddress + ":7777/put/" + input;
 		req->SetURL(url);
 		req->ProcessRequest();
+		httpRequests.Add(req);
 		UE_LOG(LogTemp, Display, TEXT("Sending command to server: %s"), *url);
 	}
 }
@@ -610,6 +615,7 @@ void Adcss::submitBug(FString message) {
 				}
 		});
 	FileUploadRequest->ProcessRequest();
+	httpRequests.Add(FileUploadRequest);
 	UE_LOG(LogTemp, Display, TEXT("Request sent"));
 
 }
@@ -951,6 +957,13 @@ void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 		FPlatformProcess::TerminateProc(ProcHandle, true);
 		FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
 		FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+	} else {
+		for (FTimerHandle& TimerHandle : timerHandles) {
+			worldRef->GetTimerManager().ClearTimer(TimerHandle);
+		}
+	}
+	for (TSharedRef<IHttpRequest>& Request : httpRequests) {
+		Request->CancelRequest();
 	}
 }
 
@@ -1000,9 +1013,13 @@ void Adcss::init() {
 	FString platformName = UGameplayStatics::GetPlatformName();
 	UE_LOG(LogTemp, Display, TEXT("Platform name: %s"), *platformName);
 
+	// Get the world
+	worldRef = GetWorld();
+
 	// Whether to use the server or not TODO
 	useServer = true;
 	serverConnected = false;
+	needNewRequest = true;
 	serverAddress = "localhost";
 
 	// Set params
@@ -1047,6 +1064,7 @@ void Adcss::init() {
 	wallScaling = 4.0f;
 	crawlHasStarted = false;
 	hasBeenWelcomed = false;
+	isMenu = true;
 	inventoryRelLoc = FVector(0.0f, 150.0f, 200.0f);
 	inventoryRelRot = FRotator(0.0f, -90.0f, 0.0f);
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
@@ -1163,7 +1181,7 @@ void Adcss::init() {
 "                                                                                \n"
 "                                                                                \n"
 "                                                                                \n"
-" Welcome back, Fiqeka Puinn the Vampire Fire Elementalist.                      \n"
+"                                                                                \n"
 "===END==="
 "===READY===";
 
@@ -1413,11 +1431,11 @@ void Adcss::init() {
 	}
 	
 	// Search the saves list
-	int maxSaves = 50;
+	int maxSaves = 3; // TODO
 	for (int i=0; i<maxSaves; i++) {
 		writeCommandQueued("down");
 	}
-	for (int i = 0; i < maxSaves+15; i++) {
+	for (int i = 0; i < maxSaves+1; i++) {
 		writeCommandQueued("up");
 	}
 	needMenu = true;
@@ -1489,7 +1507,7 @@ void Adcss::init() {
 			FVector Location(floorWidth * i, floorHeight * j, 0.0f);
 			FActorSpawnParameters SpawnInfo;
 			SpawnInfo.Template = floorTemplate;
-			AActor* floor = GetWorld()->SpawnActor<AActor>(floorTemplate->GetClass(), SpawnInfo);
+			AActor* floor = worldRef->SpawnActor<AActor>(floorTemplate->GetClass(), SpawnInfo);
 			floor->SetActorLocation(Location);
 			floor->SetActorHiddenInGame(false); 
 			floorArray[i + LOS][j + LOS] = floor;
@@ -1518,7 +1536,7 @@ void Adcss::init() {
 			FRotator Rotation(0.0f, -90.0f, 0.0f);
 			FActorSpawnParameters SpawnInfo;
 			SpawnInfo.Template = wallTemplate;
-			AActor* wall = GetWorld()->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
+			AActor* wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
 			wallArray[xInd][yInd][0] = wall;
@@ -1529,7 +1547,7 @@ void Adcss::init() {
 			// The south wall for the tile
 			Location = FVector(xLoc - wallWidth / 2, yLoc, zLoc);
 			Rotation = FRotator(0.0f, 90.0f, 0.0f);
-			wall = GetWorld()->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
+			wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
 			wallArray[xInd][yInd][1] = wall;
@@ -1540,7 +1558,7 @@ void Adcss::init() {
 			// The east wall for the tile
 			Location = FVector(xLoc, yLoc + wallWidth / 2, zLoc);
 			Rotation = FRotator(0.0f, 0.0f, 0.0f);
-			wall = GetWorld()->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
+			wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
 			wallArray[xInd][yInd][2] = wall;
@@ -1551,7 +1569,7 @@ void Adcss::init() {
 			// The west wall for the tile
 			Location = FVector(xLoc, yLoc - wallWidth / 2, zLoc);
 			Rotation = FRotator(0.0f, 180.0f, 0.0f);
-			wall = GetWorld()->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
+			wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
 			wallArray[xInd][yInd][3] = wall;
@@ -1568,7 +1586,7 @@ void Adcss::init() {
 	for (int i = 0; i < maxEnemies; i++) {
 		FActorSpawnParameters SpawnInfo;
 		SpawnInfo.Template = enemyTemplate;
-		AActor* wall = GetWorld()->SpawnActor<AActor>(enemyTemplate->GetClass(), SpawnInfo);
+		AActor* wall = worldRef->SpawnActor<AActor>(enemyTemplate->GetClass(), SpawnInfo);
 		wall->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 		wall->SetActorHiddenInGame(true);
 		enemyArray[i] = wall;
@@ -1583,7 +1601,7 @@ void Adcss::init() {
 	for (int i = 0; i < maxItems; i++) {
 		FActorSpawnParameters SpawnInfo;
 		SpawnInfo.Template = itemTemplate;
-		AActor* wall = GetWorld()->SpawnActor<AActor>(itemTemplate->GetClass(), SpawnInfo);
+		AActor* wall = worldRef->SpawnActor<AActor>(itemTemplate->GetClass(), SpawnInfo);
 		wall->SetActorScale3D(FVector(0.3f*wallScaling, 0.3f*wallScaling, 1.0f));
 		wall->SetActorHiddenInGame(true);
 		itemArray[i] = wall;
@@ -1598,7 +1616,7 @@ void Adcss::init() {
 	for (int i = 0; i < maxEffects; i++) {
 		FActorSpawnParameters SpawnInfo;
 		SpawnInfo.Template = effectTemplate;
-		AActor* wall = GetWorld()->SpawnActor<AActor>(effectTemplate->GetClass(), SpawnInfo);
+		AActor* wall = worldRef->SpawnActor<AActor>(effectTemplate->GetClass(), SpawnInfo);
 		wall->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 		wall->SetActorHiddenInGame(true);
 		effectArray[i] = wall;
@@ -1730,6 +1748,8 @@ void Adcss::init() {
 		}
 		itemLocs.Add(k, newLocs);
 	}
+
+	UE_LOG(LogTemp, Display, TEXT("Finished initialization"));
 
 }
 
@@ -2469,6 +2489,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				FPlatformProcess::TerminateProc(ProcHandle, true);
 				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
 				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+			} else {
+				for (FTimerHandle& TimerHandle : timerHandles) {
+					worldRef->GetTimerManager().ClearTimer(TimerHandle);
+				}
 			}
 
 			// Remove all the actors
@@ -3070,10 +3094,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("exit");
 			writeCommandQueued("escape");
 
-			// Get the world context object
-			UWorld* myWorldRef = GetWorld();
+			// Quit
 			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
-			UKismetSystemLibrary::QuitGame(myWorldRef, UGameplayStatics::GetPlayerController(myWorldRef, 0), QuitPreference, true);		
+			UKismetSystemLibrary::QuitGame(worldRef, UGameplayStatics::GetPlayerController(worldRef, 0), QuitPreference, true);		
 
 		// If we're holding an item, equip or use it
 		} else if (thingBeingDragged.thingIs == "InventoryItem"  && currentDescription.Len() > 0 && thingBeingDragged.x !=	-1  && thingBeingDragged.y != -1) {
@@ -4564,40 +4587,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 void Adcss::Tick(float DeltaTime) {
 	Super::Tick(DeltaTime);
 
-	// If using the server, make sure we're connected TODO
-	if (useServer && !serverConnected) {
-
-		// Check that we get the right response
-		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
-		req->SetVerb("GET");
-		FString url = "http://" + serverAddress + ":7777";
-		req->SetURL(url);
-		req->OnProcessRequestComplete().BindLambda(
-			[this](
-				FHttpRequestPtr pRequest,
-				FHttpResponsePtr pResponse,
-				bool connectedSuccessfully) mutable {
-					if (connectedSuccessfully) {
-						int code = pResponse->GetResponseCode();
-						FString response = *pResponse->GetContentAsString();
-						if (code == 200 && response.Contains("===SERVER===")) {
-							serverConnected = true;
-							needNewRequest = true;
-							UE_LOG(LogTemp, Display, TEXT("Server connected!"));
-						} else {
-							UE_LOG(LogTemp, Display, TEXT("Response code: %d"), code);
-							UE_LOG(LogTemp, Display, TEXT("Response content: %s"), *response);
-						}
-					} else {
-						UE_LOG(LogTemp, Error, TEXT("Request failed."));
-						serverConnected = false;
-					}
-			});
-		req->ProcessRequest();
-
-	}
-
-	// MAke sure all of the pointers are valid
+	// Make sure all of the pointers are valid
 	if (refToDescriptionActor == nullptr 
 		|| refToInventoryActor == nullptr
 		|| refToUIActor == nullptr
@@ -4607,6 +4597,7 @@ void Adcss::Tick(float DeltaTime) {
 		|| refToDeathActor == nullptr
 		|| refToChoiceActor == nullptr
 		|| refToShopActor == nullptr
+		|| worldRef == nullptr
 		|| refToTutorialActor == nullptr
 		|| refToMainInfoActor == nullptr
 		|| refToKeyboardActor == nullptr) {
@@ -4656,7 +4647,9 @@ void Adcss::Tick(float DeltaTime) {
 	FVector handUp = FVector(0.0f, 0.0f, 0.0f);
 	if (vrEnabled) {
 		TArray<UMotionControllerComponent*> motionControllers;
-		GetWorld()->GetFirstPlayerController()->GetPawn()->GetComponents(UMotionControllerComponent::StaticClass(), motionControllers);
+		if (worldRef != nullptr) {
+			worldRef->GetFirstPlayerController()->GetPawn()->GetComponents(UMotionControllerComponent::StaticClass(), motionControllers);
+		}
 		for (UMotionControllerComponent* motionController : motionControllers) {
 			if ((motionController->MotionSource == "RightAim" && activeHand == "right") || (motionController->MotionSource == "LeftAim" && activeHand == "left")) {
 				handLocation = motionController->GetComponentLocation();
@@ -4668,20 +4661,20 @@ void Adcss::Tick(float DeltaTime) {
 	}
 	
 	// Checking what the player is looking at
-	FVector Start = GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetCameraLocation();
-	FVector End = Start + GetWorld()->GetFirstPlayerController()->PlayerCameraManager->GetActorForwardVector() * 3000.0f;
+	FVector Start = worldRef->GetFirstPlayerController()->PlayerCameraManager->GetCameraLocation();
+	FVector End = Start + worldRef->GetFirstPlayerController()->PlayerCameraManager->GetActorForwardVector() * 3000.0f;
 	if (vrEnabled) {
 		Start = handLocation;
 		End = Start + handForward * 3000.0f;
 	}
 	FHitResult HitResult;
 	FCollisionQueryParams COQP;			
-	COQP.AddIgnoredActor(GetWorld()->GetFirstPlayerController()->GetPawn());
+	COQP.AddIgnoredActor(worldRef->GetFirstPlayerController()->GetPawn());
 	if (!selected.thingIs.Contains(TEXT("Button"))) {
 		selected = SelectedThing();
 	}
 	FCollisionResponseParams CollRes;
-	if (!inMainMenu && GetWorld()->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, COQP, CollRes)) {
+	if (!inMainMenu && worldRef->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, COQP, CollRes)) {
 		if (HitResult.bBlockingHit) {
 			AActor* hitActor = HitResult.GetActor();
 			if (hitActor != nullptr) {
@@ -4756,7 +4749,7 @@ void Adcss::Tick(float DeltaTime) {
 	}
 
 	// Get various pointers (world, player controller, etc)
-	APlayerController* playerController = GetWorld()->GetFirstPlayerController();
+	APlayerController* playerController = worldRef->GetFirstPlayerController();
 	if (playerController == nullptr) {
 		UE_LOG(LogTemp, Warning, TEXT("Player controller is null"));
 		return;
@@ -4771,7 +4764,6 @@ void Adcss::Tick(float DeltaTime) {
 		UE_LOG(LogTemp, Warning, TEXT("Player pawn is null"));
 		return;
 	}
-
 
 	// Quantities used for various things
 	FVector playerLocation = playerCameraManager->GetCameraLocation();
@@ -5490,7 +5482,7 @@ void Adcss::Tick(float DeltaTime) {
 	}
 
 	// Do an instruction from the queue
-	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===")) {
+	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===") && crawlHasStarted) {
 		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
 		FString command = commandQueue[0];
 		if (command == "CLEAR") {
@@ -5543,17 +5535,23 @@ void Adcss::Tick(float DeltaTime) {
 		effectArray[i]->SetActorRotation(newRotation);
 	}
 
-	// Continuously read from the pipe TODO
+	// Read the pipe TODO
 	outText = "";
 	if (!useServer) {
 		outText = FPlatformProcess::ReadPipe(StdOutReadHandle);
+		if (outText.Len() > 0) {
+			prevOutput = outText;
+			outputBuffer += outText;
+		}
+
+	// Or read from the server
 	} else if (needNewRequest) {
+		needNewRequest = false;
 		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
 		req->SetVerb("GET");
 		FString url = "http://" + serverAddress + ":7777/get";
 		req->SetURL(url);
-		req->OnProcessRequestComplete().BindLambda(
-			[this](
+		req->OnProcessRequestComplete().BindLambda([this](
 				FHttpRequestPtr pRequest,
 				FHttpResponsePtr pResponse,
 				bool connectedSuccessfully) mutable {
@@ -5561,11 +5559,20 @@ void Adcss::Tick(float DeltaTime) {
 						int code = pResponse->GetResponseCode();
 						FString response = *pResponse->GetContentAsString();
 						if (code == 200) {
+							serverConnected = true;
 							outText = response;
+							if (outText.Len() > 0) {
+								prevOutput = outText;
+								outputBuffer += outText;
+							}
+							UE_LOG(LogTemp, Display, TEXT("Server responded with %i bytes"), response.Len()); 
 							FTimerHandle TimerHandle;
-							GetWorld()->GetTimerManager().SetTimer(TimerHandle, [this]() {
-								needNewRequest = true;
-							}, 0.5f, false);
+							if (worldRef != nullptr) {
+								worldRef->GetTimerManager().SetTimer(TimerHandle, [this]() {
+									needNewRequest = true;
+								}, 0.1f, false);
+								timerHandles.Add(TimerHandle);
+							}
 						} else {
 							UE_LOG(LogTemp, Warning, TEXT("Server returned error code %d: %s"), code, *response);
 							serverConnected = false;
@@ -5575,25 +5582,27 @@ void Adcss::Tick(float DeltaTime) {
 						serverConnected = false;
 					}
 			});
-		needNewRequest = false;
 		req->ProcessRequest();
+		httpRequests.Add(req);
 		UE_LOG(LogTemp, Display, TEXT("Request sent to server at %s"), *url);
 	}
+
+	// If it's the menu, set it and stop requesting the menu
 	if (needMenu) {
 		outText = menuOutput;
-		needMenu = false;
-	}
-	bool shouldRedraw = false;
-	if (outText.Len() > 0) {
 		prevOutput = outText;
-
-		// Append to the buffer
 		outputBuffer += outText;
+		needMenu = false;
+		UE_LOG(LogTemp, Display, TEXT("Menu output set"));
+	}
+
+	// If we have buffer, process it
+	bool shouldRedraw = false;
+	if (outputBuffer.Len() > 0) {
 
 		// Search the buffer for the start and end markers 
 		int32 start = outputBuffer.Find(TEXT("===START==="));
 		int32 end = outputBuffer.Mid(start + 11).Find(TEXT("===END===")) + start + 11;
-		bool isMenu = outputBuffer.Contains(TEXT("===MENU==="));
 		bool isReady = outputBuffer.Contains(TEXT("===READY==="));
 
 		// If both markers are found
@@ -5607,7 +5616,12 @@ void Adcss::Tick(float DeltaTime) {
 					UE_LOG(LogTemp, Display, TEXT("Should be loaded now"));
 					hasLoaded = true;
 				}
+			} else {
+				break;
 			}
+
+			// Check if it's the menu
+			isMenu = extracted.Contains(TEXT("===MENU===")) || extracted.Contains(TEXT("Linley Henzell"));
 
 			// Remove the extracted text from the buffer
 			outputBuffer = outputBuffer.Mid(end + 8);
@@ -5694,7 +5708,7 @@ void Adcss::Tick(float DeltaTime) {
 			// If it's the main menu, get the list of saves
 			bool hasSaves = false;
 			for (int i = 0; i < charArray.Num(); i++) {
-				if (charArray[i].Contains(TEXT("Saved games:"))) {
+				if (charArray[i].Contains(TEXT("Linley Henzell"))) {
 					hasSaves = true;
 					break;
 				}
