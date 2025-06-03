@@ -6,6 +6,7 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - FEATURE map
 // - FEATURE gates
+// - BUG crash on close using server
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -70,6 +71,7 @@ FString outText;
 TArray<FTimerHandle> timerHandles;
 TArray<TSharedRef<IHttpRequest>> httpRequests;
 bool isMenu;
+int nextCommand;
 
 // Server stuff
 bool useServer;
@@ -315,12 +317,14 @@ Adcss::Adcss() {
 void Adcss::writeCommand(FString input) {
 	if (!useServer) {
 		FPlatformProcess::WritePipe(StdInWriteHandle, input);
-	} else { // TODO
+	} else {
 		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
 		req->SetVerb("GET");
 		input = input.Replace(TEXT("-"), TEXT(""));
-		FString url = "http://" + serverAddress + ":7777/put/" + input;
+		FString url = "http://" + serverAddress + ":7777/put/" + input + FString::FromInt(nextCommand);
+		nextCommand++;
 		req->SetURL(url);
+		req->SetTimeout(1.0f);
 		req->ProcessRequest();
 		httpRequests.Add(req);
 		UE_LOG(LogTemp, Display, TEXT("Sending command to server: %s"), *url);
@@ -746,7 +750,7 @@ void Adcss::loadEverything() {
 
 	}
 
-	// MAke sure the global file is set (it should always be, but just in case)
+	// Make sure the global file is set (it should always be, but just in case)
 	if (saveGameGlobal != nullptr) {
 
 		// Load the music volume
@@ -756,7 +760,7 @@ void Adcss::loadEverything() {
 			currentVolume = FMath::Clamp(currentVolume, 0.0f, 1.0f);
 			musicComponent->SetVolumeMultiplier(currentVolume);
 			UE_LOG(LogTemp, Display, TEXT("Volume set to %f"), currentVolume);
-			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 			if (WidgetComponent != nullptr) {
 				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
 				if (UserWidget != nullptr) {
@@ -771,7 +775,7 @@ void Adcss::loadEverything() {
 
 		// Load the track index
 		trackInd = saveGameGlobal->trackInd;
-		UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 		if (WidgetComponent != nullptr) {
 			UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
 			if (UserWidget != nullptr) {
@@ -1059,6 +1063,7 @@ void Adcss::init() {
 	gridWidth = 2 * LOS + 1;
 	maxEnemies = 100;
 	maxEffects = 100;
+	nextCommand = 0;
 	maxItems = 100;
 	skipNextFullDescription = false;
 	wallScaling = 4.0f;
@@ -1397,7 +1402,7 @@ void Adcss::init() {
 	musicListNames.Add(TEXT("The Time Is Upon Us - Elias Weber"));
 	musicListNames.Add(TEXT("8-bit Dungeon - Kaden_Cook"));
 	trackInd = 0;
-	UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+	UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 	if (WidgetComponent != nullptr) {
 		UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
 		if (UserWidget != nullptr) {
@@ -1431,11 +1436,12 @@ void Adcss::init() {
 	}
 	
 	// Search the saves list
-	int maxSaves = 3; // TODO
+	// Extra ups are needed because it starts with the most recent save selected
+	int maxSaves = 20;
 	for (int i=0; i<maxSaves; i++) {
 		writeCommandQueued("down");
 	}
-	for (int i = 0; i < maxSaves+1; i++) {
+	for (int i = 0; i < maxSaves+15; i++) {
 		writeCommandQueued("up");
 	}
 	needMenu = true;
@@ -3003,7 +3009,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Volume set to %f"), currentVolume);
 
 				// Change the text (TextVolume)
-				UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 				if (WidgetComponent != nullptr) {
 					UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
 					if (UserWidget != nullptr) {
@@ -3041,7 +3047,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Update the audio and the text
 			musicComponent->SetSound(musicList[trackInd]);
-			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 			if (WidgetComponent != nullptr) {
 				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
 				if (UserWidget != nullptr) {
@@ -5481,7 +5487,7 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 
-	// Do an instruction from the queue
+	// Do an instruction from the queue TODO
 	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===") && crawlHasStarted) {
 		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
 		FString command = commandQueue[0];
@@ -5535,7 +5541,7 @@ void Adcss::Tick(float DeltaTime) {
 		effectArray[i]->SetActorRotation(newRotation);
 	}
 
-	// Read the pipe TODO
+	// Read the pipe
 	outText = "";
 	if (!useServer) {
 		outText = FPlatformProcess::ReadPipe(StdOutReadHandle);
@@ -5565,12 +5571,14 @@ void Adcss::Tick(float DeltaTime) {
 								prevOutput = outText;
 								outputBuffer += outText;
 							}
-							UE_LOG(LogTemp, Display, TEXT("Server responded with %i bytes"), response.Len()); 
+							if (response.Len() > 0) {
+								UE_LOG(LogTemp, Display, TEXT("Server responded with %i bytes"), response.Len());
+							}
 							FTimerHandle TimerHandle;
 							if (worldRef != nullptr) {
 								worldRef->GetTimerManager().SetTimer(TimerHandle, [this]() {
 									needNewRequest = true;
-								}, 0.1f, false);
+								}, 0.05f, false); // TODO faster
 								timerHandles.Add(TimerHandle);
 							}
 						} else {
@@ -5584,7 +5592,6 @@ void Adcss::Tick(float DeltaTime) {
 			});
 		req->ProcessRequest();
 		httpRequests.Add(req);
-		UE_LOG(LogTemp, Display, TEXT("Request sent to server at %s"), *url);
 	}
 
 	// If it's the menu, set it and stop requesting the menu
@@ -5666,23 +5673,23 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued(TEXT("escape"));
 			}
 
-			// If we don't know how much gold we have
-			bool goldInQueue = false;
-			for (int i = 0; i < commandQueue.Num(); i++) {
-				if (commandQueue[i] == TEXT("$")) {
-					goldInQueue = true;
-					break;
-				}
-			}
-			if (gold == -1 && !isMenu && !goldInQueue) {
-				writeCommandQueued(TEXT("$"));
-			}
-
 			// Extract the level ascii
 			extracted.ParseIntoArray(charArray, TEXT("\n"), true);
 			for (int i = 0; i < charArray.Num(); i++) {
 				charArray[i] = charArray[i].Replace(TEXT("\n"), TEXT(""));
 				charArray[i] = charArray[i].Replace(TEXT("\r"), TEXT(""));
+			}
+			if (useServer) {
+				bool firstLineIsBlank = true;
+				for (int i = 0; i < charArray[0].Len(); i++) {
+					if (charArray[0][i] != ' ') {
+						firstLineIsBlank = false;
+						break;
+					}
+				}
+				if (!firstLineIsBlank) {
+					charArray.Insert(TEXT("      "), 0);
+				}
 			}
 			UE_LOG(LogTemp, Display, TEXT("Extracting level ascii..."));
 			int offsetX = 8;
@@ -5696,6 +5703,12 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isReady) {
 				UE_LOG(LogTemp, Display, TEXT("Buffer contains ready marker"));
+			}
+
+			// Output the full charArray
+			UE_LOG(LogTemp, Display, TEXT("Full charArray:"));
+			for (int i = 0; i < charArray.Num(); i++) {
+				UE_LOG(LogTemp, Display, TEXT("%i %s"), i, *charArray[i]);
 			}
 
 			// Output the length of each line
@@ -7340,6 +7353,18 @@ void Adcss::Tick(float DeltaTime) {
 
 			}
 
+			// If we don't know how much gold we have
+			bool goldInQueue = false;
+			for (int i = 0; i < commandQueue.Num(); i++) {
+				if (commandQueue[i] == TEXT("$")) {
+					goldInQueue = true;
+					break;
+				}
+			}
+			if (gold == -1 && !isMenu && !goldInQueue && isMap) {
+				writeCommandQueued(TEXT("$"));
+			}
+
 			// If the map is being shown, then we also have the log
 			if (isMap) {
 				if (charArray.Num() >= 18) {
@@ -7407,6 +7432,8 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Aiming:"))
 								|| newLine.Contains(TEXT("Casting:"))
 								|| newLine.Contains(TEXT("No monsters, items or features"))
+								|| newLine.Contains(TEXT("game will not be scored"))
+								|| newLine.Contains(TEXT("enter wizard mode"))
 								|| newLine.Contains(TEXT("Press:"))
 								|| newLine.Contains(TEXT("Mapping level"))
 							) {
