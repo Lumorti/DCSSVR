@@ -4,6 +4,8 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
+// - FEATURE server auto-connect
+// - FEATURE play button message
 // - FEATURE map
 // - FEATURE gates
 // - BUG crash on close using server
