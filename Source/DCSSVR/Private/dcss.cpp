@@ -4,10 +4,10 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - FEATURE server auto-connect
 // - FEATURE play button message
 // - FEATURE map
 // - FEATURE gates
+// - BUG main menu button using server
 // - BUG crash on close using server
 
 // 0.2 First update, hopefully with community suggestions
@@ -319,11 +319,11 @@ Adcss::Adcss() {
 void Adcss::writeCommand(FString input) {
 	if (!useServer) {
 		FPlatformProcess::WritePipe(StdInWriteHandle, input);
-	} else {
+	} else if (serverAddress.Len() > 0 && serverConnected) {
 		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
 		req->SetVerb("GET");
 		input = input.Replace(TEXT("-"), TEXT(""));
-		FString url = "http://" + serverAddress + ":7777/put/" + input + FString::FromInt(nextCommand);
+		FString url = serverAddress + "put/" + input + FString::FromInt(nextCommand);
 		nextCommand++;
 		req->SetURL(url);
 		req->SetTimeout(1.0f);
@@ -1022,11 +1022,11 @@ void Adcss::init() {
 	// Get the world
 	worldRef = GetWorld();
 
-	// Whether to use the server or not TODO
+	// Whether to use the server or not
 	useServer = true;
 	serverConnected = false;
 	needNewRequest = true;
-	serverAddress = "localhost";
+	serverAddress = "";
 
 	// Set params
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
@@ -1447,6 +1447,37 @@ void Adcss::init() {
 		writeCommandQueued("up");
 	}
 	needMenu = true;
+
+	// Search for the server
+	if (useServer) {
+		for (int i=0; i<50; i++) {
+			FString url = "http://192.168.0." + FString::FromInt(i) + ":7777/";
+			UE_LOG(LogTemp, Display, TEXT("Searching for server at %s"), *url);
+			TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
+			req->SetVerb("GET");
+			req->SetURL(url);
+			req->OnProcessRequestComplete().BindLambda([this](
+					FHttpRequestPtr pRequest,
+					FHttpResponsePtr pResponse,
+					bool connectedSuccessfully) mutable {
+						if (connectedSuccessfully) {
+							int code = pResponse->GetResponseCode();
+							FString response = *pResponse->GetContentAsString();
+							if (code == 200) {
+								if (response.Contains(TEXT("===SERVER==="))) {
+									serverConnected = true;
+									serverAddress = pRequest->GetURL();
+									nextCommand = 0;
+									UE_LOG(LogTemp, Display, TEXT("Found server at %s"), *serverAddress);
+								}
+							}
+						}
+				});
+			req->SetTimeout(0.5f);
+			req->ProcessRequest();
+			httpRequests.Add(req);
+		}
+	}
 
 	// Setup array sizes
 	UE_LOG(LogTemp, Display, TEXT("Setting up arrays..."));
@@ -3372,6 +3403,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						// Get the save info
 						FString saveName = selected.thingIs.Replace(TEXT("ButtonSave"), TEXT(""));
 						int saveLoc = FCString::Atoi(*saveName)-1 + savesPage*6;
+						if (saveLoc < 0 || saveLoc >= saveNames.Num() || !saveLocToIndex.Contains(saveLoc)) {
+							UE_LOG(LogTemp, Warning, TEXT("INPUT - Save location out of bounds: %i"), saveLoc);
+							return;
+						}
 						int saveIndex = saveLocToIndex[saveLoc];
 						UE_LOG(LogTemp, Display, TEXT("INPUT - Save button clicked: %s"), *saveName);
 
@@ -5490,7 +5525,7 @@ void Adcss::Tick(float DeltaTime) {
 	}
 
 	// Do an instruction from the queue TODO
-	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===") && crawlHasStarted) {
+	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===") && crawlHasStarted && (serverConnected || !useServer)) {
 		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
 		FString command = commandQueue[0];
 		if (command == "CLEAR") {
@@ -5553,11 +5588,12 @@ void Adcss::Tick(float DeltaTime) {
 		}
 
 	// Or read from the server
-	} else if (needNewRequest) {
+	} else if (needNewRequest && serverAddress.Len() > 0) {
 		needNewRequest = false;
 		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
 		req->SetVerb("GET");
-		FString url = "http://" + serverAddress + ":7777/get";
+		FString url = serverAddress + "get";
+		UE_LOG(LogTemp, Display, TEXT("Requesting from server: %s"), *url);
 		req->SetURL(url);
 		req->OnProcessRequestComplete().BindLambda([this](
 				FHttpRequestPtr pRequest,
@@ -5576,13 +5612,6 @@ void Adcss::Tick(float DeltaTime) {
 							if (response.Len() > 0) {
 								UE_LOG(LogTemp, Display, TEXT("Server responded with %i bytes"), response.Len());
 							}
-							FTimerHandle TimerHandle;
-							if (worldRef != nullptr) {
-								worldRef->GetTimerManager().SetTimer(TimerHandle, [this]() {
-									needNewRequest = true;
-								}, 0.05f, false); // TODO faster
-								timerHandles.Add(TimerHandle);
-							}
 						} else {
 							UE_LOG(LogTemp, Warning, TEXT("Server returned error code %d: %s"), code, *response);
 							serverConnected = false;
@@ -5590,6 +5619,14 @@ void Adcss::Tick(float DeltaTime) {
 					} else {
 						UE_LOG(LogTemp, Warning, TEXT("Failed to connect to server"));
 						serverConnected = false;
+					}
+					FTimerHandle TimerHandle;
+					if (worldRef != nullptr) {
+						needNewRequest = true;
+						// worldRef->GetTimerManager().SetTimer(TimerHandle, [this]() {
+						// 	needNewRequest = true;
+						// }, 0.01f, false); // TODO faster
+						// timerHandles.Add(TimerHandle);
 					}
 			});
 		req->ProcessRequest();
@@ -7285,6 +7322,25 @@ void Adcss::Tick(float DeltaTime) {
 						}
 					}
 				}
+			}
+
+			// If somehow we have a map but crawl hasn't loaded, set up the game TODO
+			if (!isMenu && isMap && !crawlHasStarted) {
+				crawlHasStarted = true;
+				refToUIActor->SetActorHiddenInGame(false);
+				refToUIActor->SetActorEnableCollision(true);
+				refToSaveActor->SetActorHiddenInGame(true);
+				refToSaveActor->SetActorEnableCollision(false);
+				refToTutorialActor->SetActorHiddenInGame(false);
+				refToTutorialActor->SetActorEnableCollision(true);
+				refToInventoryActor->SetActorHiddenInGame(true);
+				refToInventoryActor->SetActorEnableCollision(false);
+				refToMainMenuActor->SetActorHiddenInGame(true);
+				refToMainMenuActor->SetActorEnableCollision(false);
+				refToMainInfoActor->SetActorHiddenInGame(true);
+				refToMainInfoActor->SetActorEnableCollision(false);
+				inventoryOpen = false;
+				hasBeenWelcomed = false;
 			}
 
 			// If the map is being shown, then it means we also have the status section
