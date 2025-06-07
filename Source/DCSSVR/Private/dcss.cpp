@@ -7,7 +7,6 @@ FString version = TEXT("0.1");
 // - FEATURE play button message
 // - FEATURE map
 // - FEATURE gates
-// - BUG main menu button using server
 // - BUG crash on close using server
 
 // 0.2 First update, hopefully with community suggestions
@@ -956,9 +955,9 @@ FString Adcss::enemyNameToTextureName(FString name) {
 // Called when the actor is destroyed or deleted
 void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	UE_LOG(LogTemp, Display, TEXT("Closing process"));
-	writeCommand("exit");
-	writeCommand("escape");
 	if (!useServer) {
+		writeCommand("exit");
+		writeCommand("escape");
 		FPlatformProcess::Sleep(0.5);
 		FPlatformProcess::TerminateProc(ProcHandle, true);
 		FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
@@ -1007,7 +1006,7 @@ void Adcss::shiftLetters() {
 }
 
 // Wrapped function
-void Adcss::init() {
+void Adcss::init(bool firstTime) {
 
 	// Make sure all the templates are not null
 	if (floorTemplate == nullptr || wallTemplate == nullptr || enemyTemplate == nullptr || itemTemplate == nullptr) {
@@ -1024,17 +1023,16 @@ void Adcss::init() {
 
 	// Whether to use the server or not
 	useServer = true;
-	serverConnected = false;
-	needNewRequest = true;
-	serverAddress = "";
+	if (firstTime) {
+		serverConnected = false;
+		needNewRequest = true;
+		serverAddress = "";
+		nextCommand = 0;
+	}
 
 	// Set params
 	FString binaryPath = FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() + TEXT("\\Content\\DCSS\\"));
-	if (platformName == TEXT("Windows")) {
-		exePath = binaryPath + TEXT("crawl.exe");
-	} else {
-		exePath = binaryPath + TEXT("crawl-arm");
-	}
+	exePath = binaryPath + TEXT("crawl.exe");
 	args = TEXT(" -extra-opt-first monster_item_view_coordinates=true ");
 	args += TEXT(" -extra-opt-first bad_item_prompt=false ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=cloud ");
@@ -1065,11 +1063,10 @@ void Adcss::init() {
 	gridWidth = 2 * LOS + 1;
 	maxEnemies = 100;
 	maxEffects = 100;
-	nextCommand = 0;
 	maxItems = 100;
 	skipNextFullDescription = false;
 	wallScaling = 4.0f;
-	crawlHasStarted = false;
+	crawlHasStarted = !firstTime;
 	hasBeenWelcomed = false;
 	isMenu = true;
 	inventoryRelLoc = FVector(0.0f, 150.0f, 200.0f);
@@ -1144,7 +1141,9 @@ void Adcss::init() {
 	inventoryNextSpot = FIntVector2(-1, -1);
 	shouldRedrawInventory = true;
 	currentUI = "inventory";
-	commandQueue.Empty();
+	if (firstTime) {
+		commandQueue.Empty();
+	}
 	lastCommandTime = 0.0;
 	inventoryOpen = true;
 	choiceNames.Empty();
@@ -1440,16 +1439,16 @@ void Adcss::init() {
 	// Search the saves list
 	// Extra ups are needed because it starts with the most recent save selected
 	int maxSaves = 20;
-	for (int i=0; i<maxSaves; i++) {
+	for (int i=0; i<maxSaves+10; i++) {
 		writeCommandQueued("down");
 	}
-	for (int i = 0; i < maxSaves+15; i++) {
+	for (int i = 0; i < maxSaves+10; i++) {
 		writeCommandQueued("up");
 	}
 	needMenu = true;
 
 	// Search for the server
-	if (useServer) {
+	if (useServer && firstTime) {
 		for (int i=0; i<50; i++) {
 			FString url = "http://192.168.0." + FString::FromInt(i) + ":7777/";
 			UE_LOG(LogTemp, Display, TEXT("Searching for server at %s"), *url);
@@ -1795,7 +1794,7 @@ void Adcss::init() {
 // Called when the game starts or when spawned
 void Adcss::BeginPlay() {
 	Super::BeginPlay();
-	init();
+	init(true);
 }
 
 // Called when the level ascii has changed
@@ -2501,12 +2500,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 		// Main menu button
 		if (selected.thingIs == "ButtonMainMenu") {
-			needMenu = true;
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu button clicked"));
-			writeCommandQueued("exit");
-			for (int i = 0; i < 20; i++) {
-				writeCommandQueued("up");
-			}
+			// for (int i = 0; i < 20; i++) {
+			// 	writeCommandQueued("up");
+			// }
+			// writeCommandQueued("exit"); // TODO make sure it's fine
+			needMenu = true;
 			refToUIActor->SetActorHiddenInGame(true);
 			refToUIActor->SetActorEnableCollision(false);
 			refToTutorialActor->SetActorHiddenInGame(true);
@@ -2519,19 +2518,19 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			refToMainInfoActor->SetActorEnableCollision(true);
 			inventoryOpen = false;
 
-			// Close the process
-			UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
-			writeCommand("exit");
-			writeCommand("escape");
+			// If it's the process, close it
 			if (!useServer) {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
+				writeCommandQueued("exit");
+				writeCommand("escape");
 				FPlatformProcess::Sleep(0.5);
 				FPlatformProcess::TerminateProc(ProcHandle, true);
 				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
 				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+
+			// If it's the server, just go back to the menu
 			} else {
-				for (FTimerHandle& TimerHandle : timerHandles) {
-					worldRef->GetTimerManager().ClearTimer(TimerHandle);
-				}
+				writeCommandQueued("exit");
 			}
 
 			// Remove all the actors
@@ -2552,7 +2551,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 			// Start everything up again
-			init();
+			init(false);
 
 		// Choice button
 		} else if (selected.thingIs.Contains(TEXT("ButtonOption")) && isChoiceOpen) {
@@ -3129,9 +3128,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		} else if (selected.thingIs == "ButtonQuit" || selected.thingIs == "ButtonMainQuit") {
 
 			// Send the save commands
-			writeCommandQueued("escape");
-			writeCommandQueued("exit");
-			writeCommandQueued("escape");
+			if (!useServer) {
+				writeCommandQueued("escape");
+				writeCommandQueued("exit");
+				writeCommandQueued("escape");
+			}
 
 			// Quit
 			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
@@ -5524,7 +5525,7 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 
-	// Do an instruction from the queue TODO
+	// Do an instruction from the queue
 	if (commandQueue.Num() > 0 && prevOutput.Contains("===READY===") && crawlHasStarted && (serverConnected || !useServer)) {
 		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
 		FString command = commandQueue[0];
@@ -5593,7 +5594,6 @@ void Adcss::Tick(float DeltaTime) {
 		TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
 		req->SetVerb("GET");
 		FString url = serverAddress + "get";
-		UE_LOG(LogTemp, Display, TEXT("Requesting from server: %s"), *url);
 		req->SetURL(url);
 		req->OnProcessRequestComplete().BindLambda([this](
 				FHttpRequestPtr pRequest,
@@ -7324,8 +7324,9 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 
-			// If somehow we have a map but crawl hasn't loaded, set up the game TODO
+			// If somehow we have a map but crawl hasn't loaded, set up the game
 			if (!isMenu && isMap && !crawlHasStarted) {
+				UE_LOG(LogTemp, Warning, TEXT("Forcing game start"));
 				crawlHasStarted = true;
 				refToUIActor->SetActorHiddenInGame(false);
 				refToUIActor->SetActorEnableCollision(true);
@@ -7340,7 +7341,7 @@ void Adcss::Tick(float DeltaTime) {
 				refToMainInfoActor->SetActorHiddenInGame(true);
 				refToMainInfoActor->SetActorEnableCollision(false);
 				inventoryOpen = false;
-				hasBeenWelcomed = false;
+				commandQueue.Empty();
 			}
 
 			// If the map is being shown, then it means we also have the status section

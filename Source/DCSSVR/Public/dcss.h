@@ -170,7 +170,7 @@ public:
 	FString enemyNameToTextureName(FString name);
 	void loadEverything();
 	void saveEverything();
-	void init();
+	void init(bool firstTime);
 	void clearThings();
 	void shiftLetters();
 	void submitBug(FString message);
