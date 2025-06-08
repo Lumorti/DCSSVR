@@ -129,9 +129,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	TMap<FString, UTexture2D*> textures;
 
-	// Whether to generate a new level
+	// Whether to use the server
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	bool generateNew = false;
+	bool useServer = false;
 
 	// Debug angles
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

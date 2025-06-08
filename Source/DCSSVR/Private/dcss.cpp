@@ -4,10 +4,8 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - FEATURE play button message
 // - FEATURE map
 // - FEATURE gates
-// - BUG crash on close using server
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -75,7 +73,6 @@ bool isMenu;
 int nextCommand;
 
 // Server stuff
-bool useServer;
 bool serverConnected;
 bool needNewRequest;
 FString serverAddress;
@@ -1022,7 +1019,6 @@ void Adcss::init(bool firstTime) {
 	worldRef = GetWorld();
 
 	// Whether to use the server or not
-	useServer = true;
 	if (firstTime) {
 		serverConnected = false;
 		needNewRequest = true;
@@ -1426,6 +1422,26 @@ void Adcss::init(bool firstTime) {
 		whiteLine += TEXT(" ");
 	}
 	whiteLine += TEXT("\n");
+
+	// Set the initial play button text
+	if (firstTime) {
+		if (refToMainMenuActor != nullptr) {
+			UWidgetComponent* WidgetComponentMainMenu = Cast<UWidgetComponent>(refToMainMenuActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			if (WidgetComponentMainMenu != nullptr) {
+				UUserWidget* UserWidgetMainMenu = WidgetComponentMainMenu->GetUserWidgetObject();
+				if (UserWidgetMainMenu != nullptr) {
+					UTextBlock* PlayButtonText = Cast<UTextBlock>(UserWidgetMainMenu->GetWidgetFromName(TEXT("TextMainPlay")));
+					if (PlayButtonText != nullptr) {
+						if (useServer) {
+							PlayButtonText->SetText(FText::FromString("Waiting for server..."));
+						} else {
+							PlayButtonText->SetText(FText::FromString("Waiting for process..."));
+						}
+					}
+				}
+			}
+		}
+	}
 
     // If we're not using the server, launch the process
 	if (!useServer) {	
@@ -2501,10 +2517,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// Main menu button
 		if (selected.thingIs == "ButtonMainMenu") {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu button clicked"));
-			// for (int i = 0; i < 20; i++) {
-			// 	writeCommandQueued("up");
-			// }
-			// writeCommandQueued("exit"); // TODO make sure it's fine
 			needMenu = true;
 			refToUIActor->SetActorHiddenInGame(true);
 			refToUIActor->SetActorEnableCollision(false);
@@ -5623,10 +5635,6 @@ void Adcss::Tick(float DeltaTime) {
 					FTimerHandle TimerHandle;
 					if (worldRef != nullptr) {
 						needNewRequest = true;
-						// worldRef->GetTimerManager().SetTimer(TimerHandle, [this]() {
-						// 	needNewRequest = true;
-						// }, 0.01f, false); // TODO faster
-						// timerHandles.Add(TimerHandle);
 					}
 			});
 		req->ProcessRequest();
@@ -5767,6 +5775,22 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (hasSaves) {
 				inMainMenu = true;
+
+				// We have started
+				if (!crawlHasStarted) {
+					if (refToMainMenuActor != nullptr) {
+						UWidgetComponent* WidgetComponentMainMenu = Cast<UWidgetComponent>(refToMainMenuActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+						if (WidgetComponentMainMenu != nullptr) {
+							UUserWidget* UserWidgetMainMenu = WidgetComponentMainMenu->GetUserWidgetObject();
+							if (UserWidgetMainMenu != nullptr) {
+								UTextBlock* PlayButtonText = Cast<UTextBlock>(UserWidgetMainMenu->GetWidgetFromName(TEXT("TextMainPlay")));
+								if (PlayButtonText != nullptr) {
+									PlayButtonText->SetText(FText::FromString("Play"));
+								}
+							}
+						}
+					}
+				}
 				crawlHasStarted = true;
 
 				// Get the saves in the current menu
