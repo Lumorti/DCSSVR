@@ -33,6 +33,12 @@ public:
 	UPROPERTY(VisibleAnywhere, Category = Basic)
 	int trackInd;
 
+	UPROPERTY(VisibleAnywhere, Category = Basic)
+	int snapDegrees;
+
+	UPROPERTY(VisibleAnywhere, Category = Basic)
+	FString serverAddress;
+
 	UDCSSSaveGame();
 	
 };

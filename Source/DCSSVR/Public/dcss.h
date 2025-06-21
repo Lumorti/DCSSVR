@@ -133,6 +133,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	bool useServer = false;
 
+	// How quickly to snap turn
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	int snapDegrees = 45;
+
 	// Debug angles
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	FVector debugAngles;

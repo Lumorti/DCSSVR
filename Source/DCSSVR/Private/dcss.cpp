@@ -1,6 +1,4 @@
 #include "dcss.h"
-
-// TODO list
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
@@ -76,6 +74,8 @@ int nextCommand;
 bool serverConnected;
 bool needNewRequest;
 FString serverAddress;
+TArray<FString> serverAddressesToTry;
+int currentRequests;
 
 // Tile info type
 struct TileInfo {
@@ -695,6 +695,14 @@ void Adcss::saveEverything() {
 	// The music track
 	saveGameGlobal->trackInd = trackInd;
 
+	// The snap degrees
+	saveGameGlobal->snapDegrees = snapDegrees;
+
+	// The server address
+	if (serverAddress.Len() > 0) {
+		saveGameGlobal->serverAddress = serverAddress;
+	}
+
 	// Actually save the files
 	UGameplayStatics::SaveGameToSlot(saveGame, saveFile, 0);
 	UGameplayStatics::SaveGameToSlot(saveGameGlobal, TEXT("globalsavefile"), 0);
@@ -786,6 +794,27 @@ void Adcss::loadEverything() {
 		trackInd = FMath::Clamp(trackInd, 0, musicList.Num() - 1);
 		if (musicComponent != nullptr) {
 			musicComponent->SetSound(musicList[trackInd]);
+		}
+
+		// Load the snap degrees
+		snapDegrees = saveGameGlobal->snapDegrees;
+		if (refToSettingsActor != nullptr) {
+			UWidgetComponent* WidgetComponent2 = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			if (WidgetComponent2 != nullptr) {
+				UUserWidget* UserWidget = WidgetComponent2->GetUserWidgetObject();
+				if (UserWidget != nullptr) {
+					UTextBlock* SnapText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextSnapAngle")));
+					if (SnapText != nullptr) {
+						SnapText->SetText(FText::FromString("Snap: " + FString::FromInt(snapDegrees) + " deg"));
+					}
+				}
+			}
+		}
+
+		// Load the server address TODO
+		if (saveGameGlobal->serverAddress.Len() > 0 && serverAddress.Len() == 0) {
+			serverAddressesToTry.Add(saveGameGlobal->serverAddress);
+			UE_LOG(LogTemp, Display, TEXT("Server address loaded: %s"), *serverAddress);
 		}
 
 	}
@@ -1018,12 +1047,14 @@ void Adcss::init(bool firstTime) {
 	// Get the world
 	worldRef = GetWorld();
 
-	// Whether to use the server or not
+	// Whether to use the server or not TODO
 	if (firstTime) {
 		serverConnected = false;
 		needNewRequest = true;
 		serverAddress = "";
 		nextCommand = 0;
+		serverAddressesToTry.Empty();
+		currentRequests = 0;
 	}
 
 	// Set params
@@ -1423,20 +1454,20 @@ void Adcss::init(bool firstTime) {
 	}
 	whiteLine += TEXT("\n");
 
-	// Set the initial play button text
-	if (firstTime) {
-		if (refToMainMenuActor != nullptr) {
-			UWidgetComponent* WidgetComponentMainMenu = Cast<UWidgetComponent>(refToMainMenuActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-			if (WidgetComponentMainMenu != nullptr) {
-				UUserWidget* UserWidgetMainMenu = WidgetComponentMainMenu->GetUserWidgetObject();
-				if (UserWidgetMainMenu != nullptr) {
-					UTextBlock* PlayButtonText = Cast<UTextBlock>(UserWidgetMainMenu->GetWidgetFromName(TEXT("TextMainPlay")));
-					if (PlayButtonText != nullptr) {
-						if (useServer) {
-							PlayButtonText->SetText(FText::FromString("Waiting for server..."));
-						} else {
-							PlayButtonText->SetText(FText::FromString("Waiting for process..."));
-						}
+	// Set the initial play button text 
+	if (refToMainMenuActor != nullptr) {
+		UWidgetComponent* WidgetComponentMainMenu = Cast<UWidgetComponent>(refToMainMenuActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		if (WidgetComponentMainMenu != nullptr) {
+			UUserWidget* UserWidgetMainMenu = WidgetComponentMainMenu->GetUserWidgetObject();
+			if (UserWidgetMainMenu != nullptr) {
+				UTextBlock* PlayButtonText = Cast<UTextBlock>(UserWidgetMainMenu->GetWidgetFromName(TEXT("TextMainPlay")));
+				if (PlayButtonText != nullptr) {
+					if (!firstTime) {
+						PlayButtonText->SetText(FText::FromString("Play"));
+					} else if (useServer) {
+						PlayButtonText->SetText(FText::FromString("Waiting for server..."));
+					} else {
+						PlayButtonText->SetText(FText::FromString("Waiting for process..."));
 					}
 				}
 			}
@@ -1462,37 +1493,6 @@ void Adcss::init(bool firstTime) {
 		writeCommandQueued("up");
 	}
 	needMenu = true;
-
-	// Search for the server
-	if (useServer && firstTime) {
-		for (int i=0; i<50; i++) {
-			FString url = "http://192.168.0." + FString::FromInt(i) + ":7777/";
-			UE_LOG(LogTemp, Display, TEXT("Searching for server at %s"), *url);
-			TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
-			req->SetVerb("GET");
-			req->SetURL(url);
-			req->OnProcessRequestComplete().BindLambda([this](
-					FHttpRequestPtr pRequest,
-					FHttpResponsePtr pResponse,
-					bool connectedSuccessfully) mutable {
-						if (connectedSuccessfully) {
-							int code = pResponse->GetResponseCode();
-							FString response = *pResponse->GetContentAsString();
-							if (code == 200) {
-								if (response.Contains(TEXT("===SERVER==="))) {
-									serverConnected = true;
-									serverAddress = pRequest->GetURL();
-									nextCommand = 0;
-									UE_LOG(LogTemp, Display, TEXT("Found server at %s"), *serverAddress);
-								}
-							}
-						}
-				});
-			req->SetTimeout(0.5f);
-			req->ProcessRequest();
-			httpRequests.Add(req);
-		}
-	}
 
 	// Setup array sizes
 	UE_LOG(LogTemp, Display, TEXT("Setting up arrays..."));
@@ -1740,13 +1740,15 @@ void Adcss::init(bool firstTime) {
 	}
 
 	// Load the global save game
-	saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot("globalsavefile", 0));
-	if (saveGameGlobal == nullptr) {
-		UE_LOG(LogTemp, Display, TEXT("Global save file not found, creating"));
-		saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::CreateSaveGameObject(UDCSSSaveGame::StaticClass()));
-		saveEverything();
+	if (firstTime) {
+		saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::LoadGameFromSlot("globalsavefile", 0));
+		if (saveGameGlobal == nullptr) {
+			UE_LOG(LogTemp, Display, TEXT("Global save file not found, creating"));
+			saveGameGlobal = Cast<UDCSSSaveGame>(UGameplayStatics::CreateSaveGameObject(UDCSSSaveGame::StaticClass()));
+			saveEverything();
+		}
+		loadEverything();
 	}
-	loadEverything();
 
 	// Items locs depending on the number of items
 	float startingHeight = 0.25f * floorWidth;
@@ -3070,6 +3072,33 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			
 			}
 
+		// Change snap buttons
+		} else if (selected.thingIs.Contains(TEXT("ButtonSnap"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Snap button clicked: %s"), *selected.thingIs);
+
+			// Adjust the value
+			if (selected.thingIs.Contains(TEXT("Next"))) {
+				snapDegrees += 5;
+			} else {
+				snapDegrees -= 5;
+			}
+			snapDegrees = FMath::Clamp(snapDegrees, 5, 180);
+
+			// Set the text
+			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			if (WidgetComponent != nullptr) {
+				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+				if (UserWidget != nullptr) {
+					UTextBlock* SnapText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextSnapAngle")));
+					if (SnapText != nullptr) {
+						SnapText->SetText(FText::FromString("Snap: " + FString::FromInt(snapDegrees) + " deg"));
+					}
+				}
+			}
+
+			// Save everything
+			saveEverything();
+
 		// Change track buttons
 		} else if (selected.thingIs.Contains(TEXT("ButtonTrack"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Music track button clicked: %s"), *selected.thingIs);
@@ -3144,6 +3173,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("escape");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
+			} else {
+				writeCommandQueued("exit");
 			}
 
 			// Quit
@@ -4666,6 +4697,57 @@ void Adcss::Tick(float DeltaTime) {
 		IHeadMountedDisplay* hmd = GEngine->XRSystem->GetHMDDevice();
 		TSharedPtr<IStereoRendering, ESPMode::ThreadSafe> pStereo = GEngine->XRSystem->GetStereoRenderingDevice();
 		vrEnabled = hmd != nullptr && hmd->IsHMDConnected() && hmd->IsHMDEnabled() && pStereo->IsStereoEnabled();
+	}
+
+	// If we don't have a server address and the queue is empty, try to find one
+	serverAddress = serverAddress.TrimStartAndEnd();
+	if (useServer && serverAddress.Len() == 0 && serverAddressesToTry.Num() == 0) {
+		FString url;
+		for (int i=0; i<30; i++) {
+			serverAddressesToTry.Add("http://192.168.0." + FString::FromInt(i) + ":7777/");
+			serverAddressesToTry.Add("http://192.168.1." + FString::FromInt(i) + ":7777/");
+		}
+		for (int i=30; i<100; i++) {
+			serverAddressesToTry.Add("http://192.168.0." + FString::FromInt(i) + ":7777/");
+			serverAddressesToTry.Add("http://192.168.1." + FString::FromInt(i) + ":7777/");
+		}
+		UE_LOG(LogTemp, Display, TEXT("No server address found, added %d addresses to try"), serverAddressesToTry.Num());
+	}
+
+	// Send server connection requests TODO
+	int maxRequests = 15;
+	if (useServer && serverAddress.Len() == 0 && serverAddressesToTry.Num() > 0 && currentRequests < maxRequests) {
+		int numToDo = FMath::Min(maxRequests - currentRequests, serverAddressesToTry.Num());
+		for (int i=0; i<numToDo; i++) {
+			FString url = serverAddressesToTry[0];
+			serverAddressesToTry.RemoveAt(0);
+			currentRequests++;
+			UE_LOG(LogTemp, Display, TEXT("Searching for server at %s"), *url);
+			TSharedRef<IHttpRequest> req = (&FHttpModule::Get())->CreateRequest();
+			req->SetVerb("GET");
+			req->SetURL(url);
+			req->OnProcessRequestComplete().BindLambda([this](
+					FHttpRequestPtr pRequest,
+					FHttpResponsePtr pResponse,
+					bool connectedSuccessfully) mutable {
+						currentRequests--;
+						if (connectedSuccessfully) {
+							int code = pResponse->GetResponseCode();
+							FString response = *pResponse->GetContentAsString();
+							if (code == 200) {
+								if (response.Contains(TEXT("===SERVER==="))) {
+									serverConnected = true;
+									serverAddress = pRequest->GetURL();
+									nextCommand = 0;
+									UE_LOG(LogTemp, Display, TEXT("Found server at %s"), *serverAddress);
+								}
+							}
+						}
+				});
+			req->SetTimeout(0.5f);
+			req->ProcessRequest();
+			httpRequests.Add(req);
+		}
 	}
 
 	// Reset highlight on everything
