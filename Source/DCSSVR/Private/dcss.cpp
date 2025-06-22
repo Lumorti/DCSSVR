@@ -2,7 +2,7 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - FEATURE map
+// - BUG static discharge usage
 // - FEATURE gates
 
 // 0.2 First update, hopefully with community suggestions
@@ -144,6 +144,9 @@ FString currentType;
 bool justUsedAScroll;
 FString currentBranch;
 bool skipNextFullDescription;
+TArray<FString> gateList;
+TArray<TArray<FString>> mapToDraw;
+TArray<TArray<FString>> mapToDrawRotated;
 
 // Main menu stuff
 FString currentBackground;
@@ -366,6 +369,14 @@ void Adcss::toggleInventory() {
 			selected.thingIs = "OpenButton";
 		} else if (currentUI == "character") {
 			selected.thingIs = "ButtonCharacter";
+			keyPressed("lmb", FVector2D(0.0f, 0.0f));
+			selected.thingIs = "OpenButton";
+		} else if (currentUI == "map") {
+			selected.thingIs = "ButtonMap";
+			keyPressed("lmb", FVector2D(0.0f, 0.0f));
+			selected.thingIs = "OpenButton";
+		} else if (currentUI == "menu") {
+			selected.thingIs = "ButtonMenu";
 			keyPressed("lmb", FVector2D(0.0f, 0.0f));
 			selected.thingIs = "OpenButton";
 		}
@@ -811,7 +822,7 @@ void Adcss::loadEverything() {
 			}
 		}
 
-		// Load the server address TODO
+		// Load the server address
 		if (saveGameGlobal->serverAddress.Len() > 0 && serverAddress.Len() == 0) {
 			serverAddressesToTry.Add(saveGameGlobal->serverAddress);
 			UE_LOG(LogTemp, Display, TEXT("Server address loaded: %s"), *serverAddress);
@@ -828,6 +839,11 @@ void Adcss::loadEverything() {
 
 // Go from item name to texture name
 FString Adcss::itemNameToTextureName(FString name) {
+
+	// If it's a portal/gateway
+	if (gateList.Contains(name)) {
+		return "Portal";
+	}
 
 	// Determine the actual name of the item
 	FString itemName = name;
@@ -1047,7 +1063,7 @@ void Adcss::init(bool firstTime) {
 	// Get the world
 	worldRef = GetWorld();
 
-	// Whether to use the server or not TODO
+	// Whether to use the server or not
 	if (firstTime) {
 		serverConnected = false;
 		needNewRequest = true;
@@ -1217,6 +1233,22 @@ void Adcss::init(bool firstTime) {
 "                                                                                \n"
 "===END==="
 "===READY===";
+
+	// The list of things considered gates TODO
+	gateList.Empty();
+	gateList.Add(TEXT("a phantasmal passage"));
+	gateList.Add(TEXT("a sand-covered staircase"));
+	gateList.Add(TEXT("a glowing drain"));
+	gateList.Add(TEXT("a flagged portal"));
+	gateList.Add(TEXT("a gauntlet entrance"));
+	gateList.Add(TEXT("a frozen archway"));
+	gateList.Add(TEXT("a dark tunnel"));
+	gateList.Add(TEXT("a ruined gateway"));
+	gateList.Add(TEXT("a magic portal"));
+	gateList.Add(TEXT("a one-way gateway to a ziggurat"));
+	gateList.Add(TEXT("a gateway to a ziggurat"));
+	gateList.Add(TEXT("a gateway to a bazaar"));
+	gateList.Add(TEXT("a portal to a secret trove of treasure"));
 
 	// Set the skill descriptions
 	skillDescriptions.Empty();
@@ -1493,6 +1525,16 @@ void Adcss::init(bool firstTime) {
 		writeCommandQueued("up");
 	}
 	needMenu = true;
+
+	// Setup the map arrays
+	mapToDraw.Empty();
+	mapToDrawRotated.Empty();
+	mapToDraw.SetNum(gridWidth);
+	mapToDrawRotated.SetNum(gridWidth);
+	for (int i = 0; i < gridWidth; i++) {
+		mapToDraw[i].SetNum(gridWidth);
+		mapToDrawRotated[i].SetNum(gridWidth);
+	}
 
 	// Setup array sizes
 	UE_LOG(LogTemp, Display, TEXT("Setting up arrays..."));
@@ -2282,6 +2324,8 @@ void Adcss::updateLevel() {
 							typeName = "Altar";
 						} else if (levelInfo[i][j].items[k].Contains(TEXT("arch"))) {
 							typeName = "Arch";
+						} else if (gateList.Contains(levelInfo[i][j].items[k])) {
+							typeName = "Gate"; // TODO
 						} else if (levelInfo[i][j].items[k].Contains(TEXT("Shop"))) {
 							typeName = "Shop";
 						}
@@ -2310,13 +2354,13 @@ void Adcss::updateLevel() {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, 2*epsilon));
 						
-						// Somethings are also bigger
-						} else if (itemName.Contains(TEXT("arch")) || itemName.Contains(TEXT("idol")) || itemName.Contains(TEXT("statue")) || itemName.Contains(TEXT("fountain"))) {
+						// Some things are also bigger
+						} else if (itemName.Contains(TEXT("arch")) || typeName == "Gate" || itemName.Contains(TEXT("idol")) || itemName.Contains(TEXT("statue")) || itemName.Contains(TEXT("fountain"))) {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.33f));
 						
-						// Altars and shop are a bit bigger
-						} else if (itemName.Contains(TEXT("altar")) || itemName.Contains(TEXT("shop"))) {
+						// Altars and shop are a bit bigger TODO
+						} else if (typeName == "Altar" || typeName == "Shop") {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.6f*wallScaling, 0.6f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.3f));
 					
@@ -2584,6 +2628,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
+				} else if (choiceType == "amnesia") {
+					writeCommandQueued("Y");
 				} else if (choiceType == "removal") {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
@@ -3268,14 +3314,45 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				thingBeingDragged = SelectedThing();
 			}
 
+		// If memorizing a spell 
+		} else if (thingBeingDragged.thingIs == "Memorizing" && memorizing && thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Memorizing spell: %s"), *selected.thingIs);
+
+			// Get the index
+			int spellNum = thingBeingDragged.thingIndex;
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Spell index: %d"), spellNum);
+
+			// Check if there's something there
+			if (spellNum >= 0 && spellNum < spellLetters.Num()) {
+				FString letter = spellLetters[spellNum];
+				if (spellLetterToInfo.Contains(letter)) {
+
+					// Write the commands
+					writeCommandQueued("M");
+					writeCommandQueued(letter);
+					writeCommandQueued("Y");
+
+					// Refresh the spell list
+					writeCommandQueued("M");
+					writeCommandQueued("escape");
+
+				}
+			}
+
+			// Reset some things
+			refToDescriptionActor->SetActorHiddenInGame(true);
+			thingBeingDragged = SelectedThing();
+
 		// If we're holding a spell, use it
 		} else if (thingBeingDragged.thingIs == "Spell" && thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()) {
-			
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Using spell: %s"), *thingBeingDragged.thingIs);
+
 			// Make sure we're in range
 			int x = selected.x;
 			int y = selected.y;
 			int dist = FMath::RoundToInt(FMath::Sqrt(FMath::Pow(float(x-LOS), 2) + FMath::Pow(float(y-LOS), 2)));
-			if (dist < targetingRange || targetingRange == 0) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - targeting range: %d, distance: %d"), targetingRange, dist);
+			if (dist <= targetingRange || targetingRange == 0) {
 				FString letter = spellLetters[thingBeingDragged.thingIndex];
 				writeCommandQueued("Z");
 				writeCommandQueued(letter);
@@ -3815,11 +3892,19 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 								writeCommandQueued("escape");
 							}
 						}
+					} else if (selected.thingIs == "ButtonMap") {
+						UE_LOG(LogTemp, Display, TEXT("INPUT - Map button clicked"));
+						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
+						if (WidgetSwitcher != nullptr) {
+							WidgetSwitcher->SetActiveWidgetIndex(5);
+							currentUI = "map";
+						}
 					} else if (selected.thingIs == "ButtonMenu") {
 						UE_LOG(LogTemp, Display, TEXT("INPUT - Menu button clicked"));
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
 						if (WidgetSwitcher != nullptr) {
-							WidgetSwitcher->SetActiveWidgetIndex(5);
+							WidgetSwitcher->SetActiveWidgetIndex(6);
+							currentUI = "menu";
 						}
 
 					// The sub-buttons in the character menu
@@ -4349,7 +4434,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
-			} else if (selected.thingIs == "Altar" && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
+			} else if ((selected.thingIs == "Altar" || selected.thingIs == "Gate") && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
 				writeCommandQueued("SKIP");
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued("!");
@@ -4714,7 +4799,7 @@ void Adcss::Tick(float DeltaTime) {
 		UE_LOG(LogTemp, Display, TEXT("No server address found, added %d addresses to try"), serverAddressesToTry.Num());
 	}
 
-	// Send server connection requests TODO
+	// Send server connection requests
 	int maxRequests = 15;
 	if (useServer && serverAddress.Len() == 0 && serverAddressesToTry.Num() > 0 && currentRequests < maxRequests) {
 		int numToDo = FMath::Min(maxRequests - currentRequests, serverAddressesToTry.Num());
@@ -4937,6 +5022,60 @@ void Adcss::Tick(float DeltaTime) {
 	} else if (playerForwardProjected.Y < 0 && std::abs(playerForwardProjected.Y) > std::abs(playerForwardProjected.X)) {
 		dir = FVector(0.0f, -1.0f, 0.0f);
 		dirString = "down";
+	}
+
+	// Only update the map if we can see it
+	if (inventoryOpen && currentUI == "map") {
+
+		// Set the map based on the player's orientation
+		if (dirString == "left") {
+			for (int i = 0; i < gridWidth; i++) {
+				for (int j = 0; j < gridWidth; j++) {
+					mapToDrawRotated[i][j] = mapToDraw[gridWidth - i - 1][gridWidth - j - 1];
+				}
+			}
+		} else if (dirString == "right") {
+			mapToDrawRotated = mapToDraw;
+		} else if (dirString == "down") {
+			for (int i = 0; i < gridWidth; i++) {
+				for (int j = 0; j < gridWidth; j++) {
+					mapToDrawRotated[i][j] = mapToDraw[gridWidth - j - 1][i];
+				}
+			}
+		} else if (dirString == "up") {
+			for (int i = 0; i < gridWidth; i++) {
+				for (int j = 0; j < gridWidth; j++) {
+					mapToDrawRotated[i][j] = mapToDraw[j][gridWidth - i - 1];
+				}
+			}
+		}
+
+		// Set the map text
+		FString mapText = TEXT("");
+		for (int i = 0; i < gridWidth; i++) {
+			for (int j = 0; j < gridWidth; j++) {
+				if (mapToDrawRotated[i][j].Len() == 0) {
+					mapToDrawRotated[i][j] = TEXT(" ");
+				}
+				mapText += mapToDrawRotated[i][j];
+			}
+			if (i < gridWidth - 1) {
+				mapText += TEXT("\n");
+			}
+		}
+		UWidgetComponent* WidgetComponentMap = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		if (WidgetComponentMap != nullptr) {	
+			UUserWidget* UserWidgetMap = WidgetComponentMap->GetUserWidgetObject();
+			if (UserWidgetMap != nullptr) {
+				UTextBlock* MapBox = Cast<UTextBlock>(UserWidgetMap->GetWidgetFromName(TEXT("TextMap")));
+				if (MapBox != nullptr) {
+					MapBox->SetText(FText::FromString(mapText));
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("MAP - Map box not found"));
+				}
+			}
+		}
+
 	}
 
 	// The bottom bar should vaguely following the player
@@ -5747,7 +5886,7 @@ void Adcss::Tick(float DeltaTime) {
 			// Extract the text between them
 			FString extracted = outputBuffer.Mid(start + 11, end - start - 11);
 			if (extracted.Len() > 0) {
-				UE_LOG(LogTemp, Display, TEXT("Extracted: \"%s\""), *extracted);
+				// UE_LOG(LogTemp, Display, TEXT("Extracted: \"%s\""), *extracted);
 				if (!hasLoaded) {
 					UE_LOG(LogTemp, Display, TEXT("Should be loaded now"));
 					hasLoaded = true;
@@ -6026,7 +6165,9 @@ void Adcss::Tick(float DeltaTime) {
 			// If asking to confirm a cancel
 			bool isCancel = false;
 			for (int i = 0; i < charArray.Num(); i++) {
-				if (charArray[i].Contains(TEXT("Are you sure you want to cancel"))) {
+				if (
+					charArray[i].Contains(TEXT("Are you sure you want to cancel"))
+				) {
 					isCancel = true;
 					break;
 				}
@@ -7092,6 +7233,7 @@ void Adcss::Tick(float DeltaTime) {
 			for (int i = 0; i < charArray.Num(); i++) {
 				if (charArray[i].Contains(TEXT("You have a choice of")) 
 				|| charArray[i].Contains(TEXT("Choose an item to acquire"))
+				|| charArray[i].Contains(TEXT("Select a spell to forget"))
 				|| charArray[i].Contains(TEXT("Brand which weapon?"))
 				|| charArray[i].Contains(TEXT("Enchant which weapon?"))
 				|| charArray[i].Contains(TEXT("Identify which item?"))
@@ -7099,15 +7241,18 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Remove which one?"))
 				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
-					choiceTitle = charArray[i].TrimStartAndEnd();
+					choiceTitle = charArray[i];
+					choiceTitle = choiceTitle.Replace(TEXT("[!] toggle spell headers"), TEXT(" "));
+					choiceTitle = choiceTitle.TrimStartAndEnd();
 					if (i < charArray.Num()-1 && !charArray[i+1].Contains(TEXT(" - "))) {
 						choiceTitle += TEXT(" ") + charArray[i+1].TrimStartAndEnd();
 					}
 					if (choiceTitle.Contains(TEXT("to acquire"))) {
 						newChoiceType = "acquirement";
-					}
-					if (choiceTitle.Contains(TEXT("Remove which one?"))) {
+					} else if (choiceTitle.Contains(TEXT("Remove which one?"))) {
 						newChoiceType = "removal";
+					} else if (choiceTitle.Contains(TEXT("Select a spell to forget"))) {
+						newChoiceType = "amnesia";
 					}
 					break;
 				}
@@ -7135,9 +7280,16 @@ void Adcss::Tick(float DeltaTime) {
 						charArray[i].ParseIntoArray(words, TEXT(" "), true);
 						FString hotkey = words[0];
 						FString description = TEXT("");
-						for (int j = 2; j < words.Num(); j++) {
-							description += words[j] + TEXT(" ");
+						if (choiceType == "amnesia") {
+							for (int j = 2; j < words.Num()-3; j++) {
+								description += words[j] + TEXT(" ");
+							}
+						} else {
+							for (int j = 2; j < words.Num(); j++) {
+								description += words[j] + TEXT(" ");
+							}
 						}
+						description = description.TrimStartAndEnd();
 						UE_LOG(LogTemp, Display, TEXT("CHOICE - Added choice: {%s} %s"), *hotkey, *description);
 						choiceLetters.Add(hotkey);
 						choiceNames.Add(description);
@@ -7312,6 +7464,7 @@ void Adcss::Tick(float DeltaTime) {
 						for (int j = 5; j < words.Num(); j++) {
 							description += words[j] + TEXT(" ");
 						}
+						description = description.TrimStartAndEnd();
 						UE_LOG(LogTemp, Display, TEXT("FULL - parsed (%d, %d): %s (%s)"), xCoord, yCoord, *description, *currentType);
 
 						// Depending on the type, update the level info
@@ -7341,6 +7494,11 @@ void Adcss::Tick(float DeltaTime) {
 								
 								// Traps
 								if (description.Contains(TEXT("trap"))) {
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
+
+								// Gates TODO
+								} else if (gateList.Contains(description)) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
@@ -7630,6 +7788,16 @@ void Adcss::Tick(float DeltaTime) {
 						}
 					}
 				}
+			}
+
+			// Update the map
+			if (isMap) {
+				for (int i = 0; i < gridWidth; i++) {
+					for (int j = 0; j < gridWidth; j++) {
+						mapToDraw[i][j] = levelInfo[i][j].currentChar;
+					}
+				}
+				mapToDraw[LOS][LOS] = TEXT("@");
 			}
 			
 			// If trying to attack unarmed, let them
