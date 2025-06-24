@@ -2,8 +2,6 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - BUG static discharge usage
-// - FEATURE gates
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -69,6 +67,8 @@ TArray<FTimerHandle> timerHandles;
 TArray<TSharedRef<IHttpRequest>> httpRequests;
 bool isMenu;
 int nextCommand;
+TArray<FString> lastInputs;
+TArray<FString> lastOutputs;
 
 // Server stuff
 bool serverConnected;
@@ -278,13 +278,15 @@ struct SelectedThing {
 	int x = -1;
 	int y = -1;
 	FString thingIs = TEXT("");
+	FString letter = TEXT("");
 	int thingIndex = -1;
 	SelectedThing() {}
-	SelectedThing(int x, int y, FString thingIs, int thingIndex) {
+	SelectedThing(int x, int y, FString thingIs, int thingIndex, FString letter) {
 		this->x = x;
 		this->y = y;
 		this->thingIs = thingIs;
 		this->thingIndex = thingIndex;
+		this->letter = letter;
 	}
 };
 SelectedThing selected;
@@ -316,6 +318,10 @@ Adcss::Adcss() {
 
 // Write a command to the process
 void Adcss::writeCommand(FString input) {
+	lastInputs.Add(input);
+	while (lastInputs.Num() > 50) {
+		lastInputs.RemoveAt(0);
+	}
 	if (!useServer) {
 		FPlatformProcess::WritePipe(StdInWriteHandle, input);
 	} else if (serverAddress.Len() > 0 && serverConnected) {
@@ -401,6 +407,9 @@ TArray<uint8> FStringToUint8(const FString& InString)
 // Submit a bug report with a message
 void Adcss::submitBug(FString message) {
 
+	// How much to indent all of the non-title lines
+	FString indent = TEXT("    ");
+
 	// If it's the default message, clear it
 	if (message == defaultBugText || message == TEXT("")) {
 		message = TEXT("no message");
@@ -410,12 +419,12 @@ void Adcss::submitBug(FString message) {
 	FString dump = TEXT("");
 
 	// Also put the message at the top
-	dump += TEXT("Bug report message: ") + message + TEXT("\n");
+	dump += FString::Printf(TEXT("Bug report message:\n%s%s\n"), *indent, *message);
 
 	// The whole inventory
 	dump += TEXT("\nInventory letter to name:\n");
 	for (auto& Elem : inventoryLetterToName) {
-		dump += Elem.Key + TEXT(": ") + Elem.Value + TEXT("\n");
+		dump += indent + Elem.Key + TEXT(": ") + Elem.Value + TEXT("\n");
 	}
 
 	// The inventory locations
@@ -423,7 +432,7 @@ void Adcss::submitBug(FString message) {
 	for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
 		for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
 			if (inventoryLocToLetter[i][j] != TEXT("")) {
-				dump += FString::Printf(TEXT("%d %d %s "), i, j, *inventoryLocToLetter[i][j]) + TEXT("\n");
+				dump += indent + FString::Printf(TEXT("%d %d %s "), i, j, *inventoryLocToLetter[i][j]) + TEXT("\n");
 			}
 		}
 	}
@@ -431,50 +440,43 @@ void Adcss::submitBug(FString message) {
 	// The hotbar info
 	dump += TEXT("\nHotbar info:\n");
 	for (int i = 0; i < hotbarInfos.Num(); i++) {
-		dump += FString::Printf(TEXT("%d %s %s %s "), i, *hotbarInfos[i].letter, *hotbarInfos[i].name, *hotbarInfos[i].type) + TEXT("\n");
+		dump += indent + FString::Printf(TEXT("%d %s %s %s "), i, *hotbarInfos[i].letter, *hotbarInfos[i].name, *hotbarInfos[i].type) + TEXT("\n");
 	}
 
 	// Status stuff
-	dump += FString::Printf(TEXT("\nLeft text: %s\n"), *leftText);
-	dump += FString::Printf(TEXT("Right text: %s\n"), *rightText);
-	dump += FString::Printf(TEXT("Status text: %s\n"), *statusText);
-	dump += TEXT("Gold: ") + FString::FromInt(gold) + TEXT("\n");
+	dump += FString::Printf(TEXT("\nLeft text:\n%s%s\n"), *indent, *leftText);
+	dump += FString::Printf(TEXT("\nRight text:\n%s%s\n"), *indent, *rightText);
+	dump += FString::Printf(TEXT("\nStatus text:\n%s%s\n"), *indent, *statusText);
+	dump += FString::Printf(TEXT("\nGold:\n%s%s\n"), *indent, *FString::FromInt(gold));
 
 	// Command queue
 	dump += TEXT("\nCommand queue:\n");
 	for (int i = 0; i < commandQueue.Num(); i++) {
-		dump += FString::Printf(TEXT("%d %s\n"), i, *commandQueue[i]);
+		dump += indent + FString::Printf(TEXT("%d %s\n"), i, *commandQueue[i]);
 	}
 
 	// Passives list
 	dump += TEXT("\nPassives:\n");
 	for (int i = 0; i < passives.Num(); i++) {
-		dump += passives[i] + TEXT("\n");
+		dump += indent + passives[i] + TEXT("\n");
 	}
 
 	// Abilities list
 	dump += TEXT("\nAbilities:\n");
 	for (auto& Elem : abilityLetterToInfo) {
-		dump += Elem.Key + TEXT(": ") + Elem.Value.name + TEXT(" ") + FString::FromInt(Elem.Value.failure) + TEXT("\n");
+		dump += indent + Elem.Key + TEXT(": ") + Elem.Value.name + TEXT(" ") + FString::FromInt(Elem.Value.failure) + TEXT("\n");
 	}
 
 	// Spells list
 	dump += TEXT("\nSpells:\n");
 	for (auto& Elem : spellLetterToInfo) {
-		dump += Elem.Key + TEXT(": ") + Elem.Value.name + TEXT(" ") + FString::FromInt(Elem.Value.failure) + TEXT("\n");
+		dump += indent + Elem.Key + TEXT(": ") + Elem.Value.name + TEXT(" ") + FString::FromInt(Elem.Value.failure) + TEXT("\n");
 	}
 
-	// Output buffer
-	dump += TEXT("\nMost recent output buffer: ") + outputBuffer + TEXT("\n");
-
-	// The char array
-	dump += TEXT("\nChar array:\n");
-	for (int i = 0; i < charArray.Num(); i++) {
-		dump += FString::Printf(TEXT("%s\n"), *charArray[i]);
-	}
 	// Level ascii
 	dump += TEXT("\nLevel ascii:\n");
 	for (int i = 0; i < levelAscii.Num(); i++) {
+		dump += indent;
 		for (int j = 0; j < levelAscii[i].Num(); j++) {
 			dump += levelAscii[i][j] + TEXT(" ");
 		}
@@ -484,6 +486,7 @@ void Adcss::submitBug(FString message) {
 	// Level info
 	dump += TEXT("\nCurrent chars:\n");
 	for (int i = 0; i < levelInfo.Num(); i++) {
+		dump += indent;
 		for (int j = 0; j < levelInfo[i].Num(); j++) {
 			dump += levelInfo[i][j].currentChar + TEXT(" ");
 		}
@@ -491,6 +494,7 @@ void Adcss::submitBug(FString message) {
 	}
 	dump += TEXT("\nFloor chars:\n");
 	for (int i = 0; i < levelInfo.Num(); i++) {
+		dump += indent;
 		for (int j = 0; j < levelInfo[i].Num(); j++) {
 			dump += levelInfo[i][j].floorChar + TEXT(" ");
 		}
@@ -501,7 +505,7 @@ void Adcss::submitBug(FString message) {
 		for (int j = 0; j < levelInfo[i].Num(); j++) {
 			for (int k = 0; k < levelInfo[i][j].items.Num(); k++) {
 				if (levelInfo[i][j].items[k] != TEXT("")) {
-					dump += FString::Printf(TEXT("%d %d %s %s "), i, j, *levelInfo[i][j].items[k], *levelInfo[i][j].itemHotkeys[k]) + TEXT("\n");
+					dump += indent + FString::Printf(TEXT("%d %d %s %s "), i, j, *levelInfo[i][j].items[k], *levelInfo[i][j].itemHotkeys[k]) + TEXT("\n");
 				}
 			}
 		}
@@ -510,7 +514,7 @@ void Adcss::submitBug(FString message) {
 	for (int i = 0; i < levelInfo.Num(); i++) {
 		for (int j = 0; j < levelInfo[i].Num(); j++) {
 			if (levelInfo[i][j].effect != TEXT("")) {
-				dump += FString::Printf(TEXT("%d %d %s "), i, j, *levelInfo[i][j].effect) + TEXT("\n");
+				dump += indent + FString::Printf(TEXT("%d %d %s "), i, j, *levelInfo[i][j].effect) + TEXT("\n");
 			}
 		}
 	}
@@ -518,38 +522,79 @@ void Adcss::submitBug(FString message) {
 	for (int i = 0; i < levelInfo.Num(); i++) {
 		for (int j = 0; j < levelInfo[i].Num(); j++) {
 			if (levelInfo[i][j].enemy != TEXT("")) {
-				dump += FString::Printf(TEXT("%d %d %s "), i, j, *levelInfo[i][j].enemy) + TEXT("\n");
+				dump += indent + FString::Printf(TEXT("%d %d %s "), i, j, *levelInfo[i][j].enemy) + TEXT("\n");
 			}
 		}
 	}
 
 	// Current description
-	dump += FString::Printf(TEXT("\nCurrent description:\n%s\n"), *currentDescription);
-	dump += FString::Printf(TEXT("Current usage: %s\n"), *currentUsage);
-	dump += FString::Printf(TEXT("Current type: %s\n"), *currentType);
+	dump += TEXT("\nCurrent description:\n");
+	TArray<FString> descriptionLines;
+	currentDescription.ParseIntoArray(descriptionLines, TEXT("\n"), true);
+	for (int i = 0; i < descriptionLines.Num(); i++) {
+		dump += indent + descriptionLines[i] + TEXT("\n");
+	}
+	dump += TEXT("\nCurrent usage:\n");
+	TArray<FString> usageLines;
+	currentUsage.ParseIntoArray(usageLines, TEXT("\n"), true);
+	for (int i = 0; i < usageLines.Num(); i++) {
+		dump += indent + usageLines[i] + TEXT("\n");
+	}
+	dump += TEXT("\nCurrent type:\n") + indent + currentType + TEXT("\n");
 
 	// Most recent overview text
-	dump += FString::Printf(TEXT("\nMost recent overview text:\n%s\n"), *overviewText);
+	dump += TEXT("\nMost recent overview text:\n");
+	TArray<FString> overviewLines;
+	overviewText.ParseIntoArray(overviewLines, TEXT("\n"), true);
+	for (int i = 0; i < overviewLines.Num(); i++) {
+		dump += indent + overviewLines[i] + TEXT("\n");
+	}
 
 	// Currently selected
-	dump += FString::Printf(TEXT("\nCurrent UI: %s\n"), *currentUI);
-	dump += FString::Printf(TEXT("Currently selected: %d %d %s %d\n"), selected.x, selected.y, *selected.thingIs, selected.thingIndex);
-	dump += FString::Printf(TEXT("Currently dragging: %d %d %s %d\n"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
+	dump += TEXT("\nCurrent UI:\n") + indent + currentUI + TEXT("\n");
+	dump += FString::Printf(TEXT("\nCurrently selected:\n%s %d %d %s %d\n"), *indent, selected.x, selected.y, *selected.thingIs, selected.thingIndex);
+	dump += FString::Printf(TEXT("\nCurrently dragging:\n%s %d %d %s %d\n"), *indent, thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
 
 	// Skills
 	dump += TEXT("\nSkills: \n");
 	for (auto& Elem : skillNameToInfo) {
-		dump += Elem.Key + TEXT(": ") + FString::Printf(TEXT("%f %d %d %d\n"), Elem.Value.level, Elem.Value.focussed, Elem.Value.train, Elem.Value.apt);
+		dump += indent + Elem.Key + TEXT(": ") + FString::Printf(TEXT("%f %d %d %d\n"), Elem.Value.level, Elem.Value.focussed, Elem.Value.train, Elem.Value.apt);
 	}
 
 	// Log text
 	dump += TEXT("\nLog text: \n");
 	for (int i = 0; i < logText.Num(); i++) {
-		dump += FString::Printf(TEXT("%d %s\n"), i, *logText[i]);
+		dump += indent + FString::Printf(TEXT("%d %s\n"), i, *logText[i]);
+	}
+
+	// Last so many outputs
+	dump += TEXT("\nLast outputs:\n\n");
+	for (int i = 0; i < lastOutputs.Num(); i++) {
+		TArray<FString> outputLines;
+		lastOutputs[i].ParseIntoArray(outputLines, TEXT("\n"), true);
+		for (int j = 0; j < outputLines.Num(); j++) {
+			dump += indent + outputLines[j] + TEXT("\n");
+		}
+		if (i < lastOutputs.Num() - 1) {
+			dump += TEXT("\n");
+		}
+	}
+
+	// Last so many commands sent
+	dump += TEXT("\nLast commands sent:\n");
+	dump += indent;
+	for (int i = 0; i < lastInputs.Num(); i++) {
+		dump += FString::Printf(TEXT("%s"), *lastInputs[i]);
+		if (i < lastInputs.Num() - 1) {
+			dump += TEXT(", ");
+		}
+		if (i % 10 == 9 || i == lastInputs.Num() - 1) {
+			dump += TEXT("\n") + indent;
+		}
 	}
 
 	// List of missing things
-	dump += TEXT("\nList of missing things: ");
+	dump += TEXT("\nList of missing things:\n") + indent;
 	for (auto& Elem : listOfMissingThings) {
 		if (Elem.Len() > 0) {
 			dump += Elem + TEXT(", ");
@@ -602,9 +647,6 @@ void Adcss::submitBug(FString message) {
 
 	// The end of the message
 	messageContent += TEXT("--") + boundary + TEXT("--\r\n");
-
-	// Get rid of the extra spaces
-	messageContent = messageContent.Replace(TEXT("    "), TEXT(""));
 
 	// Send it (hard-coded URL because it's just a shitty little VPS with nothing)
 	UE_LOG(LogTemp, Display, TEXT("Sending request to server: %s"), *messageContent);
@@ -1088,6 +1130,12 @@ void Adcss::init(bool firstTime) {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=gate ");
+	args += TEXT(" -extra-opt-first prompt_menu=true ");
+	args += TEXT(" -extra-opt-first reduce_animations=true ");
+	args += TEXT(" -extra-opt-first force_spell_targeter=all ");
+	args += TEXT(" -extra-opt-first force_ability_targeter=all ");
+	args += TEXT(" -extra-opt-first default_autopickup=false ");
+	args += TEXT(" -extra-opt-first fail_severity_to_confirm=0 ");
 	args += TEXT(" -extra-opt-first wiz_mode=yes ");
 	args += TEXT(" -extra-opt-first char_set=ascii ");
 	args += TEXT(" -extra-opt-first crawl_dir=\"") + binaryPath + TEXT("\" ");
@@ -1234,7 +1282,7 @@ void Adcss::init(bool firstTime) {
 "===END==="
 "===READY===";
 
-	// The list of things considered gates TODO
+	// The list of things considered gates
 	gateList.Empty();
 	gateList.Add(TEXT("a phantasmal passage"));
 	gateList.Add(TEXT("a sand-covered staircase"));
@@ -1941,10 +1989,10 @@ void Adcss::updateLevel() {
 			wallSouth->SetActorEnableCollision(false);
 			wallEast->SetActorEnableCollision(false);
 			wallWest->SetActorEnableCollision(false);
-			meshNameToThing.Add(wallNorth->GetName(), SelectedThing(j, i, "Wall", 0));
-			meshNameToThing.Add(wallSouth->GetName(), SelectedThing(j, i, "Wall", 1));
-			meshNameToThing.Add(wallEast->GetName(), SelectedThing(j, i, "Wall", 2));
-			meshNameToThing.Add(wallWest->GetName(), SelectedThing(j, i, "Wall", 3));
+			meshNameToThing.Add(wallNorth->GetName(), SelectedThing(j, i, "Wall", 0, ""));
+			meshNameToThing.Add(wallSouth->GetName(), SelectedThing(j, i, "Wall", 1, ""));
+			meshNameToThing.Add(wallEast->GetName(), SelectedThing(j, i, "Wall", 2, ""));
+			meshNameToThing.Add(wallWest->GetName(), SelectedThing(j, i, "Wall", 3, ""));
 
 			// The floor
 			AActor* floor = floorArray[i][j];
@@ -1963,7 +2011,7 @@ void Adcss::updateLevel() {
 			UMaterialInstanceDynamic* material = (UMaterialInstanceDynamic*)mesh->GetMaterial(0);
 			material->SetTextureParameterValue("TextureImage", texture);
 			floor->SetActorHiddenInGame(false);
-			meshNameToThing.Add(floor->GetName(), SelectedThing(j, i, "Floor", 0));
+			meshNameToThing.Add(floor->GetName(), SelectedThing(j, i, "Floor", 0, ""));
 
 			// If we have an effect
 			if (levelInfo[i][j].effect.Len() > 0) {
@@ -1975,7 +2023,7 @@ void Adcss::updateLevel() {
 					effectArray[effectUseCount]->SetActorHiddenInGame(false);
 					effectArray[effectUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f));
 					UStaticMeshComponent* effectMesh = effectArray[effectUseCount]->FindComponentByClass<UStaticMeshComponent>();
-					meshNameToThing.Add(effectArray[effectUseCount]->GetName(), SelectedThing(j, i, "Effect", 0));
+					meshNameToThing.Add(effectArray[effectUseCount]->GetName(), SelectedThing(j, i, "Effect", 0, ""));
 
 					// Set the texture
 					FString effect = levelInfo[i][j].effect;
@@ -2239,7 +2287,7 @@ void Adcss::updateLevel() {
 						UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
 						material2->SetTextureParameterValue("TextureImage", texture2);
                     }
-					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
+					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0, ""));
 					enemyUseCount++;
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("Enemy count exceeded"));
@@ -2256,7 +2304,7 @@ void Adcss::updateLevel() {
 					UTexture2D* texture2 = getTexture("LadderDown");
 					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
 					material2->SetTextureParameterValue("TextureImage", texture2);
-					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "LadderDown", 0));
+					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "LadderDown", 0, ""));
 					enemyUseCount++;
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("Enemy count exceeded"));
@@ -2273,7 +2321,7 @@ void Adcss::updateLevel() {
 					UTexture2D* texture2 = getTexture("LadderUp");
 					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)enemyMesh->GetMaterial(0);
 					material2->SetTextureParameterValue("TextureImage", texture2);
-					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "LadderUp", 0));
+					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "LadderUp", 0, ""));
 					enemyUseCount++;
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("Enemy count exceeded"));
@@ -2291,7 +2339,7 @@ void Adcss::updateLevel() {
 					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
 					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + 1, floorHeight * (j - LOS) + 1, floorWidth / 3.0f));
 					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
-					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0));
+					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0, ""));
 
 					// Set the texture
 					FString enemyName = levelInfo[i][j].enemy;
@@ -2325,11 +2373,11 @@ void Adcss::updateLevel() {
 						} else if (levelInfo[i][j].items[k].Contains(TEXT("arch"))) {
 							typeName = "Arch";
 						} else if (gateList.Contains(levelInfo[i][j].items[k])) {
-							typeName = "Gate"; // TODO
+							typeName = "Gate";
 						} else if (levelInfo[i][j].items[k].Contains(TEXT("Shop"))) {
 							typeName = "Shop";
 						}
-						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, typeName, k));
+						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, typeName, k, ""));
 
 						// Determine the actual name of the item
 						FString itemName = levelInfo[i][j].items[k];
@@ -2359,7 +2407,7 @@ void Adcss::updateLevel() {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.33f));
 						
-						// Altars and shop are a bit bigger TODO
+						// Altars and shop are a bit bigger
 						} else if (typeName == "Altar" || typeName == "Shop") {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.6f*wallScaling, 0.6f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.3f));
@@ -2611,6 +2659,198 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// Start everything up again
 			init(false);
 
+		// Debug buttons TODO
+		} else if (selected.thingIs.Contains(TEXT("Debug"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Debug button clicked: %s"), *selected.thingIs);
+
+			// Process the debug command
+			if (selected.thingIs == "ButtonDebugUp") {
+				writeCommandQueued("&");
+				writeCommandQueued("u");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugDown") {
+				writeCommandQueued("&");
+				writeCommandQueued("d");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugIdentify") {
+				writeCommandQueued("&");
+				writeCommandQueued("i");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugForget") {
+				writeCommandQueued("&");
+				writeCommandQueued("I");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugZot") {
+				writeCommandQueued("&");
+				writeCommandQueued("o");
+				writeCommandQueued("0");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugCycle") {
+				TArray<TTuple<FString, FString>> branches = {
+					{"Dungeon", "D"},
+					{"Temple", "T"},
+					{"Lair", "L"},
+					{"Swamp", "S"},
+					{"Shoals", "A"},
+					{"SnakePit", "P"},
+					{"SpiderNest", "N"},
+					{"SlimePits", "M"},
+					{"OrcishMines", "O"},
+					{"ElvenHalls", "E"},
+					{"Vaults", "V"},
+					{"Crypt", "C"},
+					{"Tomb", "W"},
+					{"Depths", "U"},
+					{"Hell", "H"},
+					{"Dis", "I"},
+					{"Gehenna", "G"},
+					{"Cocytus", "X"},
+					{"Tartarus", "Y"},
+					{"Zot", "Z"},
+					{"Abyss", "J"},
+					{"Pandemonium", "R"},
+					{"Ziggurat", "Q"},
+					{"Bazaar", "1"},
+					{"Trove", "2"},
+					{"Sewer", "3"},
+					{"Ossuary", "4"},
+					{"Bailey", "5"},
+					{"Ice Cave", "6"},
+					{"Volcano", "7"},
+					{"Wizlab", "8"},
+					{"Desolation", "9"},
+					{"Gauntlet", "!"},
+					{"Arena", "\""},
+					{"Crucible", "@"},
+				};
+				writeCommandQueued("&");
+				writeCommandQueued("~");
+				for (int i = 0; i < branches.Num(); i++) {
+					if (currentBranch == branches[i].Key) {
+						writeCommandQueued(branches[i+1 % branches.Num()].Value);
+						break;
+					}
+				}
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugMol") {
+				writeCommandQueued("&");
+				writeCommandQueued("w");
+			} else if (selected.thingIs == "ButtonDebugAcquire") {
+				writeCommandQueued("&");
+				writeCommandQueued("a");
+			} else if (selected.thingIs == "ButtonDebugPotions") {
+				TArray<FString> potionNames = {
+					"ambrosia",
+					"attraction",
+					"berserk rage",
+					"brilliance",
+					"cancellation",
+					"curing",
+					"degeneration",
+					"enlightenment",
+					"experience",
+					"haste",
+					"heal wounds",
+					"invisibility",
+					"lignification",
+					"magic",
+					"might",
+					"mutation",
+					"resistance"
+				};
+				for (int i = 0; i < potionNames.Num(); i++) {
+					writeCommandQueued("&");
+					writeCommandQueued("o");
+					writeCommandQueued("!");
+					for (int j = 0; j < potionNames[i].Len(); j++) {
+						writeCommandQueued(potionNames[i].Mid(j, 1));
+					}
+					writeCommandQueued("enter");
+				}
+			} else if (selected.thingIs == "ButtonDebugScrolls") {
+				TArray<FString> scrollNames = {
+					"acquirement",
+					"amnesia",
+					"blinking",
+					"brand weapon",
+					"butterflies",
+					"enchant armour",
+					"enchant weapon",
+					"fear",
+					"fog",
+					"identify",
+					"immolation",
+					"noise",
+					"poison",
+					"revelation",
+					"silence",
+					"summoning",
+					"teleportation",
+					"torment",
+					"vulnerability"
+				};
+				for (int i = 0; i < scrollNames.Num(); i++) {
+					writeCommandQueued("&");
+					writeCommandQueued("o");
+					writeCommandQueued("?");
+					for (int j = 0; j < scrollNames[i].Len(); j++) {
+						writeCommandQueued(scrollNames[i].Mid(j, 1));
+					}
+					writeCommandQueued("enter");
+				}
+			} else if (selected.thingIs == "ButtonDebugGold0") {
+				writeCommandQueued("&");
+				writeCommandQueued("$");
+				writeCommandQueued("0");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugGold1000") {
+				writeCommandQueued("&");
+				writeCommandQueued("$");
+				writeCommandQueued("1");
+				writeCommandQueued("0");
+				writeCommandQueued("0");
+				writeCommandQueued("0");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugDismiss") {
+				writeCommandQueued("&");
+				writeCommandQueued("G");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugShop") {
+				writeCommandQueued("&");
+				writeCommandQueued("\\");
+				writeCommandQueued("*");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugRegenerate") {
+				writeCommandQueued("&");
+				writeCommandQueued("R");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugHeal") {
+				writeCommandQueued("&");
+				writeCommandQueued("h");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugGainLevel") {
+				writeCommandQueued("&");
+				writeCommandQueued("x");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugResetLevel") {
+				writeCommandQueued("&");
+				writeCommandQueued("l");
+				writeCommandQueued("1");
+				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugMonster") {
+				writeCommandQueued("&");
+				writeCommandQueued("m");
+				writeCommandQueued("r");
+				writeCommandQueued("a");
+				writeCommandQueued("n");
+				writeCommandQueued("d");
+				writeCommandQueued("o");
+				writeCommandQueued("m");
+				writeCommandQueued("enter");
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("Unknown debug button: %s"), *selected.thingIs);
+			}
+
 		// Choice button
 		} else if (selected.thingIs.Contains(TEXT("ButtonOption")) && isChoiceOpen) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Choice button clicked: %s"), *selected.thingIs);
@@ -2676,10 +2916,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 
-		// If it's a ladder
+		// If it's a ladder TODO reveal
 		} else if (thingBeingDragged.thingIs.Contains(TEXT("Ladder")) || selected.thingIs.Contains(TEXT("Ladder"))) {
-			UE_LOG(LogTemp, Display, TEXT("INPUT - Ladder clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
-			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Ladder clicked: (%d, %d) %s"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs);
+			if ((selected.x == LOS && selected.y == LOS && selected.thingIs.Contains(TEXT("Ladder"))) ||
+				(thingBeingDragged.x == LOS && thingBeingDragged.y == LOS && thingBeingDragged.thingIs.Contains(TEXT("Ladder")))) {
 				if (thingBeingDragged.thingIs.Contains(TEXT("Up"))) {
 					writeCommandQueued("<");
 					writeCommandQueued("escape");
@@ -2687,6 +2928,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
 				}
+				writeCommandQueued("&");
+				writeCommandQueued("{");
+				writeCommandQueued("enter");
 			}
 		
 		// Clicking on the name input box
@@ -2951,13 +3195,27 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		} else if (thingBeingDragged.thingIs.Contains(TEXT("Altar")) || selected.thingIs.Contains(TEXT("Altar"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Altar clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
 			showNextAltar = true;
-			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
+			if ((thingBeingDragged.x == LOS && thingBeingDragged.y == LOS && thingBeingDragged.thingIs.Contains(TEXT("Altar"))) ||
+				(selected.x == LOS && selected.y == LOS && selected.thingIs.Contains(TEXT("Altar")))) {
 				writeCommandQueued(">");
 				writeCommandQueued("enter");
 				writeCommandQueued("!");
 				writeCommandQueued("!");
 				writeCommandQueued("escape");
 				nextAltar = 0;
+			}
+
+		// If it's a gate
+		} else if (thingBeingDragged.thingIs.Contains(TEXT("Gate")) || selected.thingIs.Contains(TEXT("Gate"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Gate clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
+			if ((thingBeingDragged.x == LOS && thingBeingDragged.y == LOS && thingBeingDragged.thingIs.Contains(TEXT("Gate"))) ||
+				(selected.x == LOS && selected.y == LOS && selected.thingIs.Contains(TEXT("Gate")))) {
+				writeCommandQueued(">");
+				writeCommandQueued("Y");
+				writeCommandQueued("enter");
+				writeCommandQueued("&");
+				writeCommandQueued("{");
+				writeCommandQueued("enter");
 			}
 
 		// Shop buy button
@@ -3343,20 +3601,31 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			refToDescriptionActor->SetActorHiddenInGame(true);
 			thingBeingDragged = SelectedThing();
 
-		// If we're holding a spell, use it
-		} else if (thingBeingDragged.thingIs == "Spell" && thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()) {
+		// If we're holding a spell, use it TODO
+		} else if (thingBeingDragged.thingIs == "Spell" && (thingBeingDragged.letter.Len() > 0 || (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Using spell: %s"), *thingBeingDragged.thingIs);
+
+			// Get the letter
+			FString letter = "a";
+			if (thingBeingDragged.letter.Len() > 0) {
+				letter = thingBeingDragged.letter;
+			} else if (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()) {
+				letter = spellLetters[thingBeingDragged.thingIndex];
+			} else {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Invalid spell letter or index"));
+				return;
+			}
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Spell letter: %s"), *letter);
 
 			// Make sure we're in range
 			int x = selected.x;
 			int y = selected.y;
 			int dist = FMath::RoundToInt(FMath::Sqrt(FMath::Pow(float(x-LOS), 2) + FMath::Pow(float(y-LOS), 2)));
 			UE_LOG(LogTemp, Display, TEXT("INPUT - targeting range: %d, distance: %d"), targetingRange, dist);
-			if (dist <= targetingRange || targetingRange == 0) {
-				FString letter = spellLetters[thingBeingDragged.thingIndex];
+			if (dist <= targetingRange || targetingRange <= 0) {
 				writeCommandQueued("Z");
 				writeCommandQueued(letter);
-				if (targetingRange >= 1) {
+				if (targetingRange >= 1 || true) {
 					writeCommandQueued("r");
 					int currentX = LOS;
 					int currentY = LOS;
@@ -3383,17 +3652,28 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 		// If we're holding an ability, use it
-		} else if (thingBeingDragged.thingIs == "Ability" && thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < abilityLetters.Num()) {
+		} else if (thingBeingDragged.thingIs == "Ability" && (thingBeingDragged.letter.Len() > 0 || (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()))) {
+
+			// Get the letter
+			FString letter = "a";
+			if (thingBeingDragged.letter.Len() > 0) {
+				letter = thingBeingDragged.letter;
+			} else if (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < abilityLetters.Num()) {
+				letter = abilityLetters[thingBeingDragged.thingIndex];
+			} else {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Invalid ability letter or index"));
+				return;
+			}
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Ability letter: %s"), *letter);
 
 			// Make sure we're in range
 			int x = selected.x;
 			int y = selected.y;
 			int dist = FMath::RoundToInt(FMath::Sqrt(FMath::Pow(float(x-LOS), 2) + FMath::Pow(float(y-LOS), 2)));
-			if (dist < targetingRange || targetingRange == 0) {
-				FString letter = abilityLetters[thingBeingDragged.thingIndex];
+			if (dist < targetingRange || targetingRange <= 0) {
 				writeCommandQueued("a");
 				writeCommandQueued(letter);
-				if (targetingRange >= 1) {
+				if (targetingRange >= 1 || true) {
 					writeCommandQueued("r");
 					int currentX = LOS;
 					int currentY = LOS;
@@ -3769,17 +4049,15 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 						
 						// Select seed run
-						for (int i = 0; i < 10; i++) {
+						for (int i = 0; i < 11; i++) {
 							writeCommandQueued("up");
 						}
 						writeCommandQueued("down");
 						writeCommandQueued("enter");
 
 						// Write the seed
-						if (currentSeed != defaultSeedText) {
-							for (int i = 0; i < currentSeed.Len(); i++) {
-								writeCommandQueued(currentSeed.Mid(i, 1));
-							}
+						for (int i = 0; i < currentSeed.Len(); i++) {
+							writeCommandQueued(currentSeed.Mid(i, 1));
 						}
 
 						// Start the run
@@ -4039,7 +4317,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
 					writeCommandQueued("!");
-					thingBeingDragged = SelectedThing(-1, -1, "Choice", choiceNum);
+					thingBeingDragged = SelectedThing(-1, -1, "Choice", choiceNum, "");
 
 					// Show the description
 					currentDescription = TEXT("");
@@ -4083,7 +4361,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
-				thingBeingDragged = SelectedThing(-1, -1, "Choice", itemNum);
+				thingBeingDragged = SelectedThing(-1, -1, "Choice", itemNum, "");
 
 				// Show the description
 				currentDescription = TEXT("");
@@ -4123,7 +4401,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							writeCommandQueued(">");
 							writeCommandQueued("escape");
 							writeCommandQueued("escape");
-							thingBeingDragged = SelectedThing(j, i, "InventoryItem", 0);
+							thingBeingDragged = SelectedThing(j, i, "InventoryItem", 0, "");
 							found = true;
 							break;
 						}
@@ -4174,7 +4452,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(letter);
 					writeCommandQueued("escape");
 					writeCommandQueued("escape");
-					thingBeingDragged = SelectedThing(-1, -1, "Ability", abilityNum);
+					thingBeingDragged = SelectedThing(-1, -1, "Ability", abilityNum, "");
 
 					// Show the description
 					currentDescription = TEXT("");
@@ -4218,14 +4496,14 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						writeCommandQueued(">");
 						writeCommandQueued("escape");
 						writeCommandQueued("escape");
-						thingBeingDragged = SelectedThing(-1, -1, "Memorizing", spellNum);
+						thingBeingDragged = SelectedThing(-1, -1, "Memorizing", spellNum, "");
 					} else {
 						writeCommandQueued("I");
 						writeCommandQueued(letter);
 						writeCommandQueued(">");
 						writeCommandQueued("escape");
 						writeCommandQueued("escape");
-						thingBeingDragged = SelectedThing(-1, -1, "Spell", spellNum);
+						thingBeingDragged = SelectedThing(-1, -1, "Spell", spellNum, "");
 					}
 
 					// Show the description
@@ -4253,6 +4531,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// If right clicking on one of the hotbar slots
 		} else if (selected.thingIs.Contains(TEXT("SlotButton"))) {
 
+			// Get the index
 			FString hotbarSlot = selected.thingIs.Replace(TEXT("SlotButton"), TEXT(""));
 			int hotbarIndex = FCString::Atoi(*hotbarSlot)-1;
 			if (hotbarIndex >= 0 && hotbarIndex <= numHotbarSlots) {
@@ -4285,7 +4564,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							}
 						}
 						if (found) {
-							thingBeingDragged = SelectedThing(xLoc, yLoc, "InventoryItem", 0);
+							thingBeingDragged = SelectedThing(xLoc, yLoc, "InventoryItem", 0, "");
 						}
 
 					// If it's an ability
@@ -4295,7 +4574,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						writeCommandQueued(hotbarInfos[hotbarIndex].letter);
 						writeCommandQueued("escape");
 						writeCommandQueued("escape");
-						thingBeingDragged = SelectedThing(-1, -1, "Ability", 0);
+						thingBeingDragged = SelectedThing(-1, -1, "Ability", 0, hotbarInfos[hotbarIndex].letter);
 						found = true;
 
 					// If it's a spell
@@ -4304,7 +4583,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						writeCommandQueued(hotbarInfos[hotbarIndex].letter);
 						writeCommandQueued("escape");
 						writeCommandQueued("escape");
-						thingBeingDragged = SelectedThing(-1, -1, "Spell", 0);
+						thingBeingDragged = SelectedThing(-1, -1, "Spell", 0, hotbarInfos[hotbarIndex].letter);
 						found = true;
 
 					}
@@ -4345,7 +4624,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			
 			// If it's not an empty slot
 			if (inventoryLocToLetter[row][col].Len() > 0) {
-				thingBeingDragged = SelectedThing(col, row, "InventoryItem", 0);
+				thingBeingDragged = SelectedThing(col, row, "InventoryItem", 0, "");
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Thing being dragged: (%d, %d) %s %d"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs, thingBeingDragged.thingIndex);
 
 				// Send the commands to get the description
@@ -4434,7 +4713,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
-			} else if ((selected.thingIs == "Altar" || selected.thingIs == "Gate") && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
+			} else if ((selected.thingIs == "Altar" || selected.thingIs == "Gate" || selected.thingIs == "Arch") && selected.thingIndex >= 0 && levelInfo[selected.y][selected.x].itemHotkeys.Num() > selected.thingIndex) {
 				writeCommandQueued("SKIP");
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued("!");
@@ -4595,160 +4874,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 	} else if (key == "debug") {
 
 		// show everything
-		// writeCommandQueued("ctrl-X");
-
-		// give a single potion
-		FString potionName = "potion of might";
-		writeCommandQueued("&");
-		writeCommandQueued("%");
-		for (int j = 0; j < potionName.Len(); j++) {
-			writeCommandQueued(potionName.Mid(j, 1));
-		}
-		writeCommandQueued("enter");
-		writeCommandQueued("enter");
 		writeCommandQueued("ctrl-X");
-
-		// level up
-		// writeCommandQueued("&");
-		// writeCommandQueued("x");
-		// writeCommandQueued("enter");
-
-		// forget everything
-		// writeCommandQueued("&");
-		// writeCommandQueued("I");
-
-		// identify everything
-		// writeCommandQueued("&");
-		// writeCommandQueued("i");
-
-		// kill
-		// writeCommandQueued("&");
-		// writeCommandQueued("m");
-		// writeCommandQueued("g");
-		// writeCommandQueued("r");
-		// writeCommandQueued("i");
-		// writeCommandQueued("n");
-		// writeCommandQueued("d");
-		// writeCommandQueued("enter");
-
-		// give the orb of zot
-		// writeCommandQueued("&");
-		// writeCommandQueued("o");
-		// writeCommandQueued("0");
-
-		// god mollification
-		// writeCommandQueued("&");
-		// writeCommandQueued("w");
-
-		// change level
-		// TArray<TTuple<FString, FString>> branches = {
-		// 	{"Dungeon", "D"},
-		// 	{"Temple", "T"},
-		// 	{"Lair", "L"},
-		// 	{"Swamp", "S"},
-		// 	{"Shoals", "A"},
-		// 	{"SnakePit", "P"},
-		// 	{"SpiderNest", "N"},
-		// 	{"SlimePits", "M"},
-		// 	{"OrcishMines", "O"},
-		// 	{"ElvenHalls", "E"},
-		// 	{"Vaults", "V"},
-		// 	{"Crypt", "C"},
-		// 	{"Tomb", "W"},
-		// 	{"Depths", "U"},
-		// 	{"Hell", "H"},
-		// 	{"Dis", "I"},
-		// 	{"Gehenna", "G"},
-		// 	{"Cocytus", "X"},
-		// 	{"Tartarus", "Y"},
-		// 	{"Zot", "Z"},
-		// 	{"Abyss", "J"},
-		// 	{"Pandemonium", "R"},
-		// 	{"Ziggurat", "Q"},
-		// 	{"Bazaar", "1"},
-		// 	{"Trove", "2"},
-		// 	{"Sewer", "3"},
-		// 	{"Ossuary", "4"},
-		// 	{"Bailey", "5"},
-		// 	{"Ice Cave", "6"},
-		// 	{"Volcano", "7"},
-		// 	{"Wizlab", "8"},
-		// 	{"Desolation", "9"},
-		// 	{"Gauntlet", "!"},
-		// 	{"Arena", "\""},
-		// 	{"Crucible", "@"},
-		// };
-		// writeCommandQueued("&");
-		// writeCommandQueued("~");
-		// for (int i = 0; i < branches.Num(); i++) {
-		// 	if (currentBranch == branches[i].Key) {
-		// 		writeCommandQueued(branches[i+1 % branches.Num()].Value);
-		// 		break;
-		// 	}
-		// }
-		// writeCommandQueued("enter");
-
-		// all scrolls
-		// TArray<FString> scrollNames = {
-		// 	"acquirement",
-		// 	"amnesia",
-		// 	"blinking",
-		// 	"brand weapon",
-		// 	"butterflies",
-		// 	"enchant armour",
-		// 	"enchant weapon",
-		// 	"fear",
-		// 	"fog",
-		// 	"identify",
-		// 	"immolation",
-		// 	"noise",
-		// 	"poison",
-		// 	"revelation",
-		// 	"silence",
-		// 	"summoning",
-		// 	"teleportation",
-		// 	"torment",
-		// 	"vulnerability"
-		// };
-		// for (int i = 0; i < scrollNames.Num(); i++) {
-		// 	writeCommandQueued("&");
-		// 	writeCommandQueued("o");
-		// 	writeCommandQueued("?");
-		// 	for (int j = 0; j < scrollNames[i].Len(); j++) {
-		// 		writeCommandQueued(scrollNames[i].Mid(j, 1));
-		// 	}
-		// 	writeCommandQueued("enter");
-		// }
-
-		// all potions
-		// TArray<FString> potionNames = {
-		// 	"ambrosia",
-		// 	"attraction",
-		// 	"berserk rage",
-		// 	"brilliance",
-		// 	"cancellation",
-		// 	"curing",
-		// 	"degeneration",
-		// 	"enlightenment",
-		// 	"experience",
-		// 	"haste",
-		// 	"heal wounds",
-		// 	"invisibility",
-		// 	"lignification",
-		// 	"magic",
-		// 	"might",
-		// 	"mutation",
-		// 	"resistance"
-		// };
-		// for (int i = 0; i < potionNames.Num(); i++) {
-		// 	writeCommandQueued("&");
-		// 	writeCommandQueued("o");
-		// 	writeCommandQueued("!");
-		// 	for (int j = 0; j < potionNames[i].Len(); j++) {
-		// 		writeCommandQueued(potionNames[i].Mid(j, 1));
-		// 	}
-		// 	writeCommandQueued("enter");
-		// }
 
 	} else {
 		writeCommandQueued(key);
@@ -4802,8 +4928,8 @@ void Adcss::Tick(float DeltaTime) {
 	// Send server connection requests
 	int maxRequests = 15;
 	if (useServer && serverAddress.Len() == 0 && serverAddressesToTry.Num() > 0 && currentRequests < maxRequests) {
-		int numToDo = FMath::Min(maxRequests - currentRequests, serverAddressesToTry.Num());
-		for (int i=0; i<numToDo; i++) {
+		int numToSend = FMath::Min(maxRequests - currentRequests, serverAddressesToTry.Num());
+		for (int i=0; i<numToSend; i++) {
 			FString url = serverAddressesToTry[0];
 			serverAddressesToTry.RemoveAt(0);
 			currentRequests++;
@@ -4958,7 +5084,7 @@ void Adcss::Tick(float DeltaTime) {
 				// Otherwise maybe it's the inventory panel
 				} else {
 					if (HitResult.GetActor()->GetName() == refToInventoryActor->GetName() && !draggingInventory && !selected.thingIs.Contains(TEXT("Button"))) {
-						selected = SelectedThing(-1, -1, "Inventory", -1);
+						selected = SelectedThing(-1, -1, "Inventory", -1, "");
 						inventoryGrabDistance = HitResult.Distance;
 
 						// Determine x and y hit on the plane, based on the world vec hit location
@@ -5912,6 +6038,12 @@ void Adcss::Tick(float DeltaTime) {
 				continue;
 			}
 
+			// Add to the log of outputs
+			lastOutputs.Add(extracted);
+			while (lastOutputs.Num() > 10) {
+				lastOutputs.RemoveAt(0);
+			}
+
 			// Copy the extracted text to the text object
 			if (refToTextActor != nullptr) {
 				refToTextRender = refToTextActor->GetTextRender();
@@ -6755,6 +6887,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Pray here with"))
 				|| charArray[i].Contains(TEXT("shop in the dungeon"))
 				|| charArray[i].Contains(TEXT("A stone archway that seems to"))
+				|| charArray[i].Contains(TEXT("standing here, you can enter"))
 				|| charArray[i].Contains(TEXT("A decorative fountain"))
 				|| charArray[i].Contains(TEXT("It can be dug through"))
 				|| charArray[i].Contains(TEXT("(i)nscribe"))
@@ -6794,6 +6927,8 @@ void Adcss::Tick(float DeltaTime) {
 						typeOfThing = TEXT("Statue");
 					} else if (charArray[i].Contains(TEXT(" idol"))) {
 						typeOfThing = TEXT("Idol");
+					} else if (charArray[i].Contains(TEXT("vanish after you do so"))) {
+						typeOfThing = TEXT("Gate");
 					} else if (charArray[i].Contains(TEXT(" fountain"))) {
 						typeOfThing = TEXT("Fountain");
 					} else if (charArray[i].Contains(TEXT(" shop"))) {
@@ -6807,6 +6942,7 @@ void Adcss::Tick(float DeltaTime) {
 						|| charArray[i].Contains(TEXT("prefixes")) 
 						|| charArray[i].Contains(TEXT("(i)")) 
 						|| charArray[i].Contains(TEXT("While standing here")) 
+						|| charArray[i].Contains(TEXT("vanish after you do so")) 
 						|| charArray[i].Contains(TEXT("armor}")) 
 						|| charArray[i].Contains(TEXT("key. ")) 
 						|| charArray[i].Contains(TEXT("You are here.")) 
@@ -6942,6 +7078,8 @@ void Adcss::Tick(float DeltaTime) {
 					currentUsage = TEXT("Press USE whilst HELD to drink the potion.\nRELEASE onto a slot or the floor to move it.");
 				} else if (typeOfThing == TEXT("Altar")) {
 					currentUsage = TEXT("Press USE whilst on the same tile to view the altar menu.");
+				} else if (typeOfThing == TEXT("Gate")) {
+					currentUsage = TEXT("Press USE whilst on the same tile to travel through.");
 				} else if (typeOfThing == TEXT("Shop")) {
 					currentUsage = TEXT("Press USE whilst on the same tile to view the shop menu.");
 				} else if (typeOfThing == TEXT("Scroll")) {
@@ -7356,6 +7494,7 @@ void Adcss::Tick(float DeltaTime) {
 
 			// Otherwise hide the window and reset
 			if (isChoiceOpen && !isChoice && !isAttributeChoice && !isItemOrEnemy && !isYesNo) {
+				UE_LOG(LogTemp, Display, TEXT("Clearing choice window"));
 				choiceLetters.Empty();
 				choiceNames.Empty();
 				isChoiceOpen = false;
@@ -7364,6 +7503,7 @@ void Adcss::Tick(float DeltaTime) {
 
 			// If we should show the choice window
 			} else if (isChoiceOpen && (isChoice || isAttributeChoice || isYesNo)) {
+				UE_LOG(LogTemp, Display, TEXT("Showing choice window"));
 
 				// Set up the window
 				UWidgetComponent* WidgetComponentChoice = Cast<UWidgetComponent>(refToChoiceActor->GetComponentByClass(UWidgetComponent::StaticClass()));
@@ -7464,6 +7604,7 @@ void Adcss::Tick(float DeltaTime) {
 						for (int j = 5; j < words.Num(); j++) {
 							description += words[j] + TEXT(" ");
 						}
+						description = description.Replace(TEXT("(here)"), TEXT(""));
 						description = description.TrimStartAndEnd();
 						UE_LOG(LogTemp, Display, TEXT("FULL - parsed (%d, %d): %s (%s)"), xCoord, yCoord, *description, *currentType);
 
@@ -7497,7 +7638,7 @@ void Adcss::Tick(float DeltaTime) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
-								// Gates TODO
+								// Gates
 								} else if (gateList.Contains(description)) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
@@ -7724,6 +7865,16 @@ void Adcss::Tick(float DeltaTime) {
 								continue;
 							}
 
+							// If told that we already know all spells
+							if (newLine.Contains(TEXT("You already know all available spells"))) {
+								if (memorizing) {
+									spellLetters.Empty();
+									spellLetterToInfo.Empty();
+									shouldRedrawSpells = true;
+								}
+								continue;
+							}
+
 							// If told that we don't know any spells
 							if (newLine.Contains(TEXT("You don't know any spells"))) {
 								if (!memorizing) {
@@ -7751,6 +7902,7 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Blink to where?"))
 								|| newLine.Contains(TEXT("Really renounce your faith"))
 								|| newLine.Contains(TEXT("Are you sure?"))
+								|| newLine.Contains(TEXT("Cast which spell?"))
 								|| newLine.Contains(TEXT("Wizard Command"))
 								|| newLine.Contains(TEXT("Aiming:"))
 								|| newLine.Contains(TEXT("Casting:"))
