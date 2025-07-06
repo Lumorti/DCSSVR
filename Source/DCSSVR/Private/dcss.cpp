@@ -2,6 +2,7 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
+// - allow quiver of spells
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -2404,11 +2405,13 @@ void Adcss::updateLevel() {
 						
 						// Some things are also bigger
 						} else if (itemName.Contains(TEXT("arch")) || typeName == "Gate" || itemName.Contains(TEXT("idol")) || itemName.Contains(TEXT("statue")) || itemName.Contains(TEXT("fountain"))) {
+							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 90.0f));
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.33f));
 						
 						// Altars and shop are a bit bigger
 						} else if (typeName == "Altar" || typeName == "Shop") {
+							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 90.0f));
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.6f*wallScaling, 0.6f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.3f));
 					
@@ -2659,7 +2662,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// Start everything up again
 			init(false);
 
-		// Debug buttons TODO
+		// Debug buttons
 		} else if (selected.thingIs.Contains(TEXT("Debug"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Debug button clicked: %s"), *selected.thingIs);
 
@@ -3601,7 +3604,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			refToDescriptionActor->SetActorHiddenInGame(true);
 			thingBeingDragged = SelectedThing();
 
-		// If we're holding a spell, use it TODO
+		// If we're holding a spell, use it
 		} else if (thingBeingDragged.thingIs == "Spell" && (thingBeingDragged.letter.Len() > 0 || (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Using spell: %s"), *thingBeingDragged.thingIs);
 
@@ -4080,6 +4083,37 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 				}
 			}
+
+		// If clicking on a monster and we have a ranged or spell quivered TODO
+		} else if (selected.thingIs == "Enemy" && (leftText.Contains(TEXT("Fire:")) || leftText.Contains(TEXT("Cast:")))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Enemy clicked whilst holding ranged quivered"));
+
+			// Send the commands to target the clicked enemy
+			int x = selected.x;
+			int y = selected.y;
+			writeCommandQueued("f");
+			writeCommandQueued("r");
+			int currentX = LOS;
+			int currentY = LOS;
+			while (currentX != x) {
+				if (currentX < x) {
+					writeCommandQueued("l");
+					currentX++;
+				} else {
+					writeCommandQueued("h");
+					currentX--;
+				}
+			}
+			while (currentY != y) {
+				if (currentY < y) {
+					writeCommandQueued("j");
+					currentY++;
+				} else {
+					writeCommandQueued("k");
+					currentY--;
+				}
+			}
+			writeCommandQueued("enter");
 
 		// If clicking on an inventory button
 		} else if (selected.thingIs.Contains(TEXT("Button")) && inventoryOpen) {
@@ -5336,6 +5370,16 @@ void Adcss::Tick(float DeltaTime) {
 	keyboardRotation.Yaw += 180.0f;
 	keyboardRotation.Roll = 0.0f;
 	refToKeyboardActor->SetActorRotation(keyboardRotation);
+
+	// The shop menu should also snap TODO
+	FVector shopLocation = dir * 150.0f;
+	shopLocation.Z = 200.0f;
+	refToShopActor->SetActorLocation(shopLocation);
+	FRotator shopRotation = dir.Rotation();
+	shopRotation.Pitch = 0.0f;
+	shopRotation.Yaw += 180.0f;
+	shopRotation.Roll = 0.0f;
+	refToShopActor->SetActorRotation(shopRotation);
 
 	// If told to redraw the inventory
 	if (shouldRedrawInventory) {
@@ -6911,6 +6955,10 @@ void Adcss::Tick(float DeltaTime) {
 					// Determine the type of thing
 					if (charArray[i].Contains(TEXT("Threat:"))) {
 						typeOfThing = TEXT("Enemy");
+					} else if (charArray[i].Contains(TEXT(" shop"))) {
+						typeOfThing = TEXT("Shop");
+					} else if (charArray[i].Contains(TEXT("Base accuracy"))) {
+						typeOfThing = TEXT("Item");
 					} else if (charArray[i].Contains(TEXT("Range:"))) {
 						typeOfThing = TEXT("Spell");
 					} else if (charArray[i].Contains(TEXT("potion"))) {
@@ -6931,8 +6979,6 @@ void Adcss::Tick(float DeltaTime) {
 						typeOfThing = TEXT("Gate");
 					} else if (charArray[i].Contains(TEXT(" fountain"))) {
 						typeOfThing = TEXT("Fountain");
-					} else if (charArray[i].Contains(TEXT(" shop"))) {
-						typeOfThing = TEXT("Shop");
 					}
 
 					// Ignore some lines
