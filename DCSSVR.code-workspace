@@ -75,7 +75,10 @@
 			"xstring": "cpp",
 			"xtr1common": "cpp",
 			"memory_resource": "cpp",
-			"xutility": "cpp"
+			"xutility": "cpp",
+			"typeindex": "cpp",
+			"future": "cpp",
+			"xlocale": "cpp"
 		}
 	},
 	"extensions": {

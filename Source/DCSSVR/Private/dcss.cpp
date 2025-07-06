@@ -252,6 +252,7 @@ struct HotbarInfo {
 	FString letter;
 };
 TArray<HotbarInfo> hotbarInfos;
+HotbarInfo equippedInfo;
 bool shouldRedrawHotbar;
 
 // Altar stuff
@@ -914,6 +915,10 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("runed"), TEXT(""));
 	itemName = itemName.Replace(TEXT("heavily"), TEXT(""));
 	itemName = itemName.Replace(TEXT("masterwork"), TEXT(""));
+	itemName = itemName.Replace(TEXT("embroidered"), TEXT(""));
+	itemName = itemName.Replace(TEXT("polished"), TEXT(""));
+	itemName = itemName.Replace(TEXT("shiny"), TEXT(""));
+	itemName = itemName.Replace(TEXT("pair of "), TEXT(""));
 
 	// Remove any text in brackets using Regex
 	FRegexPattern pattern(TEXT("\\(.*?\\)"));
@@ -933,6 +938,17 @@ FString Adcss::itemNameToTextureName(FString name) {
 	int32 quoteIndex = itemName.Find(TEXT("\""));
 	if (quoteIndex != INDEX_NONE) {
 		itemName = itemName.Left(quoteIndex);
+	}
+
+	// If we have something in braces i.e. the +1 hat "Nutis" {+Inv rF+++ Dex-5 Stlth-}
+	int32 braceIndex = itemName.Find(TEXT("{"));
+	if (braceIndex != INDEX_NONE) {
+		itemName = itemName.Left(braceIndex);
+	}
+
+	// If it's a talisman
+	if (itemName.Contains(TEXT("talisman"))) {
+		return "Talisman";
 	}
 
 	// If it's a potion
@@ -961,7 +977,12 @@ FString Adcss::itemNameToTextureName(FString name) {
 	}
 
 	// If it's a shop
-	if (itemName.Contains(TEXT("shop"))) {
+	if (itemName.Contains(TEXT(" shop")) 
+		|| itemName.Contains(TEXT(" store")) 
+		|| itemName.Contains(TEXT(" boutique")) 
+		|| itemName.Contains(TEXT(" antiques")) 
+		|| itemName.Contains(TEXT(" emporium")) 
+		|| itemName.Contains(TEXT(" bazaar"))) {
 		return "Shop";
 	}
 
@@ -2375,7 +2396,12 @@ void Adcss::updateLevel() {
 							typeName = "Arch";
 						} else if (gateList.Contains(levelInfo[i][j].items[k])) {
 							typeName = "Gate";
-						} else if (levelInfo[i][j].items[k].Contains(TEXT("Shop"))) {
+						} else if (levelInfo[i][j].items[k].Contains(TEXT(" shop")) 
+						|| levelInfo[i][j].items[k].Contains(TEXT(" bazaar")) 
+						|| levelInfo[i][j].items[k].Contains(TEXT(" emporium")) 
+						|| levelInfo[i][j].items[k].Contains(TEXT(" boutique")) 
+						|| levelInfo[i][j].items[k].Contains(TEXT(" antiques")) 
+						|| levelInfo[i][j].items[k].Contains(TEXT(" store"))) {
 							typeName = "Shop";
 						}
 						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, typeName, k, ""));
@@ -2919,7 +2945,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 
-		// If it's a ladder TODO reveal
+		// If it's a ladder
 		} else if (thingBeingDragged.thingIs.Contains(TEXT("Ladder")) || selected.thingIs.Contains(TEXT("Ladder"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Ladder clicked: (%d, %d) %s"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs);
 			if ((selected.x == LOS && selected.y == LOS && selected.thingIs.Contains(TEXT("Ladder"))) ||
@@ -4418,31 +4444,59 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			}
 
-		// If right clicking on one of the equipped slots
+		// If right clicking on one of the equipped slots TODO
 		} else if (selected.thingIs.Contains(TEXT("EquippedButton"))) {
 
-			// If we have something equipped
-			if (rightText != "Nothing wielded") {
-
-				// Search the inventory for something with (weapon)
+			// If there's something there
+			if (equippedInfo.name.Len() >= 0) {
 				bool found = false;
-				for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
-					for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
-						if (inventoryLocToLetter[i][j].Len() > 0 && inventoryLetterToName.Contains(inventoryLocToLetter[i][j]) && inventoryLetterToName[inventoryLocToLetter[i][j]].Contains(TEXT("(weapon)"))) {
-							writeCommandQueued("i");
-							writeCommandQueued(inventoryLocToLetter[i][j]);
-							writeCommandQueued(">");
-							writeCommandQueued(">");
-							writeCommandQueued("escape");
-							writeCommandQueued("escape");
-							thingBeingDragged = SelectedThing(j, i, "InventoryItem", 0, "");
-							found = true;
+
+				// If it's an inventory item
+				if (equippedInfo.type == "InventoryItem") {
+					writeCommandQueued("i");
+					writeCommandQueued(equippedInfo.letter);
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued("escape");
+					writeCommandQueued("escape");
+					int yLoc = -1;
+					int xLoc = -1;
+					for (int i = 0; i < inventoryLocToLetter.Num(); i++) {
+						for (int j = 0; j < inventoryLocToLetter[i].Num(); j++) {
+							if (inventoryLocToLetter[i][j] == equippedInfo.letter) {
+								yLoc = i;
+								xLoc = j;
+								found = true;
+								break;
+							}
+						}
+						if (found) {
 							break;
 						}
 					}
 					if (found) {
-						break;
+						thingBeingDragged = SelectedThing(xLoc, yLoc, "InventoryItem", 0, "");
 					}
+
+				// If it's an ability
+				} else if (equippedInfo.type == "Ability") {
+					writeCommandQueued("a");
+					writeCommandQueued("?");
+					writeCommandQueued(equippedInfo.letter);
+					writeCommandQueued("escape");
+					writeCommandQueued("escape");
+					thingBeingDragged = SelectedThing(-1, -1, "Ability", 0, equippedInfo.letter);
+					found = true;
+
+				// If it's a spell
+				} else if (equippedInfo.type == "Spell") {
+					writeCommandQueued("I");
+					writeCommandQueued(equippedInfo.letter);
+					writeCommandQueued("escape");
+					writeCommandQueued("escape");
+					thingBeingDragged = SelectedThing(-1, -1, "Spell", 0, equippedInfo.letter);
+					found = true;
+
 				}
 
 				// Show the description
@@ -4465,7 +4519,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					}
 					refToDescriptionActor->SetActorHiddenInGame(false);
 				}
-				
+
 			}
 
 		// If right clicking on an ability
@@ -4823,28 +4877,94 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			int32 col = FCString::Atoi(*parts[2])-1;
 			inventoryNextSpot = FIntVector2(row, col);
 
-		// If dragging something onto one of the equipped slots
-		} else if (thingBeingDragged.thingIs == "InventoryItem" && thingBeingDragged.x != -1 && thingBeingDragged.y != -1 && selected.thingIs.Contains(TEXT("EquippedButton"))) {
+		// If dragging something onto one of the equipped slot TODO
+		} else if ((thingBeingDragged.thingIs == "InventoryItem" || thingBeingDragged.thingIs == "Ability" || thingBeingDragged.thingIs == "Spell") && selected.thingIs.Contains(TEXT("EquippedButton"))) {
 
-			// Get the letter of the item
-			FString letter = inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x];
+			// If it's an inventory item
+			if (thingBeingDragged.thingIs == "InventoryItem") { 
 
-			// If the name is different
-			if (!rightText.Contains(inventoryLetterToName[letter]) && !inventoryLetterToName[letter].Contains(TEXT("(weapon)"))) {
-				UE_LOG(LogTemp, Display, TEXT("INPUT - Equipping item via drag onto equip slot %s"), *inventoryLetterToName[letter]);
+				// Get the letter of the item
+				FString letter = inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x];
+				if (thingBeingDragged.letter.Len() > 0) {
+					letter = thingBeingDragged.letter;
+				}
 
-				// Try to equip it
-				writeCommandQueued("w");
+				// If the name is different
+				if (!rightText.Contains(inventoryLetterToName[letter]) && !inventoryLetterToName[letter].Contains(TEXT("(weapon)"))) {
+					UE_LOG(LogTemp, Display, TEXT("INPUT - Equipping item via drag onto equip slot %s"), *inventoryLetterToName[letter]);
+
+					// Try to equip it
+					writeCommandQueued("w");
+					writeCommandQueued(letter);
+
+					// Refresh the inventory
+					writeCommandQueued("CLEARINV");
+					writeCommandQueued("i");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued("escape");
+
+				}
+
+				// Update the info
+				equippedInfo.name = inventoryLetterToName[letter];
+				equippedInfo.type = thingBeingDragged.thingIs;
+				equippedInfo.letter = letter;
+
+			// If it's an ability
+			} else if (thingBeingDragged.thingIs == "Ability") {
+
+				// Get the letter of the ability
+				FString letter;
+				if (thingBeingDragged.letter.Len() > 0) {
+					letter = thingBeingDragged.letter;
+				} else if (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < abilityLetters.Num()) {
+					letter = abilityLetters[thingBeingDragged.thingIndex];
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("INPUT - Ability letter not found for index %d"), thingBeingDragged.thingIndex);
+					return;
+				}
+
+				// Update the info
+				equippedInfo.type = thingBeingDragged.thingIs;
+				equippedInfo.letter = letter;
+				equippedInfo.name = abilityLetterToInfo[letter].name;
+
+				// Quiver the thing
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Quivering ability via drag onto equip slot %s"), *abilityLetterToInfo[abilityLetters[thingBeingDragged.thingIndex]].name);
+				writeCommandQueued("Q");
+				writeCommandQueued("^");
 				writeCommandQueued(letter);
 
-				// Refresh the inventory
-				writeCommandQueued("CLEARINV");
-				writeCommandQueued("i");
-				writeCommandQueued(">");
-				writeCommandQueued(">");
-				writeCommandQueued("escape");
+			// If it's a spell
+			} else if (thingBeingDragged.thingIs == "Spell") {
+
+				// Get the letter of the spell
+				FString letter;
+				if (thingBeingDragged.letter.Len() > 0) {
+					letter = thingBeingDragged.letter;
+				} else if (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()) {
+					letter = spellLetters[thingBeingDragged.thingIndex];
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("INPUT - Spell letter not found for index %d"), thingBeingDragged.thingIndex);
+					return;
+				}
+
+				// Update the info
+				equippedInfo.type = thingBeingDragged.thingIs;
+				equippedInfo.letter = letter;
+				equippedInfo.name = spellLetterToInfo[letter].name;
+
+				// Quiver the thing
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Quivering spell via drag onto equip slot %s"), *spellLetterToInfo[spellLetters[thingBeingDragged.thingIndex]].name);
+				writeCommandQueued("Q");
+				writeCommandQueued("&");
+				writeCommandQueued(letter);
 
 			}
+
+			// We need to redraw the hotbar
+			shouldRedrawHotbar = true;
 
 		// If dragging something onto one of the hotbar slots
 		} else if ((thingBeingDragged.thingIs == "InventoryItem" || thingBeingDragged.thingIs == "Ability" || thingBeingDragged.thingIs == "Spell") && selected.thingIs.Contains(TEXT("SlotButton"))) {
@@ -5470,14 +5590,19 @@ void Adcss::Tick(float DeltaTime) {
 				// For the equip slot
 				UImage* EquipImage = Cast<UImage>(UserWidget->GetWidgetFromName(TEXT("EquippedImage")));
 				if (EquipImage != nullptr) {
-					if (rightText == TEXT("Nothing wielded")) {
+
+					// If it's empty
+					if (equippedInfo.letter == TEXT("")) {
 						EquipImage->SetVisibility(ESlateVisibility::Hidden);
+
+					// Otherwise, set the texture
 					} else {
-						FString matName = itemNameToTextureName(rightText);
+						FString matName = itemNameToTextureName(equippedInfo.name);
 						UTexture2D* tex2D = getTexture(matName);
 						EquipImage->SetBrushFromTexture(tex2D);
-						EquipImage->SetVisibility(ESlateVisibility::Visible);
+						EquipImage->SetVisibility(ESlateVisibility::Visible);	
 					}
+
 				}
 
 			}
@@ -6807,7 +6932,7 @@ void Adcss::Tick(float DeltaTime) {
 						int costInt = FCString::Atoi(*cost);
 
 						// Get the name
-						FString name = charArray[i].Mid(15, 30).TrimStartAndEnd();;
+						FString name = charArray[i].Mid(15).TrimStartAndEnd();;
 
 						// Add to the list
 						UE_LOG(LogTemp, Display, TEXT("Shop: {%s} %s %s"), *letter, *cost, *name);
@@ -7714,11 +7839,6 @@ void Adcss::Tick(float DeltaTime) {
 									levelInfo[yCoord][xCoord].items.Add(description);
 									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
-								// Shops
-								} else if (description.Contains(TEXT("shop"))) {
-									levelInfo[yCoord][xCoord].items.Add(description);
-									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
-
 								// Open door
 								} else if (description.Contains(TEXT("open door"))) {
 									levelInfo[yCoord][xCoord].currentChar = TEXT("'");
@@ -7748,6 +7868,16 @@ void Adcss::Tick(float DeltaTime) {
 								} else if (description.Contains(TEXT("shallow water"))) {
 									levelInfo[yCoord][xCoord].currentChar = TEXT("~");
 									levelInfo[yCoord][xCoord].floorChar = TEXT("~");
+
+								// Shops
+								} else if (description.Contains(TEXT(" shop")) 
+									|| description.Contains(TEXT(" bazaar")) 
+									|| description.Contains(TEXT(" store")) 
+									|| description.Contains(TEXT(" antiques")) 
+									|| description.Contains(TEXT(" boutique")) 
+									|| description.Contains(TEXT(" emporium"))) {
+									levelInfo[yCoord][xCoord].items.Add(description);
+									levelInfo[yCoord][xCoord].itemHotkeys.Add(hotkey);
 
 								// Deep water
 								} else if (description.Contains(TEXT("deep water"))) {
