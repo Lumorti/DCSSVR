@@ -2,7 +2,9 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - allow quiver of spells
+// - ability use
+// - spear evoke
+// - item evoke
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -1901,7 +1903,7 @@ void Adcss::init(bool firstTime) {
 	});
 
 	// Then for each number after that, stack
-	for (int k = 7; k < maxEnemies; k++) {
+	for (int k = 7; k < maxItems; k++) {
 		TArray<FVector> newLocs = itemLocs[6];
 		int remaining = k - 6;
 		int levelCount = 1;
@@ -3654,7 +3656,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (dist <= targetingRange || targetingRange <= 0) {
 				writeCommandQueued("Z");
 				writeCommandQueued(letter);
-				if (targetingRange >= 1 || true) {
+				if (targetingRange >= 1) {
 					writeCommandQueued("r");
 					int currentX = LOS;
 					int currentY = LOS;
@@ -3676,12 +3678,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							currentY--;
 						}
 					}
-					writeCommandQueued("enter");
 				}
+				writeCommandQueued("enter");
 			}
 
-		// If we're holding an ability, use it
-		} else if (thingBeingDragged.thingIs == "Ability" && (thingBeingDragged.letter.Len() > 0 || (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < spellLetters.Num()))) {
+		// If we're holding an ability, use it TODO
+		} else if (thingBeingDragged.thingIs == "Ability" && (thingBeingDragged.letter.Len() > 0 || (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < abilityLetters.Num()))) {
 
 			// Get the letter
 			FString letter = "a";
@@ -3699,10 +3701,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			int x = selected.x;
 			int y = selected.y;
 			int dist = FMath::RoundToInt(FMath::Sqrt(FMath::Pow(float(x-LOS), 2) + FMath::Pow(float(y-LOS), 2)));
+			UE_LOG(LogTemp, Display, TEXT("INPUT - targeting range: %d, distance: %d"), targetingRange, dist);
 			if (dist < targetingRange || targetingRange <= 0) {
 				writeCommandQueued("a");
 				writeCommandQueued(letter);
-				if (targetingRange >= 1 || true) {
+				if (targetingRange >= 1) {
 					writeCommandQueued("r");
 					int currentX = LOS;
 					int currentY = LOS;
@@ -3724,8 +3727,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							currentY--;
 						}
 					}
-					writeCommandQueued("enter");
 				}
+				writeCommandQueued("enter");
 			}
 
 		// If trying to show/hide the inventory
@@ -5490,6 +5493,16 @@ void Adcss::Tick(float DeltaTime) {
 	keyboardRotation.Yaw += 180.0f;
 	keyboardRotation.Roll = 0.0f;
 	refToKeyboardActor->SetActorRotation(keyboardRotation);
+
+	// The altar menu should also snap
+	FVector altarLocation = dir * 100.0f;
+	altarLocation.Z = 200.0f;
+	refToAltarActor->SetActorLocation(altarLocation);
+	FRotator altarRotation = dir.Rotation();
+	altarRotation.Pitch = 0.0f;
+	altarRotation.Yaw += 180.0f;
+	altarRotation.Roll = 0.0f;
+	refToAltarActor->SetActorRotation(altarRotation);
 
 	// The shop menu should also snap TODO
 	FVector shopLocation = dir * 150.0f;
@@ -7284,6 +7297,7 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 			if (isAltarMenu && currentUI != "religion" && showNextAltar) {
+				UE_LOG(LogTemp, Display, TEXT("Found altar menu"));
 
 				// Get the text
 				FString textToSet = TEXT("");
@@ -7306,7 +7320,7 @@ void Adcss::Tick(float DeltaTime) {
 				nextAltar = nextAltar % 3;
 
 				// Show the altar actor and set the text
-				if (refToAltarActor != nullptr && !showingAltar) {
+				if (refToAltarActor != nullptr) {
 					UWidgetComponent* WidgetComponentAltar = Cast<UWidgetComponent>(refToAltarActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 					if (WidgetComponentAltar != nullptr) {
 						UUserWidget* UserWidgetAltar = WidgetComponentAltar->GetUserWidgetObject();
@@ -7322,6 +7336,25 @@ void Adcss::Tick(float DeltaTime) {
 					refToAltarActor->SetActorEnableCollision(true);
 					showingAltar = true;
 					currentUI = TEXT("altar");
+				}
+
+				// When this is open, hide the shop itself
+				FString meshName = TEXT("");
+				for (auto& Elem : meshNameToThing) {
+					if (Elem.Value.thingIs.Contains(TEXT("Altar")) && Elem.Value.x == LOS && Elem.Value.y == LOS) {
+						meshName = Elem.Key;
+						break;
+					}
+				}
+				if (meshName.Len() > 0) {
+					UE_LOG(LogTemp, Display, TEXT("Hiding altar mesh %s"), *meshName);
+					for (int i=0; i<itemArray.Num(); i++) {
+						if (itemArray[i]->GetName() == meshName) {
+							itemArray[i]->SetActorHiddenInGame(true);
+							itemArray[i]->SetActorEnableCollision(false);
+							break;
+						}
+					}
 				}
 
 			}
