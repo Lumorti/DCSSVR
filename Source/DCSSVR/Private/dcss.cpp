@@ -2,9 +2,9 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - ability use
 // - spear evoke
 // - item evoke
+// - hand cannon art
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -891,6 +891,16 @@ FString Adcss::itemNameToTextureName(FString name) {
 		return "Portal";
 	}
 
+	// If it's a spell book
+	if (gateList.Contains("Almanac") 
+	|| gateList.Contains("Codex") 
+	|| gateList.Contains("Lessons") 
+	|| gateList.Contains("Catalogue") 
+	|| (gateList.Contains("Collected") && gateList.Contains("Works")) 
+	|| gateList.Contains("Book")) {
+		return "Book";
+	}
+
 	// Determine the actual name of the item
 	FString itemName = name;
 	itemName = itemName.Replace(TEXT("the "), TEXT(""));
@@ -918,6 +928,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("heavily"), TEXT(""));
 	itemName = itemName.Replace(TEXT("masterwork"), TEXT(""));
 	itemName = itemName.Replace(TEXT("embroidered"), TEXT(""));
+	itemName = itemName.Replace(TEXT("Antimagic"), TEXT(""));
 	itemName = itemName.Replace(TEXT("polished"), TEXT(""));
 	itemName = itemName.Replace(TEXT("shiny"), TEXT(""));
 	itemName = itemName.Replace(TEXT("pair of "), TEXT(""));
@@ -2946,23 +2957,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					}
 				}
 			}
-
-		// If it's a ladder
-		} else if (thingBeingDragged.thingIs.Contains(TEXT("Ladder")) || selected.thingIs.Contains(TEXT("Ladder"))) {
-			UE_LOG(LogTemp, Display, TEXT("INPUT - Ladder clicked: (%d, %d) %s"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs);
-			if ((selected.x == LOS && selected.y == LOS && selected.thingIs.Contains(TEXT("Ladder"))) ||
-				(thingBeingDragged.x == LOS && thingBeingDragged.y == LOS && thingBeingDragged.thingIs.Contains(TEXT("Ladder")))) {
-				if (thingBeingDragged.thingIs.Contains(TEXT("Up"))) {
-					writeCommandQueued("<");
-					writeCommandQueued("escape");
-				} else {
-					writeCommandQueued(">");
-					writeCommandQueued("escape");
-				}
-				writeCommandQueued("&");
-				writeCommandQueued("{");
-				writeCommandQueued("enter");
-			}
 		
 		// Clicking on the name input box
 		} else if (selected.thingIs.Contains(TEXT("ButtonEditName")) || selected.thingIs.Contains(TEXT("ButtonEditSeed"))) {
@@ -3682,7 +3676,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 			}
 
-		// If we're holding an ability, use it TODO
+		// If we're holding an ability, use it
 		} else if (thingBeingDragged.thingIs == "Ability" && (thingBeingDragged.letter.Len() > 0 || (thingBeingDragged.thingIndex >= 0 && thingBeingDragged.thingIndex < abilityLetters.Num()))) {
 
 			// Get the letter
@@ -4113,7 +4107,24 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 
-		// If clicking on a monster and we have a ranged or spell quivered TODO
+		// If it's a ladder
+		} else if (thingBeingDragged.thingIs.Contains(TEXT("Ladder")) || selected.thingIs.Contains(TEXT("Ladder"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Ladder clicked: (%d, %d) %s"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs);
+			if ((selected.x == LOS && selected.y == LOS && selected.thingIs.Contains(TEXT("Ladder"))) ||
+				(thingBeingDragged.x == LOS && thingBeingDragged.y == LOS && thingBeingDragged.thingIs.Contains(TEXT("Ladder")))) {
+				if (thingBeingDragged.thingIs.Contains(TEXT("Up"))) {
+					writeCommandQueued("<");
+					writeCommandQueued("escape");
+				} else {
+					writeCommandQueued(">");
+					writeCommandQueued("escape");
+				}
+				writeCommandQueued("&");
+				writeCommandQueued("{");
+				writeCommandQueued("enter");
+			}
+
+		// If clicking on a monster and we have a ranged or spell quivered
 		} else if (selected.thingIs == "Enemy" && (leftText.Contains(TEXT("Fire:")) || leftText.Contains(TEXT("Cast:")))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Enemy clicked whilst holding ranged quivered"));
 
@@ -4143,6 +4154,39 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 			writeCommandQueued("enter");
+
+		// Any of the page buttons
+		} else if (selected.thingIs.Contains(TEXT("Button")) && (selected.thingIs.Contains(TEXT("Left")) || selected.thingIs.Contains(TEXT("Right")))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Page button clicked: %s"), *selected.thingIs);
+			bool isLeft = selected.thingIs.Contains(TEXT("Left"));
+
+			// If it's the spells page
+			if (selected.thingIs.Contains(TEXT("Spells"))) {
+				if (isLeft) {
+					spellPage--;
+				} else {
+					spellPage++;
+				}
+				shouldRedrawSpells = true;
+
+			// If it's the abilities page
+			} else if (selected.thingIs.Contains(TEXT("Abilities"))) {
+				if (isLeft) {
+					abilityPage--;
+				} else {
+					abilityPage++;
+				}
+				shouldRedrawAbilities = true;
+
+			// If it's the passives page
+			} else if (selected.thingIs.Contains(TEXT("Passives"))) {
+				if (isLeft) {
+					passivePage--;
+				} else {
+					passivePage++;
+				}
+				shouldRedrawPassives = true;
+			}
 
 		// If clicking on an inventory button
 		} else if (selected.thingIs.Contains(TEXT("Button")) && inventoryOpen) {
@@ -4447,7 +4491,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			}
 
-		// If right clicking on one of the equipped slots TODO
+		// If right clicking on one of the equipped slots
 		} else if (selected.thingIs.Contains(TEXT("EquippedButton"))) {
 
 			// If there's something there
@@ -4529,8 +4573,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		} else if (selected.thingIs.Contains(TEXT("ButtonAbility")) && inventoryOpen) {
 
 			// Get the index
+			int perPage = 10;
 			FString abilityIndex = selected.thingIs.Replace(TEXT("ButtonAbility"), TEXT(""));
 			int abilityNum = FCString::Atoi(*abilityIndex)-1;
+			abilityNum += abilityPage * perPage;
 
 			// Check if there's something there
 			if (abilityNum >= 0 && abilityNum < abilityLetters.Num()) {
@@ -4570,9 +4616,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// If right clicking on a spell
 		} else if (selected.thingIs.Contains(TEXT("ButtonSpell")) && inventoryOpen) {
 
-			// Get the index
+			// Get the index TODO
+			int perPage = 10;
 			FString spellIndex = selected.thingIs.Replace(TEXT("ButtonSpell"), TEXT(""));
 			int spellNum = FCString::Atoi(*spellIndex)-1;
+			spellNum += spellPage * perPage;
 
 			// Check if there's something there
 			if (spellNum >= 0 && spellNum < spellLetters.Num()) {
@@ -4880,7 +4928,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			int32 col = FCString::Atoi(*parts[2])-1;
 			inventoryNextSpot = FIntVector2(row, col);
 
-		// If dragging something onto one of the equipped slot TODO
+		// If dragging something onto one of the equipped slot
 		} else if ((thingBeingDragged.thingIs == "InventoryItem" || thingBeingDragged.thingIs == "Ability" || thingBeingDragged.thingIs == "Spell") && selected.thingIs.Contains(TEXT("EquippedButton"))) {
 
 			// If it's an inventory item
@@ -5504,7 +5552,7 @@ void Adcss::Tick(float DeltaTime) {
 	altarRotation.Roll = 0.0f;
 	refToAltarActor->SetActorRotation(altarRotation);
 
-	// The shop menu should also snap TODO
+	// The shop menu should also snap
 	FVector shopLocation = dir * 150.0f;
 	shopLocation.Z = 200.0f;
 	refToShopActor->SetActorLocation(shopLocation);
@@ -5642,9 +5690,10 @@ void Adcss::Tick(float DeltaTime) {
 
 				// Where to start and end based on the page
 				int perPage = 12;
+				int pagesNeeded = FMath::CeilToInt((float)passives.Num() / (float)perPage);
+				passivePage = FMath::Clamp(passivePage, 0, pagesNeeded-1);
 				int startIndex = passivePage * perPage;
 				int endIndex = FMath::Min(passives.Num(), (passivePage+1) * perPage);
-				int pagesNeeded = FMath::CeilToInt((float)passives.Num() / (float)perPage);
 				pagesNeeded = FMath::Max(pagesNeeded, 1);
 
 				// Set the page counter
@@ -5692,9 +5741,10 @@ void Adcss::Tick(float DeltaTime) {
 
 				// Where to start and end based on the page
 				int perPage = 10;
+				int pagesNeeded = FMath::CeilToInt((float)spellLetters.Num() / (float)perPage);
+				spellPage = FMath::Clamp(spellPage, 0, pagesNeeded-1);
 				int startIndex = spellPage * perPage;
 				int endIndex = FMath::Min(spellLetters.Num(), (spellPage+1) * perPage);
-				int pagesNeeded = FMath::CeilToInt((float)spellLetters.Num() / (float)perPage);
 				pagesNeeded = FMath::Max(pagesNeeded, 1);
 
 				// Set the spell level text
@@ -5813,9 +5863,10 @@ void Adcss::Tick(float DeltaTime) {
 
 				// Where to start and end based on the page
 				int perPage = 10;
+				int pagesNeeded = FMath::CeilToInt((float)abilityLetters.Num() / (float)perPage);
+				abilityPage = FMath::Clamp(abilityPage, 0, pagesNeeded-1);
 				int startIndex = abilityPage * perPage;
 				int endIndex = FMath::Min(abilityLetters.Num(), (abilityPage+1) * perPage);
-				int pagesNeeded = FMath::CeilToInt((float)abilityLetters.Num() / (float)perPage);
 				pagesNeeded = FMath::Max(pagesNeeded, 1);
 
 				// Set the page counter
@@ -6563,7 +6614,6 @@ void Adcss::Tick(float DeltaTime) {
 				spellLetters.Empty();
 				spellLetterToInfo.Empty();
 				shouldRedrawSpells = true;
-				spellPage = 0;
 
 				// Get the number of spell levels left
 				TArray<FString> parts;
@@ -6718,7 +6768,6 @@ void Adcss::Tick(float DeltaTime) {
 				spellLetters.Empty();
 				spellLetterToInfo.Empty();
 				shouldRedrawSpells = true;
-				spellPage = 0;
 
 				// Add spells
 				for (int i = 2; i < charArray.Num(); i++) {
