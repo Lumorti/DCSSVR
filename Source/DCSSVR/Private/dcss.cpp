@@ -4,7 +4,6 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - spear evoke
 // - item evoke
-// - hand cannon art
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -892,12 +891,33 @@ FString Adcss::itemNameToTextureName(FString name) {
 	}
 
 	// If it's a spell book
-	if (gateList.Contains("Almanac") 
-	|| gateList.Contains("Codex") 
-	|| gateList.Contains("Lessons") 
-	|| gateList.Contains("Catalogue") 
-	|| (gateList.Contains("Collected") && gateList.Contains("Works")) 
-	|| gateList.Contains("Book")) {
+	if (name.Contains("Almanac") 
+	|| name.Contains("Codex") 
+	|| name.Contains("Lessons") 
+	|| name.Contains("Annotations") 
+	|| name.Contains("Opusculum") 
+	|| name.Contains("Information") 
+	|| name.Contains("Compilation") 
+	|| name.Contains("Catalogue") 
+	|| name.Contains("Compendium") 
+	|| name.Contains("Grimoire") 
+	|| name.Contains("Encyclopedia") 
+	|| name.Contains("Commentary") 
+	|| name.Contains("Elucidation") 
+	|| name.Contains("Quarto") 
+	|| name.Contains("Memoranda") 
+	|| name.Contains("Vol.") 
+	|| name.Contains("Analects") 
+	|| name.Contains("Handbook") 
+	|| name.Contains("Spellbook") 
+	|| name.Contains("Necronomicon") 
+	|| name.Contains("Folio") 
+	|| name.Contains("Treatise") 
+	|| name.Contains("Volume") 
+	|| (name.Contains("Wrath") && name.Contains("Trog")) 
+	|| (name.Contains("Sojourn") && name.Contains("Swampland")) 
+	|| (name.Contains("Collected") && name.Contains("Works")) 
+	|| name.Contains("Book")) {
 		return "Book";
 	}
 
@@ -928,6 +948,8 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("heavily"), TEXT(""));
 	itemName = itemName.Replace(TEXT("masterwork"), TEXT(""));
 	itemName = itemName.Replace(TEXT("embroidered"), TEXT(""));
+	itemName = itemName.Replace(TEXT("vampiric"), TEXT(""));
+	itemName = itemName.Replace(TEXT("heavy"), TEXT(""));
 	itemName = itemName.Replace(TEXT("Antimagic"), TEXT(""));
 	itemName = itemName.Replace(TEXT("polished"), TEXT(""));
 	itemName = itemName.Replace(TEXT("shiny"), TEXT(""));
@@ -1064,9 +1086,18 @@ FString Adcss::enemyNameToTextureName(FString name) {
 
 	// Convert to material name
 	FString materialName = "Monster" + enemyName;
+
+	// Check for plurals
 	if (!textures.Contains(materialName) && materialName.EndsWith(TEXT("s"))) {
 		materialName = materialName.Left(materialName.Len() - 1);
 	}
+
+	// In case it's a monster version of a weapon
+	FString itemName = itemNameToTextureName(name);
+	if (!textures.Contains(materialName) && textures.Contains(itemName)) {
+		materialName = itemName;
+	}
+
 	return materialName;
 
 }
@@ -2909,6 +2940,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued("ctrl-X");
 					writeCommandQueued(">");
 					writeCommandQueued(">");
+					writeCommandQueued(">");
 					writeCommandQueued("escape");
 				} else if (choiceType == "amnesia") {
 					writeCommandQueued("Y");
@@ -4616,7 +4648,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// If right clicking on a spell
 		} else if (selected.thingIs.Contains(TEXT("ButtonSpell")) && inventoryOpen) {
 
-			// Get the index TODO
+			// Get the index
 			int perPage = 10;
 			FString spellIndex = selected.thingIs.Replace(TEXT("ButtonSpell"), TEXT(""));
 			int spellNum = FCString::Atoi(*spellIndex)-1;
