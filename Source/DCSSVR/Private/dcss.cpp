@@ -4,6 +4,7 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - spear evoke
 // - item evoke
+// - BUG when monster is a H or a P
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -1082,6 +1083,17 @@ FString Adcss::enemyNameToTextureName(FString name) {
 		if (!words[k].IsNumeric() && words[k] != TEXT("a") && words[k] != TEXT("an")) {
 			enemyName += words[k];
 		}
+	}
+
+	// Simulacrum/zombie/skeleton are just copies of other monsters
+	if (enemyName.EndsWith(TEXT("Simulacrum"))) {
+		enemyName = enemyName.Replace(TEXT("Simulacrum"), TEXT(""));
+	}
+	if (enemyName.EndsWith(TEXT("Zombie"))) {
+		enemyName = enemyName.Replace(TEXT("Zombie"), TEXT(""));
+	}
+	if (enemyName.EndsWith(TEXT("Skeleton"))) {
+		enemyName = enemyName.Replace(TEXT("Skeleton"), TEXT(""));
 	}
 
 	// Convert to material name
@@ -2337,7 +2349,7 @@ void Adcss::updateLevel() {
 				material2->SetTextureParameterValue("TextureImage", texture2);
 
 			// If it's a plant
-            } else if (ascii == TEXT("P") || ascii == TEXT("7")  || ascii == TEXT("c") || ascii == TEXT("C")) {
+            } else if (levelInfo[i][j].enemy.Len() == 0 && (ascii == TEXT("P") || ascii == TEXT("7")  || ascii == TEXT("c") || ascii == TEXT("C"))) {
 
 				// Add an enemy
 				if (enemyUseCount < maxEnemies) {
@@ -8297,7 +8309,7 @@ void Adcss::Tick(float DeltaTime) {
 							levelInfo[i][j].currentChar = TEXT(".");
 							levelInfo[i][j].floorChar = TEXT(".");
 						}
-						if (thingsThatCountAsFloors.Contains(levelAscii[i][j], ESearchCase::CaseSensitive)) {
+						if (thingsThatCountAsFloors.Contains(levelAscii[i][j], ESearchCase::CaseSensitive) && levelInfo[i][j].enemy.Len() == 0) {
 							levelInfo[i][j].floorChar = levelAscii[i][j];
 						}
 					}
