@@ -4,7 +4,8 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - spear evoke
 // - item evoke
-// - BUG when monster is a H or a P
+// - BUG when monster is a H or a P (maybe fixed)
+// - BUG describing alarm trap when clouded (maybe fixed)
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -1086,6 +1087,7 @@ FString Adcss::enemyNameToTextureName(FString name) {
 	}
 
 	// Simulacrum/zombie/skeleton are just copies of other monsters
+	enemyName = enemyName.Replace(TEXT("Spectral"), TEXT(""));
 	if (enemyName.EndsWith(TEXT("Simulacrum"))) {
 		enemyName = enemyName.Replace(TEXT("Simulacrum"), TEXT(""));
 	}
@@ -7162,6 +7164,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Pray here with"))
 				|| charArray[i].Contains(TEXT("shop in the dungeon"))
 				|| charArray[i].Contains(TEXT("A stone archway that seems to"))
+				|| charArray[i].Contains(TEXT("Clouds of this kind"))
 				|| charArray[i].Contains(TEXT("standing here, you can enter"))
 				|| charArray[i].Contains(TEXT("A decorative fountain"))
 				|| charArray[i].Contains(TEXT("It can be dug through"))
