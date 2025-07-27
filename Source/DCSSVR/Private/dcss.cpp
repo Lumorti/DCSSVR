@@ -6,6 +6,7 @@ FString version = TEXT("0.1");
 // - item evoke
 // - BUG when monster is a H or a P (maybe fixed)
 // - BUG describing alarm trap when clouded (maybe fixed)
+// - BUG trying to select something on same tile as cloud (mostly fixed)
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -2101,7 +2102,8 @@ void Adcss::updateLevel() {
 
 					// Set up the effect
 					effectArray[effectUseCount]->SetActorHiddenInGame(false);
-					effectArray[effectUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f));
+					FVector effectLocation = FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f);
+					effectArray[effectUseCount]->SetActorLocation(effectLocation);
 					UStaticMeshComponent* effectMesh = effectArray[effectUseCount]->FindComponentByClass<UStaticMeshComponent>();
 					meshNameToThing.Add(effectArray[effectUseCount]->GetName(), SelectedThing(j, i, "Effect", 0, ""));
 
@@ -2111,11 +2113,21 @@ void Adcss::updateLevel() {
 					UTexture2D* texture2 = getTexture(textureName);
 					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)effectMesh->GetMaterial(0);
 					material2->SetTextureParameterValue("TextureImage", texture2);
-					material2->SetScalarParameterValue("Transparency", 0.2f);
-					effectUseCount++;
+					material2->SetScalarParameterValue("Transparency", 0.3f);
 
 					// No collision
 					effectArray[effectUseCount]->SetActorEnableCollision(false);
+
+					// Move slightly away from the player for easier selecting of other stuff TODO
+					FVector deltaLoc = effectLocation;
+					deltaLoc.Normalize();
+					deltaLoc *= 50.0f;
+					deltaLoc.Z = 0.0f;
+					FVector newLocation = effectLocation + deltaLoc;
+					effectArray[effectUseCount]->SetActorLocation(newLocation);
+
+					// Increment the effect use count
+					effectUseCount++;
 
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("Effect count exceeded"));
@@ -2797,7 +2809,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					{"Abyss", "J"},
 					{"Pandemonium", "R"},
 					{"Ziggurat", "Q"},
-					{"Bazaar", "1"},
+					{"Shop", "1"},
 					{"Trove", "2"},
 					{"Sewer", "3"},
 					{"Ossuary", "4"},
@@ -2934,6 +2946,19 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("o");
 				writeCommandQueued("m");
 				writeCommandQueued("enter");
+			} else if (selected.thingIs == "ButtonDebugMonsterMany") {
+				int numMonsters = 20;
+				for (int i = 0; i < numMonsters; i++) {
+					writeCommandQueued("&");
+					writeCommandQueued("m");
+					writeCommandQueued("r");
+					writeCommandQueued("a");
+					writeCommandQueued("n");
+					writeCommandQueued("d");
+					writeCommandQueued("o");
+					writeCommandQueued("m");
+					writeCommandQueued("enter");
+				}
 			} else {
 				UE_LOG(LogTemp, Warning, TEXT("Unknown debug button: %s"), *selected.thingIs);
 			}
