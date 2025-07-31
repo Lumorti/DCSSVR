@@ -4,9 +4,9 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - spear evoke
 // - item evoke
+// - monster sleeping / poisoned / confused
 // - BUG when monster is a H or a P (maybe fixed)
 // - BUG describing alarm trap when clouded (maybe fixed)
-// - BUG trying to select something on same tile as cloud (mostly fixed)
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -5465,6 +5465,28 @@ void Adcss::Tick(float DeltaTime) {
 				mapText += TEXT("\n");
 			}
 		}
+
+		// Set the direction indicator
+		FString indicatorText = TEXT("");
+		if (dirString == "up") {
+			indicatorText =  TEXT("         \n");
+			indicatorText += TEXT("  ← N    \n");
+			indicatorText += TEXT("         \n");
+		} else if (dirString == "down") {
+			indicatorText =  TEXT("         \n");
+			indicatorText += TEXT("    N →  \n");
+			indicatorText += TEXT("         \n");
+		} else if (dirString == "left") {
+			indicatorText =  TEXT("         \n");
+			indicatorText += TEXT("    N    \n");
+			indicatorText += TEXT("    ↓    \n");
+		} else if (dirString == "right") {
+			indicatorText =  TEXT("         \n");
+			indicatorText += TEXT("    ↑    \n");
+			indicatorText += TEXT("    N    \n");
+		}
+
+		// Update the widget texts
 		UWidgetComponent* WidgetComponentMap = Cast<UWidgetComponent>(refToInventoryActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 		if (WidgetComponentMap != nullptr) {	
 			UUserWidget* UserWidgetMap = WidgetComponentMap->GetUserWidgetObject();
@@ -5474,6 +5496,12 @@ void Adcss::Tick(float DeltaTime) {
 					MapBox->SetText(FText::FromString(mapText));
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("MAP - Map box not found"));
+				}
+				UTextBlock* DirectionBox = Cast<UTextBlock>(UserWidgetMap->GetWidgetFromName(TEXT("TextIndicator")));
+				if (DirectionBox != nullptr) {
+					DirectionBox->SetText(FText::FromString(indicatorText));
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("MAP - Direction box not found"));
 				}
 			}
 		}
