@@ -905,6 +905,16 @@ FString Adcss::itemNameToTextureName(FString name) {
 	|| name.Contains("Compendium") 
 	|| name.Contains("Grimoire") 
 	|| name.Contains("Encyclopedia") 
+	|| name.Contains("Papyrus") 
+	|| name.Contains("Incunabulum") 
+	|| name.Contains("Precepts") 
+	|| name.Contains("Mastery of") 
+	|| name.Contains("Vademecum") 
+	|| name.Contains("Anthology") 
+	|| name.Contains("Excursus") 
+	|| name.Contains("Cyclopedia") 
+	|| name.Contains("Meditations") 
+	|| name.Contains("Prolegomenon") 
 	|| name.Contains("Commentary") 
 	|| name.Contains("Elucidation") 
 	|| name.Contains("Quarto") 
@@ -982,6 +992,11 @@ FString Adcss::itemNameToTextureName(FString name) {
 	int32 braceIndex = itemName.Find(TEXT("{"));
 	if (braceIndex != INDEX_NONE) {
 		itemName = itemName.Left(braceIndex);
+	}
+
+	// If it's a ring
+	if (itemName.Contains(TEXT("ring"))) {
+		return "Ring";
 	}
 
 	// If it's a talisman
@@ -2118,7 +2133,7 @@ void Adcss::updateLevel() {
 					// No collision
 					effectArray[effectUseCount]->SetActorEnableCollision(false);
 
-					// Move slightly away from the player for easier selecting of other stuff TODO
+					// Move slightly away from the player for easier selecting of other stuff
 					FVector deltaLoc = effectLocation;
 					deltaLoc.Normalize();
 					deltaLoc *= 50.0f;
@@ -2814,7 +2829,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					{"Sewer", "3"},
 					{"Ossuary", "4"},
 					{"Bailey", "5"},
-					{"Ice Cave", "6"},
+					{"IceCave", "6"},
 					{"Volcano", "7"},
 					{"Wizlab", "8"},
 					{"Desolation", "9"},
@@ -2826,7 +2841,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("~");
 				for (int i = 0; i < branches.Num(); i++) {
 					if (currentBranch == branches[i].Key) {
-						writeCommandQueued(branches[i+1 % branches.Num()].Value);
+						writeCommandQueued(branches[(i+1) % branches.Num()].Value);
 						break;
 					}
 				}
@@ -3687,7 +3702,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued("Y");
 
 					// Refresh the spell list
+					writeCommandQueued("CLEARSPELLS");
 					writeCommandQueued("M");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
 					writeCommandQueued("escape");
 
 				}
@@ -4134,6 +4155,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 
 						// Write the name
+						UE_LOG(LogTemp, Display, TEXT("Putting name: %s"), *currentName);
 						if (currentName.Len() == 0 || currentName == defaultNameText) {
 							writeCommandQueued("*");
 						} else {
@@ -4153,6 +4175,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						writeCommandQueued("enter");
 
 						// Write the seed
+						UE_LOG(LogTemp, Display, TEXT("Putting seed: %s"), *currentSeed);
 						for (int i = 0; i < currentSeed.Len(); i++) {
 							writeCommandQueued(currentSeed.Mid(i, 1));
 						}
@@ -4171,6 +4194,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToBackgroundActor->SetActorEnableCollision(false);
 						refToUIActor->SetActorHiddenInGame(false);
 						refToUIActor->SetActorEnableCollision(true);
+						refToKeyboardActor->SetActorHiddenInGame(true);
+						refToKeyboardActor->SetActorEnableCollision(false);
+						isKeyboardOpen = false;
 						hasBeenWelcomed = false;
 
 					}
@@ -4283,7 +4309,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 					} else if (selected.thingIs == "ButtonSpells") {
 						UE_LOG(LogTemp, Display, TEXT("INPUT - Spells button clicked"));
+						writeCommandQueued("CLEARSPELLS");
 						writeCommandQueued("I");
+						writeCommandQueued(">");
+						writeCommandQueued(">");
+						writeCommandQueued(">");
+						writeCommandQueued(">");
+						writeCommandQueued(">");
 						writeCommandQueued("escape");
 						UWidgetSwitcher* WidgetSwitcher = Cast<UWidgetSwitcher>(UserWidget->GetWidgetFromName(TEXT("WidgetSwitcherTop")));
 						if (WidgetSwitcher != nullptr) {
@@ -4399,10 +4431,22 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 						// Depending on the mode, write the command
 						if (memorizing) {
+							writeCommandQueued("CLEARSPELLS");
 							writeCommandQueued("M");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
 							writeCommandQueued("escape");
 						} else {
+							writeCommandQueued("CLEARSPELLS");
 							writeCommandQueued("I");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
+							writeCommandQueued(">");
 							writeCommandQueued("escape");
 						}
 
@@ -4974,12 +5018,16 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("escape");
 
 		// If we're selecting an item from the ground and dropping it into the inventory
-		} else if (thingBeingDragged.x == 8 && thingBeingDragged.y == 8 && thingBeingDragged.thingIs == "Item" && selected.thingIs.Contains(TEXT("ItemButton"))) {
-			UE_LOG(LogTemp, Display, TEXT("Picking up item"));
+		} else if (thingBeingDragged.x == 8 && thingBeingDragged.y == 8 
+			      && thingBeingDragged.thingIs == "Item" 
+				  && selected.thingIs.Contains(TEXT("ItemButton"))
+				  && levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys.Num() > thingBeingDragged.thingIndex) {
+			FString letter = levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex];
+			UE_LOG(LogTemp, Display, TEXT("Picking up item with letter %s"), *letter);
 			writeCommandQueued("SKIP");
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued("!");
-			writeCommandQueued(levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex]);
+			writeCommandQueued(letter);
 			writeCommandQueued("g");
 			writeCommandQueued("CLEARINV");
 			writeCommandQueued("i");
@@ -6221,9 +6269,15 @@ void Adcss::Tick(float DeltaTime) {
 		UE_LOG(LogTemp, Display, TEXT("Doing command %s"), *commandQueue[0]);
 		FString command = commandQueue[0];
 		if (command == "CLEAR") {
+			UE_LOG(LogTemp, Display, TEXT("Clearing things"));
 			clearThings();
 		} else if (command == "CLEARINV") {
+			UE_LOG(LogTemp, Display, TEXT("Clearing inventory"));
 			inventoryLetterToName.Empty();
+		} else if (command == "CLEARSPELLS") { // TODO
+			UE_LOG(LogTemp, Display, TEXT("Clearing spells"));
+			spellLetters.Empty();
+			spellLetterToInfo.Empty();
 		} else if (command == "SKIP") {
 			skipNextFullDescription = true;
 		} else {
@@ -6709,11 +6763,6 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isMemorizeList) {
 
-				// Reset the spell list
-				spellLetters.Empty();
-				spellLetterToInfo.Empty();
-				shouldRedrawSpells = true;
-
 				// Get the number of spell levels left
 				TArray<FString> parts;
 				UE_LOG(LogTemp, Display, TEXT("Extracting spell levels from: %s"), *charArray[charArray.Num()-2]);
@@ -6723,6 +6772,7 @@ void Adcss::Tick(float DeltaTime) {
 				}
 
 				// Add spells
+				shouldRedrawSpells = true;
 				for (int i = 2; i < charArray.Num()-2; i++) {
 					if (charArray[i].Contains("-")) {
 
@@ -6863,12 +6913,8 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isSpellList) {
 
-				// Reset the spell list
-				spellLetters.Empty();
-				spellLetterToInfo.Empty();
-				shouldRedrawSpells = true;
-
 				// Add spells
+				shouldRedrawSpells = true;
 				for (int i = 2; i < charArray.Num(); i++) {
 					if (charArray[i].Contains("-") || charArray[i].Contains("+")) {
 
@@ -7217,6 +7263,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Pray here with"))
 				|| charArray[i].Contains(TEXT("shop in the dungeon"))
 				|| charArray[i].Contains(TEXT("A stone archway that seems to"))
+				|| charArray[i].Contains(TEXT("possesses the following magical abilities"))
 				|| charArray[i].Contains(TEXT("Clouds of this kind"))
 				|| charArray[i].Contains(TEXT("standing here, you can enter"))
 				|| charArray[i].Contains(TEXT("A decorative fountain"))
