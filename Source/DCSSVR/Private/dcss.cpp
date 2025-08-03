@@ -5,8 +5,8 @@ FString version = TEXT("0.1");
 // - spear evoke
 // - item evoke
 // - monster sleeping / poisoned / confused
-// - BUG when monster is a H or a P (maybe fixed)
-// - BUG describing alarm trap when clouded (maybe fixed)
+// - BUG dragon's call text
+// - BUG save equipped slot if spell/ability
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -995,7 +995,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	}
 
 	// If it's a ring
-	if (itemName.Contains(TEXT("ring"))) {
+	if (itemName.Contains(TEXT(" ring")) || itemName.Contains(TEXT("ring "))) {
 		return "Ring";
 	}
 
@@ -3696,8 +3696,18 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				FString letter = spellLetters[spellNum];
 				if (spellLetterToInfo.Contains(letter)) {
 
+					// If it's not on the first page
+					int nextPagesNeeded = 0;
+					if (letter.Len() > 1) {
+						nextPagesNeeded = 2*(letter.Len() - 1);
+						letter = letter.Left(1);
+					}
+
 					// Write the commands
 					writeCommandQueued("M");
+					for (int i = 0; i < nextPagesNeeded; i++) {
+						writeCommandQueued(">");
+					}
 					writeCommandQueued(letter);
 					writeCommandQueued("Y");
 
@@ -4652,8 +4662,17 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 				// If it's a spell
 				} else if (equippedInfo.type == "Spell") {
+					FString letter = equippedInfo.letter;
+					int nextPagesNeeded = 0;
+					if (letter.Len() > 1) {
+						nextPagesNeeded = 2*(letter.Len() - 1);
+						letter = letter.Left(1);
+					}
 					writeCommandQueued("I");
-					writeCommandQueued(equippedInfo.letter);
+					for (int i = 0; i < nextPagesNeeded; i++) {
+						writeCommandQueued(">");
+					}
+					writeCommandQueued(letter);
 					writeCommandQueued("escape");
 					writeCommandQueued("escape");
 					thingBeingDragged = SelectedThing(-1, -1, "Spell", 0, equippedInfo.letter);
@@ -4742,10 +4761,20 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				FString letter = spellLetters[spellNum];
 				if (spellLetterToInfo.Contains(letter)) {
 
+					// If it's not on the first page
+					int nextPagesNeeded = 0;
+					if (letter.Len() > 1) {
+						nextPagesNeeded = 2*(letter.Len() - 1);
+						letter = letter.Left(1);
+					}
+
 					// Write the commands
 					if (memorizing) {
 						writeCommandQueued("M");
 						writeCommandQueued("!");
+						for (int i = 0; i < nextPagesNeeded; i++) {
+							writeCommandQueued(">");
+						}
 						writeCommandQueued(letter);
 						writeCommandQueued(">");
 						writeCommandQueued("escape");
@@ -4753,6 +4782,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						thingBeingDragged = SelectedThing(-1, -1, "Memorizing", spellNum, "");
 					} else {
 						writeCommandQueued("I");
+						for (int i = 0; i < nextPagesNeeded; i++) {
+							writeCommandQueued(">");
+						}
 						writeCommandQueued(letter);
 						writeCommandQueued(">");
 						writeCommandQueued("escape");
@@ -6274,7 +6306,7 @@ void Adcss::Tick(float DeltaTime) {
 		} else if (command == "CLEARINV") {
 			UE_LOG(LogTemp, Display, TEXT("Clearing inventory"));
 			inventoryLetterToName.Empty();
-		} else if (command == "CLEARSPELLS") { // TODO
+		} else if (command == "CLEARSPELLS") {
 			UE_LOG(LogTemp, Display, TEXT("Clearing spells"));
 			spellLetters.Empty();
 			spellLetterToInfo.Empty();
@@ -6772,7 +6804,6 @@ void Adcss::Tick(float DeltaTime) {
 				}
 
 				// Add spells
-				shouldRedrawSpells = true;
 				for (int i = 2; i < charArray.Num()-2; i++) {
 					if (charArray[i].Contains("-")) {
 
@@ -6793,9 +6824,20 @@ void Adcss::Tick(float DeltaTime) {
 						FString level = charArray[i].Mid(74, 5).TrimStartAndEnd();
 						int levelInt = FCString::Atoi(*level);
 
-						UE_LOG(LogTemp, Display, TEXT("Spell: {%s} %s %s %d %d"), *letter, *name, *school, failureInt, levelInt);
+						// If the letter is already in the map but with a different name, change the letter
+						FString baseLetter = letter;
+						if (spellLetterToInfo.Contains(letter) && spellLetterToInfo[letter].name != name) {
+							letter = letter + baseLetter;
+						}
+						if (spellLetterToInfo.Contains(letter) && spellLetterToInfo[letter].name != name) {
+							letter = letter + baseLetter;
+						}
+						if (spellLetterToInfo.Contains(letter) && spellLetterToInfo[letter].name != name) {
+							letter = letter + baseLetter;
+						}
 
 						// Add to the map
+						UE_LOG(LogTemp, Display, TEXT("Spell: {%s} %s %s %d %d"), *letter, *name, *school, failureInt, levelInt);
 						SpellInfo info;
 						info.name = name;
 						info.school = school;
@@ -6806,6 +6848,35 @@ void Adcss::Tick(float DeltaTime) {
 
 					}
 				}
+
+				// Make sure the spell letters are unique
+				TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> uniqueSpellLetters;
+				for (const FString& letter : spellLetters) {
+					uniqueSpellLetters.Add(letter, letter);
+				}
+				spellLetters.Empty();
+				for (const auto& pair : uniqueSpellLetters) {
+					spellLetters.Add(pair.Key);
+				}
+
+				// Sort the spell letters
+				// should go a-z, then A-Z, then aa-zz, then AA-ZZ, then aaa-zzz, then AAA-ZZZ
+				spellLetters.Sort([](const FString& A, const FString& B) {
+					if (A.Len() != B.Len()) {
+						return A.Len() < B.Len();
+					}
+					if (A.Len() > 0 && B.Len() > 0) {
+						if (FChar::IsLower(A[0]) && FChar::IsUpper(B[0])) {
+							return true;
+						} else if (FChar::IsUpper(A[0]) && FChar::IsLower(B[0])) {
+							return false;
+						}
+					}
+					return A < B;
+				});
+
+				// Redraw the spell list
+				shouldRedrawSpells = true;
 
 			}
 
@@ -6914,7 +6985,6 @@ void Adcss::Tick(float DeltaTime) {
 			if (isSpellList) {
 
 				// Add spells
-				shouldRedrawSpells = true;
 				for (int i = 2; i < charArray.Num(); i++) {
 					if (charArray[i].Contains("-") || charArray[i].Contains("+")) {
 
@@ -6935,9 +7005,20 @@ void Adcss::Tick(float DeltaTime) {
 						FString level = charArray[i].Mid(74, 5).TrimStartAndEnd();
 						int levelInt = FCString::Atoi(*level);
 
-						UE_LOG(LogTemp, Display, TEXT("Spell: {%s} %s %s %d %d"), *letter, *name, *school, failureInt, levelInt);
+						// If the letter is already in the map but with a different name, change the letter
+						FString baseLetter = letter;
+						if (spellLetterToInfo.Contains(letter) && spellLetterToInfo[letter].name != name) {
+							letter = letter + baseLetter;
+						}
+						if (spellLetterToInfo.Contains(letter) && spellLetterToInfo[letter].name != name) {
+							letter = letter + baseLetter;
+						}
+						if (spellLetterToInfo.Contains(letter) && spellLetterToInfo[letter].name != name) {
+							letter = letter + baseLetter;
+						}
 
 						// Add to the map
+						UE_LOG(LogTemp, Display, TEXT("Spell: {%s} %s %s %d %d"), *letter, *name, *school, failureInt, levelInt);
 						SpellInfo info;
 						info.name = name;
 						info.school = school;
@@ -6949,6 +7030,35 @@ void Adcss::Tick(float DeltaTime) {
 					}
 
 				}
+
+				// Make sure the spell letters are unique
+				TMap<FString, FString, FDefaultSetAllocator, FCaseSensitiveLookupKeyFuncs<FString>> uniqueSpellLetters;
+				for (const FString& letter : spellLetters) {
+					uniqueSpellLetters.Add(letter, letter);
+				}
+				spellLetters.Empty();
+				for (const auto& pair : uniqueSpellLetters) {
+					spellLetters.Add(pair.Key);
+				}
+
+				// Sort the spell letters
+				// should go a-z, then A-Z, then aa-zz, then AA-ZZ, then aaa-zzz, then AAA-ZZZ
+				spellLetters.Sort([](const FString& A, const FString& B) {
+					if (A.Len() != B.Len()) {
+						return A.Len() < B.Len();
+					}
+					if (A.Len() > 0 && B.Len() > 0) {
+						if (FChar::IsLower(A[0]) && FChar::IsUpper(B[0])) {
+							return true;
+						} else if (FChar::IsUpper(A[0]) && FChar::IsLower(B[0])) {
+							return false;
+						}
+					}
+					return A < B;
+				});
+
+				// Redraw the spell list
+				shouldRedrawSpells = true;
 
 			}
 
