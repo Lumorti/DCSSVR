@@ -39,11 +39,9 @@ public:
 	// Sets default values for this actor's properties
 	Adcss();
 
-	// The reference to the ui object
+	// The reference to the menu panels
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToUIActor;
-
-	// The reference to the menu panels
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToMainMenuActor;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -54,6 +52,26 @@ public:
 	AActor* refToNameActor;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToSaveActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToDescriptionActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToKeyboardActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToMainInfoActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToTutorialActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToInventoryActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToDeathActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToAltarActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToShopActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToSettingsActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToChoiceActor;
 
 	// The references to the music
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
@@ -61,45 +79,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AAmbientSound* refToMusicActor;
 
-	// The reference to the description panel
+	// The reference to the name tag
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToDescriptionActor;
-
-	// The reference to the keyboard panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToKeyboardActor;
-
-	// The reference to the main info panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToMainInfoActor;
-
-	// The reference to the tutorial panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToTutorialActor;
-
-	// The reference to the inventory panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToInventoryActor;
-
-	// The reference to the death panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToDeathActor;
-
-	// The reference to the altar panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToAltarActor;
-
-	// The reference to the shop panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToShopActor;
-
-	// The reference to the settings panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToSettingsActor;
-
-	// The reference to the choice panel
-	UPROPERTY(EditAnywhere, BlueprintReadWrite)
-	AActor* refToChoiceActor;
+	AActor* refToNameTagActor;
 
 	// The reference to the text object
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

@@ -4,9 +4,7 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - spear evoke
 // - item evoke
-// - monster sleeping / poisoned / confused
-// - BUG dragon's call text
-// - BUG save equipped slot if spell/ability
+// - all ability textures
 
 // 0.2 First update, hopefully with community suggestions
 // - footstep/attacking/casting/monster sounds?
@@ -306,13 +304,15 @@ TSet<FString> listOfMissingThings;
 // Get a texture with a given name
 UTexture2D* Adcss::getTexture(FString name) {
 	if (!textures.Contains(name)) {
-		listOfMissingThings.Add(name);
-		FString allMissingTextures = TEXT("");
-		for (auto& Elem : listOfMissingThings) {
-			allMissingTextures += Elem + TEXT(", ");
+		if (!listOfMissingThings.Contains(name)) {
+			listOfMissingThings.Add(name);
+			FString allMissingTextures = TEXT("");
+			for (auto& Elem : listOfMissingThings) {
+				allMissingTextures += Elem + TEXT(", ");
+			}
+			UE_LOG(LogTemp, Warning, TEXT("Missing textures: %s"), *allMissingTextures);
 		}
-		UE_LOG(LogTemp, Warning, TEXT("Missing textures: %s"), *allMissingTextures);
-		textures.Add(name, textures[FString("Unknown")]);
+		return textures[FString("Unknown")];
 	}
 	return textures[name];
 }
@@ -888,11 +888,6 @@ void Adcss::loadEverything() {
 // Go from item name to texture name
 FString Adcss::itemNameToTextureName(FString name) {
 
-	// If it's a portal/gateway
-	if (gateList.Contains(name)) {
-		return "Portal";
-	}
-
 	// If it's a spell book
 	if (name.Contains("Almanac") 
 	|| name.Contains("Codex") 
@@ -978,7 +973,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 
 	// Deal with brands e.g. dagger of venom
 	int32 ofIndex = itemName.Find(TEXT(" of "));
-	if (ofIndex != INDEX_NONE) {
+	if (ofIndex != INDEX_NONE && !itemName.Contains(TEXT("statue"))) {
 		itemName = itemName.Left(ofIndex);
 	}
 
@@ -992,36 +987,6 @@ FString Adcss::itemNameToTextureName(FString name) {
 	int32 braceIndex = itemName.Find(TEXT("{"));
 	if (braceIndex != INDEX_NONE) {
 		itemName = itemName.Left(braceIndex);
-	}
-
-	// If it's a ring
-	if (itemName.Contains(TEXT(" ring")) || itemName.Contains(TEXT("ring "))) {
-		return "Ring";
-	}
-
-	// If it's a talisman
-	if (itemName.Contains(TEXT("talisman"))) {
-		return "Talisman";
-	}
-
-	// If it's a potion
-	if (itemName.Contains(TEXT("potion"))) {
-		return "Potion";
-	}
-
-	// If it's an arch
-	if (itemName.Contains(TEXT("arch"))) {
-		return "Arch";
-	}
-
-	// If it's a statue
-	if (itemName.Contains(TEXT("statue"))) {
-		return "Statue";
-	}
-
-	// If it's an idol
-	if (itemName.Contains(TEXT("idol"))) {
-		return "Idol";
 	}
 
 	// If it's a fountain
@@ -1067,6 +1032,51 @@ FString Adcss::itemNameToTextureName(FString name) {
 	// If it ends with s
 	if (!textures.Contains(itemName) && itemName.EndsWith(TEXT("s"))) {
 		itemName = itemName.Left(itemName.Len() - 1);
+	}
+
+	// If it's a statue
+	if (!textures.Contains(itemName) && itemName.Contains(TEXT("statue"))) {
+		getTexture(itemName);
+		return "Statue";
+	}
+
+	// If it's a ring (need to be careful with things like "shimmering") TODO
+	int32 ringIndex = itemName.Find(TEXT("ring"));
+	if (ringIndex != INDEX_NONE && !textures.Contains(itemName)) {
+		if (ringIndex == 0 || itemName[ringIndex - 1] == ' ') {
+			getTexture(itemName);
+			return "Ring";
+		}
+	}
+
+	// If it's a talisman
+	if (itemName.Contains(TEXT("talisman")) && !textures.Contains(itemName)) {
+		getTexture(itemName);
+		return "Talisman";
+	}
+
+	// If it's a potion
+	if (itemName.Contains(TEXT("potion")) && !textures.Contains(itemName)) {
+		getTexture(itemName);
+		return "Potion";
+	}
+
+	// If it's an arch
+	if (itemName.Contains(TEXT("arch")) && !textures.Contains(itemName)) {
+		getTexture(itemName);
+		return "Arch";
+	}
+
+	// If it's an idol
+	if (itemName.Contains(TEXT("idol")) && !textures.Contains(itemName)) {
+		getTexture(itemName);
+		return "Idol";
+	}
+
+	// If it's a portal/gateway
+	if (gateList.Contains(name) && !textures.Contains(itemName)) {
+		getTexture(itemName);
+		return "Portal";
 	}
 
 	// Return the texture name
@@ -5364,10 +5374,36 @@ void Adcss::Tick(float DeltaTime) {
 			}
 		}
 	}
+
+	// Get various pointers (world, player controller, etc)
+	APlayerController* playerController = worldRef->GetFirstPlayerController();
+	if (playerController == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Player controller is null"));
+		return;
+	}
+	APlayerCameraManager* playerCameraManager = playerController->PlayerCameraManager;
+	if (playerCameraManager == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Player camera manager is null"));
+		return;
+	}
+	APawn* playerPawn = playerController->GetPawn();
+	if (playerPawn == nullptr) {
+		UE_LOG(LogTemp, Warning, TEXT("Player pawn is null"));
+		return;
+	}
+
+	// Quantities used for various things
+	FVector playerLocation = playerCameraManager->GetCameraLocation();
+	FVector playerForward = playerCameraManager->GetActorForwardVector();
+	FVector playerRight = playerPawn->GetActorRightVector();
+	FVector playerUp = playerPawn->GetActorUpVector();
+	FVector playerForwardProjected = FVector(playerForward.X, playerForward.Y, 0.0f);
+	playerForwardProjected.Normalize();
 	
 	// Checking what the player is looking at
-	FVector Start = worldRef->GetFirstPlayerController()->PlayerCameraManager->GetCameraLocation();
-	FVector End = Start + worldRef->GetFirstPlayerController()->PlayerCameraManager->GetActorForwardVector() * 3000.0f;
+	refToNameTagActor->SetActorHiddenInGame(true);
+	FVector Start = playerLocation;
+	FVector End = Start + playerForward * 3000.0f;
 	if (vrEnabled) {
 		Start = handLocation;
 		End = Start + handForward * 3000.0f;
@@ -5393,14 +5429,57 @@ void Adcss::Tick(float DeltaTime) {
 						UE_LOG(LogTemp, Warning, TEXT("Mesh name not in map: %s"), *HitResult.GetActor()->GetName());
 					}
 
-					// Highlight it
+					// If not describing an item
 					if (!rmbOn || isBlinkOrUnknown) {
 
 						// If it's not a wall
 						if (selected.thingIs == TEXT("Wall")) {
 							selected = SelectedThing();
 						} else {
+
+							// Highlight it
 							hitMesh->SetRenderCustomDepth(true);
+
+							// Enable the nametag
+							if (selected.thingIs != TEXT("Wall") && selected.thingIs != TEXT("Floor") && selected.thingIs != TEXT("Effect")) {
+
+								// Determine the text to show
+								FString textToShow = selected.thingIs;
+								if (selected.thingIs == TEXT("Enemy")) {
+									textToShow = levelInfo[selected.y][selected.x].enemy;
+								} else if (selected.thingIndex >= 0 && selected.thingIndex < levelInfo[selected.y][selected.x].items.Num()) {
+									textToShow = levelInfo[selected.y][selected.x].items[selected.thingIndex];
+								}
+
+								// Update the text
+								if (refToNameTagActor != nullptr) {
+									UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToNameTagActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+									if (WidgetComponent != nullptr) {
+										UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+										if (UserWidget != nullptr) {
+											UTextBlock* TextBox = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextNametag")));
+											if (TextBox != nullptr) {
+												TextBox->SetText(FText::FromString(textToShow));
+											}
+										}
+									}
+
+									// Set the location and rotation
+									FVector meshLoc = hitMesh->GetComponentLocation();
+									refToNameTagActor->SetActorLocation(meshLoc + playerUp * 180.0f);
+									FRotator newRotation = playerForward.Rotation();
+									newRotation.Pitch = 0.0f;
+									newRotation.Yaw += 180.0f;
+									newRotation.Roll = 0.0f;
+
+									// Show it
+									refToNameTagActor->SetActorRotation(newRotation);
+									refToNameTagActor->SetActorHiddenInGame(false);
+									refToNameTagActor->SetActorEnableCollision(false);
+
+								}
+							}
+
 						}
 
 					// Or spell targeting
@@ -5452,31 +5531,6 @@ void Adcss::Tick(float DeltaTime) {
 			}
 		}
 	}
-
-	// Get various pointers (world, player controller, etc)
-	APlayerController* playerController = worldRef->GetFirstPlayerController();
-	if (playerController == nullptr) {
-		UE_LOG(LogTemp, Warning, TEXT("Player controller is null"));
-		return;
-	}
-	APlayerCameraManager* playerCameraManager = playerController->PlayerCameraManager;
-	if (playerCameraManager == nullptr) {
-		UE_LOG(LogTemp, Warning, TEXT("Player camera manager is null"));
-		return;
-	}
-	APawn* playerPawn = playerController->GetPawn();
-	if (playerPawn == nullptr) {
-		UE_LOG(LogTemp, Warning, TEXT("Player pawn is null"));
-		return;
-	}
-
-	// Quantities used for various things
-	FVector playerLocation = playerCameraManager->GetCameraLocation();
-	FVector playerForward = playerCameraManager->GetActorForwardVector();
-	FVector playerRight = playerPawn->GetActorRightVector();
-	FVector playerUp = playerPawn->GetActorUpVector();
-	FVector playerForwardProjected = FVector(playerForward.X, playerForward.Y, 0.0f);
-	playerForwardProjected.Normalize();
 
 	// Keep the pop up following the player's head 
 	if (isChoiceOpen) {
@@ -7476,12 +7530,23 @@ void Adcss::Tick(float DeltaTime) {
 				toAdd = toAdd.Replace(TEXT("with [v])."), TEXT(""));
 
 				// Remove until the first period
-				int32 periodIndex = toAdd.Find(TEXT("."));
-				FString withoutFirst = toAdd.Mid(periodIndex+1);
-				FString newFirst = toAdd.Left(periodIndex+1).TrimStartAndEnd();
+				// int32 firstLineEnd = toAdd.Find(TEXT("."));
+				int32 firstLineEnd = 0;
+				bool foundNonWhitespace = false;
+				for (int i = 0; i < toAdd.Len()-1; i++) {
+					if (toAdd.Mid(i, 2) != TEXT("  ") && toAdd[i] != TEXT('\n') && toAdd[i] != TEXT('\r') && toAdd[i] != TEXT('\t')) {
+						foundNonWhitespace = true;
+					} else if (foundNonWhitespace) {
+						firstLineEnd = i;
+						break;
+					}
+				}
+				FString withoutFirst = toAdd.Mid(firstLineEnd+1);
+				FString newFirst = toAdd.Left(firstLineEnd+1).TrimStartAndEnd();
 
 				// Determine where to add the new section
 				FString searchString = TEXT("");
+				int addLocNew = -1;
 				for (int i = 0; i < withoutFirst.Len(); i++) {
 					if (withoutFirst[i] != TEXT('\n') && withoutFirst[i] != TEXT(' ')) {
 						for (int j = 0; j < std::min(40, withoutFirst.Len()-i); j++) {
@@ -7489,27 +7554,27 @@ void Adcss::Tick(float DeltaTime) {
 								break;
 							}
 							searchString += withoutFirst[i+j];
+							if (addLocNew == -1) {
+								addLocNew = i + j;
+							}
 						}
 						break;
 					}
 				}
-				UE_LOG(LogTemp, Display, TEXT("searchString: %s"), *searchString);
 				int addLoc = currentDescription.Find(searchString);
-				UE_LOG(LogTemp, Display, TEXT("addLoc: %d"), addLoc);
 				
 				// Combine the descriptions
+				UE_LOG(LogTemp, Display, TEXT("searchString: %s"), *searchString);
+				UE_LOG(LogTemp, Display, TEXT("addLoc: %d"), addLoc);
+				UE_LOG(LogTemp, Display, TEXT("newLoc: %d"), addLocNew);
 				if (addLoc != INDEX_NONE) {
-					currentDescription = currentDescription.Left(addLoc) + withoutFirst;
+					currentDescription = currentDescription.Left(addLoc) + withoutFirst.Mid(addLocNew);
 				} else {
 					currentDescription += toAdd;
 				}
+				UE_LOG(LogTemp, Display, TEXT("Current description: \n%s\n"), *currentDescription);
 
-				// Update the first line
-				int firstLineEnd = currentDescription.Find(TEXT("."));
-				FString descWithoutFirst = currentDescription.Mid(firstLineEnd+1);
-				currentDescription = newFirst + descWithoutFirst;
-
-				// If the last line is a blank line, remove it
+				// While the last line is a blank line, remove it
 				while (currentDescription.EndsWith(TEXT("\n"))) {
 					currentDescription = currentDescription.Left(currentDescription.Len()-1);
 				}
