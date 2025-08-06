@@ -1040,7 +1040,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 		return "Statue";
 	}
 
-	// If it's a ring (need to be careful with things like "shimmering") TODO
+	// If it's a ring (need to be careful with things like "shimmering")
 	int32 ringIndex = itemName.Find(TEXT("ring"));
 	if (ringIndex != INDEX_NONE && !textures.Contains(itemName)) {
 		if (ringIndex == 0 || itemName[ringIndex - 1] == ' ') {
@@ -2859,6 +2859,22 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			} else if (selected.thingIs == "ButtonDebugMol") {
 				writeCommandQueued("&");
 				writeCommandQueued("w");
+			} else if (selected.thingIs == "ButtonDebugMaxPiety") {
+				writeCommandQueued("&");
+				writeCommandQueued("^");
+				writeCommandQueued("2");
+				writeCommandQueued("0");
+				writeCommandQueued("0");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
+				writeCommandQueued("w");
+			} else if (selected.thingIs == "ButtonDebugMinPiety") {
+				writeCommandQueued("&");
+				writeCommandQueued("^");
+				writeCommandQueued("1");
+				writeCommandQueued("5");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 			} else if (selected.thingIs == "ButtonDebugAcquire") {
 				writeCommandQueued("&");
 				writeCommandQueued("a");
@@ -3006,6 +3022,35 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
+				} else if (choiceType == "divine") { // TODO
+					writeCommandQueued("r");
+					int x = selected.x;
+					int y = selected.y;
+					if (locForBlink.X != -1 && locForBlink.Y != -1) {
+						x = locForBlink.X;
+						y = locForBlink.Y;
+					}
+					int currentX = LOS;
+					int currentY = LOS;
+					while (currentX != x) {
+						if (currentX < x) {
+							writeCommandQueued("l");
+							currentX++;
+						} else {
+							writeCommandQueued("h");
+							currentX--;
+						}
+					}
+					while (currentY != y) {
+						if (currentY < y) {
+							writeCommandQueued("j");
+							currentY++;
+						} else {
+							writeCommandQueued("k");
+							currentY--;
+						}
+					}
+					writeCommandQueued("enter");
 				} else if (choiceType == "amnesia") {
 					writeCommandQueued("Y");
 				} else if (choiceType == "removal") {
@@ -3803,6 +3848,20 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Ability letter: %s"), *letter);
 
+			// Some spells abilities have targeting TODO
+			if (currentDescription.Contains(TEXT("Divine Exegesis"))) {
+				locForBlink = FIntVector2(selected.x, selected.y);
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used Divine Exegesis, setting blink location to (%d, %d)"), locForBlink.X, locForBlink.Y);
+			}
+
+			// In case we need to avoid enter
+			bool noEnter = false;
+			if (currentDescription.Contains(TEXT("Forget Spell"))
+				|| currentDescription.Contains(TEXT("Divine Exegesis"))) {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Ignoring enter for ability"));
+				noEnter = true;
+			}
+
 			// Make sure we're in range
 			int x = selected.x;
 			int y = selected.y;
@@ -3834,7 +3893,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 					}
 				}
-				writeCommandQueued("enter");
+				if (!noEnter) {
+					writeCommandQueued("enter");
+				}
 			}
 
 		// If trying to show/hide the inventory
@@ -7612,8 +7673,12 @@ void Adcss::Tick(float DeltaTime) {
 						currentUsage = TEXT("Press USE whilst HELD to memorize the spell.\n(if you have at least ") + FString::FromInt(spellLevelsNeeded) + TEXT(" spell levels remaining)");
 					} else {
 						targetingRange = 0;
+						bool forceTargeting = false;
 						for (int i = 0; i < charArray.Num(); i++) {
 							if (charArray[i].Contains(TEXT("Range:"))) {
+								if (charArray[i].Contains(TEXT("divine exegesis"))) {
+									forceTargeting = true;
+								}
 								int rangeStart = charArray[i].Find(TEXT("Range:"))+7;
 								FString spellRange = charArray[i].Mid(rangeStart).TrimStartAndEnd();
 								UE_LOG(LogTemp, Display, TEXT("Spell range: %s"), *spellRange);
@@ -7626,6 +7691,10 @@ void Adcss::Tick(float DeltaTime) {
 								UE_LOG(LogTemp, Display, TEXT("Spell range: %d"), targetingRange);
 								break;
 							}
+						}
+						if (forceTargeting) { // TODO
+							UE_LOG(LogTemp, Display, TEXT("Forcing targeting range to 10"));
+							targetingRange = 10;
 						}
 						currentUsage = TEXT("Press USE whilst HELD to perform the spell/ability.\nRELEASE onto a slot to move it.");
 					}
@@ -7949,6 +8018,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Select a spell to forget"))
 				|| charArray[i].Contains(TEXT("Brand which weapon?"))
 				|| charArray[i].Contains(TEXT("Enchant which weapon?"))
+				|| charArray[i].Contains(TEXT("Casting with Divine Exegesis"))
 				|| charArray[i].Contains(TEXT("Identify which item?"))
 				|| charArray[i].Contains(TEXT("Enchant which item?"))
 				|| charArray[i].Contains(TEXT("Remove which one?"))
@@ -7960,7 +8030,10 @@ void Adcss::Tick(float DeltaTime) {
 					if (i < charArray.Num()-1 && !charArray[i+1].Contains(TEXT(" - "))) {
 						choiceTitle += TEXT(" ") + charArray[i+1].TrimStartAndEnd();
 					}
-					if (choiceTitle.Contains(TEXT("to acquire"))) {
+					if (choiceTitle.Contains(TEXT("Divine Exegesis"))) {
+						choiceTitle = TEXT("Cast which spell with Divine Exegesis?");
+						newChoiceType = "divine";
+					} else if (choiceTitle.Contains(TEXT("to acquire"))) {
 						newChoiceType = "acquirement";
 					} else if (choiceTitle.Contains(TEXT("Remove which one?"))) {
 						newChoiceType = "removal";
@@ -7984,6 +8057,12 @@ void Adcss::Tick(float DeltaTime) {
 							|| charArray[i].Contains(TEXT("Help"))
 							|| charArray[i].Contains(TEXT("[!]"))
 							|| charArray[i].Contains(TEXT("Jewelry"))
+							|| charArray[i].Contains(TEXT("Casting with Divine"))
+							|| charArray[i].Contains(TEXT("[Ctrl-F]"))
+							|| charArray[i].Contains(TEXT("Jewelry"))
+							|| charArray[i].Contains(TEXT("Jewelry"))
+							|| charArray[i].Contains(TEXT("Jewelry"))
+							|| charArray[i].Contains(TEXT("Jewelry"))
 							|| charArray[i].Contains(TEXT("List aptitudes"))) {
 							continue;
 						}
@@ -7995,6 +8074,10 @@ void Adcss::Tick(float DeltaTime) {
 						FString description = TEXT("");
 						if (choiceType == "amnesia") {
 							for (int j = 2; j < words.Num()-3; j++) {
+								description += words[j] + TEXT(" ");
+							}
+						} else if (choiceType == "divine") {
+							for (int j = 2; j < words.Num()-2; j++) {
 								description += words[j] + TEXT(" ");
 							}
 						} else {
