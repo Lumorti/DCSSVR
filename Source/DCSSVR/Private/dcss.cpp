@@ -125,6 +125,7 @@ int maxHP;
 int currentMP;
 int maxMP;
 bool inMainMenu;
+FString fullName;
 UWorld* worldRef;
 FString leftText;
 FString rightText;
@@ -962,6 +963,10 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("polished"), TEXT(""));
 	itemName = itemName.Replace(TEXT("shiny"), TEXT(""));
 	itemName = itemName.Replace(TEXT("pair of "), TEXT(""));
+	itemName = itemName.Replace(TEXT("not visited"), TEXT(""));
+	itemName = itemName.Replace(TEXT("not visit"), TEXT(""));
+	itemName = itemName.Replace(TEXT("smoky"), TEXT(""));
+	itemName = itemName.Replace(TEXT("cursed"), TEXT(""));
 
 	// Remove any text in brackets using Regex
 	FRegexPattern pattern(TEXT("\\(.*?\\)"));
@@ -1086,6 +1091,11 @@ FString Adcss::itemNameToTextureName(FString name) {
 
 // Go from enemy name to texture name
 FString Adcss::enemyNameToTextureName(FString name) {
+
+	// If it contains the player's name
+	if (name.Contains(fullName)  || name.Contains("the ancestor")) {
+		return "Player";
+	}
 
 	// Remove various things
 	FString enemyName = name;
@@ -1259,6 +1269,7 @@ void Adcss::init(bool firstTime) {
 	itemUseCount = 0;
 	gridWidth = 2 * LOS + 1;
 	maxEnemies = 100;
+	fullName = TEXT("");
 	maxEffects = 100;
 	maxItems = 100;
 	skipNextFullDescription = false;
@@ -2859,6 +2870,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			} else if (selected.thingIs == "ButtonDebugMol") {
 				writeCommandQueued("&");
 				writeCommandQueued("w");
+			} else if (selected.thingIs == "ButtonDebugGodGift") {
+				writeCommandQueued("&");
+				writeCommandQueued("-");
 			} else if (selected.thingIs == "ButtonDebugMaxPiety") {
 				writeCommandQueued("&");
 				writeCommandQueued("^");
@@ -2867,7 +2881,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("0");
 				writeCommandQueued("enter");
 				writeCommandQueued("enter");
-				writeCommandQueued("w");
 			} else if (selected.thingIs == "ButtonDebugMinPiety") {
 				writeCommandQueued("&");
 				writeCommandQueued("^");
@@ -3004,6 +3017,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				UE_LOG(LogTemp, Warning, TEXT("Unknown debug button: %s"), *selected.thingIs);
 			}
 
+		// Choice cancel button
+		} else if (selected.thingIs == "ButtonOptionCancel") {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Choice cancel button clicked"));
+			writeCommandQueued("escape");
+			writeCommandQueued("escape");
+			writeCommandQueued("escape");
+
 		// Choice button
 		} else if (selected.thingIs.Contains(TEXT("ButtonOption")) && isChoiceOpen) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Choice button clicked: %s"), *selected.thingIs);
@@ -3022,7 +3042,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
-				} else if (choiceType == "divine") { // TODO
+				} else if (choiceType == "divine") {
 					writeCommandQueued("r");
 					int x = selected.x;
 					int y = selected.y;
@@ -3062,7 +3082,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
 					writeCommandQueued("escape");
-				} else {
+				} else if (choiceType != "branding") {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
 				}
@@ -3848,7 +3868,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Ability letter: %s"), *letter);
 
-			// Some spells abilities have targeting TODO
+			// Some spells abilities have targeting
 			if (currentDescription.Contains(TEXT("Divine Exegesis"))) {
 				locForBlink = FIntVector2(selected.x, selected.y);
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used Divine Exegesis, setting blink location to (%d, %d)"), locForBlink.X, locForBlink.Y);
@@ -3857,7 +3877,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// In case we need to avoid enter
 			bool noEnter = false;
 			if (currentDescription.Contains(TEXT("Forget Spell"))
-				|| currentDescription.Contains(TEXT("Divine Exegesis"))) {
+				|| currentDescription.Contains(TEXT("Divine Exegesis"))
+				|| currentDescription.Contains(TEXT("Curse Item"))
+				|| currentDescription.Contains(TEXT("Ancestor Life"))
+				|| currentDescription.Contains(TEXT("Shatter the Chains"))
+				|| currentDescription.Contains(TEXT("Renounce Religion"))
+			) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Ignoring enter for ability"));
 				noEnter = true;
 			}
@@ -5409,6 +5434,17 @@ void Adcss::Tick(float DeltaTime) {
 		}
 	}
 	floorArray[LOS][LOS]->FindComponentByClass<UStaticMeshComponent>()->SetRenderCustomDepth(true);
+
+	// If in nightfall, reduce the light intensity
+	if (statusText.Contains(TEXT("Nightfall"))) {
+		for (int i = 0; i < refToLightsActors.Num(); i++) {
+			refToLightsActors[i]->FindComponentByClass<UPointLightComponent>()->SetIntensity(1.0f);
+		}
+	} else {
+		for (int i = 0; i < refToLightsActors.Num(); i++) {
+			refToLightsActors[i]->FindComponentByClass<UPointLightComponent>()->SetIntensity(60.0f);
+		}
+	}
 
 	// If the current scroll is a blink or unknown, we should show the targeting
 	bool isBlinkOrUnknown = false;
@@ -7203,6 +7239,7 @@ void Adcss::Tick(float DeltaTime) {
 						&& !charArray[i].Contains(TEXT("Ability -"))
 						&& !charArray[i].Contains(TEXT("Invocations -"))
 						&& !charArray[i].Contains(TEXT("Build terrain"))
+						&& !charArray[i].Contains(TEXT("Ancestor Identity"))
 						&& !charArray[i].Contains(TEXT("Set terrain to build"))
 						&& !charArray[i].Contains(TEXT("Clear terrain to floor"))
 					) {
@@ -7628,7 +7665,7 @@ void Adcss::Tick(float DeltaTime) {
 				UE_LOG(LogTemp, Display, TEXT("searchString: %s"), *searchString);
 				UE_LOG(LogTemp, Display, TEXT("addLoc: %d"), addLoc);
 				UE_LOG(LogTemp, Display, TEXT("newLoc: %d"), addLocNew);
-				if (addLoc != INDEX_NONE) {
+				if (addLoc != INDEX_NONE && searchString.TrimStartAndEnd().Len() > 0) {
 					currentDescription = currentDescription.Left(addLoc) + withoutFirst.Mid(addLocNew);
 				} else {
 					currentDescription += toAdd;
@@ -7692,7 +7729,7 @@ void Adcss::Tick(float DeltaTime) {
 								break;
 							}
 						}
-						if (forceTargeting) { // TODO
+						if (forceTargeting) {
 							UE_LOG(LogTemp, Display, TEXT("Forcing targeting range to 10"));
 							targetingRange = 10;
 						}
@@ -8016,11 +8053,13 @@ void Adcss::Tick(float DeltaTime) {
 				if (charArray[i].Contains(TEXT("You have a choice of")) 
 				|| charArray[i].Contains(TEXT("Choose an item to acquire"))
 				|| charArray[i].Contains(TEXT("Select a spell to forget"))
-				|| charArray[i].Contains(TEXT("Brand which weapon?"))
-				|| charArray[i].Contains(TEXT("Enchant which weapon?"))
+				|| charArray[i].Contains(TEXT("Brand which "))
+				|| charArray[i].Contains(TEXT("Curse which "))
+				|| charArray[i].Contains(TEXT("Enchant which "))
+				|| charArray[i].Contains(TEXT("Uncurse and destroy which "))
+				|| charArray[i].Contains(TEXT("Do you wish to have your"))
 				|| charArray[i].Contains(TEXT("Casting with Divine Exegesis"))
-				|| charArray[i].Contains(TEXT("Identify which item?"))
-				|| charArray[i].Contains(TEXT("Enchant which item?"))
+				|| charArray[i].Contains(TEXT("Identify which "))
 				|| charArray[i].Contains(TEXT("Remove which one?"))
 				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
@@ -8035,6 +8074,10 @@ void Adcss::Tick(float DeltaTime) {
 						newChoiceType = "divine";
 					} else if (choiceTitle.Contains(TEXT("to acquire"))) {
 						newChoiceType = "acquirement";
+					} else if (choiceTitle.Contains(TEXT("Brand which"))
+								|| choiceTitle.Contains(TEXT("Uncurse and destroy"))
+								|| choiceTitle.Contains(TEXT("Curse which"))) {
+						newChoiceType = "branding";
 					} else if (choiceTitle.Contains(TEXT("Remove which one?"))) {
 						newChoiceType = "removal";
 					} else if (choiceTitle.Contains(TEXT("Select a spell to forget"))) {
@@ -8045,6 +8088,8 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isChoice) {
 				choiceType = newChoiceType;
+				UE_LOG(LogTemp, Display, TEXT("Found choice menu: %s"), *choiceTitle);
+				UE_LOG(LogTemp, Display, TEXT("Choice type: %s"), *choiceType);
 				choiceLetters.Empty();
 				choiceNames.Empty();
 				isChoiceOpen = true;
@@ -8060,9 +8105,7 @@ void Adcss::Tick(float DeltaTime) {
 							|| charArray[i].Contains(TEXT("Casting with Divine"))
 							|| charArray[i].Contains(TEXT("[Ctrl-F]"))
 							|| charArray[i].Contains(TEXT("Jewelry"))
-							|| charArray[i].Contains(TEXT("Jewelry"))
-							|| charArray[i].Contains(TEXT("Jewelry"))
-							|| charArray[i].Contains(TEXT("Jewelry"))
+							|| charArray[i].Contains(TEXT("go to first with"))
 							|| charArray[i].Contains(TEXT("List aptitudes"))) {
 							continue;
 						}
@@ -8418,6 +8461,8 @@ void Adcss::Tick(float DeltaTime) {
 
 					// Extract the name and thus the filename
 					FString nameLine = charArray[1].Mid(37);
+					nameLine = nameLine.Replace(TEXT("*WIZARD*"), TEXT("")).TrimStartAndEnd();
+					fullName = nameLine;
 					saveFile = nameLine.Left(nameLine.Find(TEXT(" the "))).Replace(TEXT(" "), TEXT(""));
 					UE_LOG(LogTemp, Display, TEXT("STATUS - name line -> %s"), *nameLine);
 					UE_LOG(LogTemp, Display, TEXT("STATUS - setting save file -> %s"), *saveFile);
@@ -8566,6 +8611,7 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Really renounce your faith"))
 								|| newLine.Contains(TEXT("Are you sure?"))
 								|| newLine.Contains(TEXT("Cast which spell?"))
+								|| newLine.Contains(TEXT("Press <"))
 								|| newLine.Contains(TEXT("Wizard Command"))
 								|| newLine.Contains(TEXT("Aiming:"))
 								|| newLine.Contains(TEXT("Casting:"))

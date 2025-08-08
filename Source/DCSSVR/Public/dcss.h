@@ -21,6 +21,7 @@
 #include "Components/Border.h"
 #include "Runtime/HeadMountedDisplay/Public/IHeadMountedDisplay.h"
 #include "IXRTrackingSystem.h"
+#include "Components/PointLightComponent.h"
 #include "MotionControllerComponent.h"
 #include "Interfaces/IHttpRequest.h"
 #include "Interfaces/IHttpResponse.h"
@@ -72,6 +73,10 @@ public:
 	AActor* refToSettingsActor;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToChoiceActor;
+
+	// The references to the lights
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	TArray<AActor*> refToLightsActors;
 
 	// The references to the music
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
