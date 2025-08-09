@@ -967,6 +967,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("not visit"), TEXT(""));
 	itemName = itemName.Replace(TEXT("smoky"), TEXT(""));
 	itemName = itemName.Replace(TEXT("cursed"), TEXT(""));
+	itemName = itemName.Replace(TEXT("small"), TEXT(""));
 
 	// Remove any text in brackets using Regex
 	FRegexPattern pattern(TEXT("\\(.*?\\)"));
@@ -1017,7 +1018,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	}
 	itemName = TEXT("");
 	for (int l = 0; l < words.Num(); l++) {
-		if (!words[l].IsNumeric() && words[l] != TEXT("a") && words[l] != TEXT("an")) {
+		if (!words[l].IsNumeric() && words[l] != TEXT("a") && words[l] != TEXT("an") && !words[l].Contains(TEXT("'s"))) {
 			itemName += words[l];
 		}
 	}
@@ -1048,7 +1049,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	// If it's a ring (need to be careful with things like "shimmering")
 	int32 ringIndex = itemName.Find(TEXT("ring"));
 	if (ringIndex != INDEX_NONE && !textures.Contains(itemName)) {
-		if (ringIndex == 0 || itemName[ringIndex - 1] == ' ') {
+		if (ringIndex == 0 || itemName[ringIndex] == 'R') {
 			getTexture(itemName);
 			return "Ring";
 		}
@@ -1156,6 +1157,10 @@ FString Adcss::enemyNameToTextureName(FString name) {
 void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	UE_LOG(LogTemp, Display, TEXT("Closing process"));
 	if (!useServer) {
+		writeCommand("escape");
+		writeCommand("escape");
+		writeCommand("enter");
+		writeCommand("enter");
 		writeCommand("exit");
 		writeCommand("escape");
 		FPlatformProcess::Sleep(0.5);
@@ -1244,6 +1249,7 @@ void Adcss::init(bool firstTime) {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=statue ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=fountain ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=abandoned ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=gate ");
 	args += TEXT(" -extra-opt-first prompt_menu=true ");
@@ -2146,6 +2152,8 @@ void Adcss::updateLevel() {
 					// Set the texture
 					FString effect = levelInfo[i][j].effect;
 					FString textureName = itemNameToTextureName(effect);
+					UE_LOG(LogTemp, Display, TEXT("Effect: %s"), *effect);
+					UE_LOG(LogTemp, Display, TEXT("Texture name: %s"), *textureName);
 					UTexture2D* texture2 = getTexture(textureName);
 					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)effectMesh->GetMaterial(0);
 					material2->SetTextureParameterValue("TextureImage", texture2);
@@ -2762,6 +2770,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// If it's the process, close it
 			if (!useServer) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
+				writeCommandQueued("escape");
+				writeCommandQueued("escape");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommand("escape");
 				FPlatformProcess::Sleep(0.5);
@@ -2771,6 +2783,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// If it's the server, just go back to the menu
 			} else {
+				writeCommandQueued("escape");
+				writeCommandQueued("escape");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 			}
 
@@ -3082,6 +3098,15 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
 					writeCommandQueued("escape");
+				} else if (choiceType == "gozag") {
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
 				} else if (choiceType != "branding") {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
@@ -3851,6 +3876,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					}
 				}
 				writeCommandQueued("enter");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 			}
 
 		// If we're holding an ability, use it
@@ -3880,6 +3907,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				|| currentDescription.Contains(TEXT("Divine Exegesis"))
 				|| currentDescription.Contains(TEXT("Curse Item"))
 				|| currentDescription.Contains(TEXT("Ancestor Life"))
+				|| currentDescription.Contains(TEXT("Receive Forbidden Knowledge"))
+				|| currentDescription.Contains(TEXT("Sacrifice "))
 				|| currentDescription.Contains(TEXT("Shatter the Chains"))
 				|| currentDescription.Contains(TEXT("Renounce Religion"))
 			) {
@@ -3919,6 +3948,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					}
 				}
 				if (!noEnter) {
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
 					writeCommandQueued("enter");
 				}
 			}
@@ -4311,11 +4342,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 		// If it's a ladder
-		} else if (thingBeingDragged.thingIs.Contains(TEXT("Ladder")) || selected.thingIs.Contains(TEXT("Ladder"))) {
+		} else if (thingBeingDragged.thingIs.Contains(TEXT("Ladder"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Ladder clicked: (%d, %d) %s"), thingBeingDragged.x, thingBeingDragged.y, *thingBeingDragged.thingIs);
-			if ((selected.x == LOS && selected.y == LOS && selected.thingIs.Contains(TEXT("Ladder"))) ||
-				(thingBeingDragged.x == LOS && thingBeingDragged.y == LOS && thingBeingDragged.thingIs.Contains(TEXT("Ladder")))) {
-				if (thingBeingDragged.thingIs.Contains(TEXT("Up"))) {
+			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS && thingBeingDragged.thingIs.Contains(TEXT("Ladder"))) {
+				if (thingBeingDragged.thingIs == "LadderUp") {
 					writeCommandQueued("<");
 					writeCommandQueued("escape");
 				} else {
@@ -5143,6 +5173,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("ctrl-X");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
+			writeCommandQueued(">");
 			writeCommandQueued("escape");
 
 		// If we're selecting an item from the ground and dropping it into the inventory
@@ -5164,6 +5195,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("escape");
 			writeCommandQueued("CLEAR");
 			writeCommandQueued("ctrl-X");
+			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued("escape");
@@ -7712,10 +7744,14 @@ void Adcss::Tick(float DeltaTime) {
 						targetingRange = 0;
 						bool forceTargeting = false;
 						for (int i = 0; i < charArray.Num(); i++) {
+							if (charArray[i].Contains(TEXT("divine exegesis"))
+								|| charArray[i].Contains(TEXT("line pass"))
+								|| charArray[i].Contains(TEXT("heal other"))
+								|| charArray[i].Contains(TEXT("wall jump"))
+							) {
+								forceTargeting = true;
+							}
 							if (charArray[i].Contains(TEXT("Range:"))) {
-								if (charArray[i].Contains(TEXT("divine exegesis"))) {
-									forceTargeting = true;
-								}
 								int rangeStart = charArray[i].Find(TEXT("Range:"))+7;
 								FString spellRange = charArray[i].Mid(rangeStart).TrimStartAndEnd();
 								UE_LOG(LogTemp, Display, TEXT("Spell range: %s"), *spellRange);
@@ -8057,6 +8093,8 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Curse which "))
 				|| charArray[i].Contains(TEXT("Enchant which "))
 				|| charArray[i].Contains(TEXT("Uncurse and destroy which "))
+				|| charArray[i].Contains(TEXT("Purchase which effect"))
+				|| charArray[i].Contains(TEXT("Fund which merchant"))
 				|| charArray[i].Contains(TEXT("Do you wish to have your"))
 				|| charArray[i].Contains(TEXT("Casting with Divine Exegesis"))
 				|| charArray[i].Contains(TEXT("Identify which "))
@@ -8074,6 +8112,9 @@ void Adcss::Tick(float DeltaTime) {
 						newChoiceType = "divine";
 					} else if (choiceTitle.Contains(TEXT("to acquire"))) {
 						newChoiceType = "acquirement";
+					} else if (choiceTitle.Contains(TEXT("purchase which effect")) 
+								|| choiceTitle.Contains(TEXT("Fund which merchant"))) {
+						newChoiceType = "gozag";
 					} else if (choiceTitle.Contains(TEXT("Brand which"))
 								|| choiceTitle.Contains(TEXT("Uncurse and destroy"))
 								|| choiceTitle.Contains(TEXT("Curse which"))) {
@@ -8174,6 +8215,8 @@ void Adcss::Tick(float DeltaTime) {
 			for (int i = 0; i < charArray.Num(); i++) {
 				if (charArray[i].Contains(TEXT("Are you sure you want to"))
 				|| charArray[i].Contains(TEXT("Really renounce your faith"))
+				|| charArray[i].Contains(TEXT("Do you wish to receive"))
+				|| charArray[i].Contains(TEXT("Do you really want to"))
 			) {
 					isYesNo = true;
 				}
@@ -8404,6 +8447,7 @@ void Adcss::Tick(float DeltaTime) {
 									|| description.Contains(TEXT(" bazaar")) 
 									|| description.Contains(TEXT(" store")) 
 									|| description.Contains(TEXT(" antiques")) 
+									|| description.Contains(TEXT(" distillery")) 
 									|| description.Contains(TEXT(" boutique")) 
 									|| description.Contains(TEXT(" emporium"))) {
 									levelInfo[yCoord][xCoord].items.Add(description);
@@ -8687,6 +8731,7 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
+				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("enter");
 				writeCommandQueued("&");
@@ -8751,6 +8796,7 @@ void Adcss::Tick(float DeltaTime) {
 					UE_LOG(LogTemp, Display, TEXT("Getting list of things..."));
 					writeCommandQueued("CLEAR");
 					writeCommandQueued("ctrl-X");
+					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued("escape");
