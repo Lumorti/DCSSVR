@@ -5,12 +5,8 @@ FString version = TEXT("0.1");
 // - spear evoke
 // - item evoke
 // - all ability textures
-
-// 0.2 First update, hopefully with community suggestions
-// - footstep/attacking/casting/monster sounds?
-// - nearest stairs indicator?
-// - find/search?
-// - multiplayer?
+// - all uniques
+// - BUG sometimes saving on exit doesn't work
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
@@ -1157,13 +1153,13 @@ FString Adcss::enemyNameToTextureName(FString name) {
 void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	UE_LOG(LogTemp, Display, TEXT("Closing process"));
 	if (!useServer) {
-		writeCommand("escape");
-		writeCommand("escape");
-		writeCommand("enter");
-		writeCommand("enter");
-		writeCommand("exit");
-		writeCommand("escape");
-		FPlatformProcess::Sleep(0.5);
+		writeCommandQueued("escape");
+		writeCommandQueued("escape");
+		writeCommandQueued("enter");
+		writeCommandQueued("enter");
+		writeCommandQueued("exit");
+		writeCommandQueued("escape");
+		FPlatformProcess::Sleep(2.0f);
 		FPlatformProcess::TerminateProc(ProcHandle, true);
 		FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
 		FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
@@ -2775,8 +2771,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
-				writeCommand("escape");
-				FPlatformProcess::Sleep(0.5);
+				writeCommandQueued("escape");
+				FPlatformProcess::Sleep(2.0f);
 				FPlatformProcess::TerminateProc(ProcHandle, true);
 				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
 				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
@@ -3107,7 +3103,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
-				} else if (choiceType != "branding") {
+				} else if (choiceType != "branding" && choiceType != "cards") {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
 				}
@@ -3685,11 +3681,21 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Send the save commands
 			if (!useServer) {
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
 				writeCommandQueued("escape");
+				writeCommandQueued("escape");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
+				FPlatformProcess::Sleep(2.0f);
+				FPlatformProcess::TerminateProc(ProcHandle, true);
+				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
+				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
 			} else {
-				writeCommandQueued("exit");
+				writeCommand("enter");
+				writeCommand("enter");
+				writeCommand("exit");
 			}
 
 			// Quit
@@ -3907,6 +3913,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				|| currentDescription.Contains(TEXT("Divine Exegesis"))
 				|| currentDescription.Contains(TEXT("Curse Item"))
 				|| currentDescription.Contains(TEXT("Ancestor Life"))
+				|| currentDescription.Contains(TEXT("Triple Draw"))
+				|| currentDescription.Contains(TEXT("Deal Four"))
+				|| currentDescription.Contains(TEXT("Stack Five"))
 				|| currentDescription.Contains(TEXT("Receive Forbidden Knowledge"))
 				|| currentDescription.Contains(TEXT("Sacrifice "))
 				|| currentDescription.Contains(TEXT("Shatter the Chains"))
@@ -7812,6 +7821,16 @@ void Adcss::Tick(float DeltaTime) {
 			if (isAltarMenu && currentUI != "religion" && showNextAltar) {
 				UE_LOG(LogTemp, Display, TEXT("Found altar menu"));
 
+				// If it's a god that I haven't bothered to implement yet, skip it
+				bool skipAltar = false;
+				for (int i = 0; i < charArray.Num(); i++) {
+					if (charArray[i].Contains(TEXT("Nemelex"))) {
+						skipAltar = true;
+						UE_LOG(LogTemp, Display, TEXT("Skipping altar"));
+						break;
+					}
+				}
+
 				// Get the text
 				FString textToSet = TEXT("");
 				for (int i = 0; i < charArray.Num(); i++) {
@@ -7832,42 +7851,47 @@ void Adcss::Tick(float DeltaTime) {
 				nextAltar++;
 				nextAltar = nextAltar % 3;
 
-				// Show the altar actor and set the text
-				if (refToAltarActor != nullptr) {
-					UWidgetComponent* WidgetComponentAltar = Cast<UWidgetComponent>(refToAltarActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-					if (WidgetComponentAltar != nullptr) {
-						UUserWidget* UserWidgetAltar = WidgetComponentAltar->GetUserWidgetObject();
-						if (UserWidgetAltar != nullptr) {
-							UTextBlock* AltarText = Cast<UTextBlock>(UserWidgetAltar->GetWidgetFromName(TEXT("TextAltar")));
-							if (AltarText != nullptr) {
-								AltarText->SetText(FText::FromString(altarOverview));
+				// If we aren't skipping
+				if (!skipAltar) {
+
+					// Show the altar actor and set the text
+					if (refToAltarActor != nullptr) {
+						UWidgetComponent* WidgetComponentAltar = Cast<UWidgetComponent>(refToAltarActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+						if (WidgetComponentAltar != nullptr) {
+							UUserWidget* UserWidgetAltar = WidgetComponentAltar->GetUserWidgetObject();
+							if (UserWidgetAltar != nullptr) {
+								UTextBlock* AltarText = Cast<UTextBlock>(UserWidgetAltar->GetWidgetFromName(TEXT("TextAltar")));
+								if (AltarText != nullptr) {
+									AltarText->SetText(FText::FromString(altarOverview));
+								}
 							}
 						}
+						UE_LOG(LogTemp, Display, TEXT("Showing altar menu"));
+						refToAltarActor->SetActorHiddenInGame(false);
+						refToAltarActor->SetActorEnableCollision(true);
+						showingAltar = true;
+						currentUI = TEXT("altar");
 					}
-					UE_LOG(LogTemp, Display, TEXT("Showing altar menu"));
-					refToAltarActor->SetActorHiddenInGame(false);
-					refToAltarActor->SetActorEnableCollision(true);
-					showingAltar = true;
-					currentUI = TEXT("altar");
-				}
 
-				// When this is open, hide the shop itself
-				FString meshName = TEXT("");
-				for (auto& Elem : meshNameToThing) {
-					if (Elem.Value.thingIs.Contains(TEXT("Altar")) && Elem.Value.x == LOS && Elem.Value.y == LOS) {
-						meshName = Elem.Key;
-						break;
-					}
-				}
-				if (meshName.Len() > 0) {
-					UE_LOG(LogTemp, Display, TEXT("Hiding altar mesh %s"), *meshName);
-					for (int i=0; i<itemArray.Num(); i++) {
-						if (itemArray[i]->GetName() == meshName) {
-							itemArray[i]->SetActorHiddenInGame(true);
-							itemArray[i]->SetActorEnableCollision(false);
+					// When this is open, hide the altar itself
+					FString meshName = TEXT("");
+					for (auto& Elem : meshNameToThing) {
+						if (Elem.Value.thingIs.Contains(TEXT("Altar")) && Elem.Value.x == LOS && Elem.Value.y == LOS) {
+							meshName = Elem.Key;
 							break;
 						}
 					}
+					if (meshName.Len() > 0) {
+						UE_LOG(LogTemp, Display, TEXT("Hiding altar mesh %s"), *meshName);
+						for (int i=0; i<itemArray.Num(); i++) {
+							if (itemArray[i]->GetName() == meshName) {
+								itemArray[i]->SetActorHiddenInGame(true);
+								itemArray[i]->SetActorEnableCollision(false);
+								break;
+							}
+						}
+					}
+
 				}
 
 			}
@@ -8095,6 +8119,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Uncurse and destroy which "))
 				|| charArray[i].Contains(TEXT("Purchase which effect"))
 				|| charArray[i].Contains(TEXT("Fund which merchant"))
+				|| charArray[i].Contains(TEXT("Draw which"))
 				|| charArray[i].Contains(TEXT("Do you wish to have your"))
 				|| charArray[i].Contains(TEXT("Casting with Divine Exegesis"))
 				|| charArray[i].Contains(TEXT("Identify which "))
@@ -8121,6 +8146,8 @@ void Adcss::Tick(float DeltaTime) {
 						newChoiceType = "branding";
 					} else if (choiceTitle.Contains(TEXT("Remove which one?"))) {
 						newChoiceType = "removal";
+					} else if (choiceTitle.Contains(TEXT("Draw which"))) {
+						newChoiceType = "cards";
 					} else if (choiceTitle.Contains(TEXT("Select a spell to forget"))) {
 						newChoiceType = "amnesia";
 					}
