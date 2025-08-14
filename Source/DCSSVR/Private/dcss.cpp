@@ -4,7 +4,6 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - spear evoke
 // - item evoke
-// - all ability textures
 // - all uniques
 // - BUG sometimes saving on exit doesn't work
 
