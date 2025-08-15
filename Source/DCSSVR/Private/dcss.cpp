@@ -5,7 +5,6 @@ FString version = TEXT("0.1");
 // - spear evoke
 // - item evoke
 // - all uniques
-// - BUG sometimes saving on exit doesn't work
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
@@ -1158,10 +1157,7 @@ void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 		writeCommandQueued("enter");
 		writeCommandQueued("exit");
 		writeCommandQueued("escape");
-		FPlatformProcess::Sleep(2.0f);
-		FPlatformProcess::TerminateProc(ProcHandle, true);
-		FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
-		FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+		writeCommandQueued("SHUTDOWN");
 	} else {
 		for (FTimerHandle& TimerHandle : timerHandles) {
 			worldRef->GetTimerManager().ClearTimer(TimerHandle);
@@ -2771,10 +2767,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
-				FPlatformProcess::Sleep(2.0f);
-				FPlatformProcess::TerminateProc(ProcHandle, true);
-				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
-				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+				writeCommandQueued("SHUTDOWN");
 
 			// If it's the server, just go back to the menu
 			} else {
@@ -3687,19 +3680,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
-				FPlatformProcess::Sleep(2.0f);
-				FPlatformProcess::TerminateProc(ProcHandle, true);
-				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
-				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+				writeCommandQueued("SHUTDOWN");
 			} else {
 				writeCommand("enter");
 				writeCommand("enter");
 				writeCommand("exit");
-			}
-
-			// Quit
-			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
-			UKismetSystemLibrary::QuitGame(worldRef, UGameplayStatics::GetPlayerController(worldRef, 0), QuitPreference, true);		
+			}	
 
 		// If we're holding an item, equip or use it
 		} else if (thingBeingDragged.thingIs == "InventoryItem"  && currentDescription.Len() > 0 && thingBeingDragged.x !=	-1  && thingBeingDragged.y != -1) {
@@ -6501,6 +6487,15 @@ void Adcss::Tick(float DeltaTime) {
 			UE_LOG(LogTemp, Display, TEXT("Clearing spells"));
 			spellLetters.Empty();
 			spellLetterToInfo.Empty();
+		} else if (command == "SHUTDOWN") {
+			if (!useServer) {
+				FPlatformProcess::Sleep(1.0f);
+				FPlatformProcess::TerminateProc(ProcHandle, true);
+				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
+				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+			}
+			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
+			UKismetSystemLibrary::QuitGame(worldRef, UGameplayStatics::GetPlayerController(worldRef, 0), QuitPreference, true);	
 		} else if (command == "SKIP") {
 			skipNextFullDescription = true;
 		} else {
