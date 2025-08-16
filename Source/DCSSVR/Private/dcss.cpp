@@ -4,7 +4,6 @@ FString version = TEXT("0.1");
 // 0.1 Initial Release
 // - spear evoke
 // - item evoke
-// - all uniques
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
@@ -1073,6 +1072,12 @@ FString Adcss::itemNameToTextureName(FString name) {
 		return "Idol";
 	}
 
+	// If it's an orb
+	if (itemName.Contains(TEXT("orb")) && !textures.Contains(itemName)) {
+		getTexture(itemName);
+		return "Orb";
+	}
+
 	// If it's a portal/gateway
 	if (gateList.Contains(name) && !textures.Contains(itemName)) {
 		getTexture(itemName);
@@ -1150,14 +1155,15 @@ FString Adcss::enemyNameToTextureName(FString name) {
 // Called when the actor is destroyed or deleted
 void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	UE_LOG(LogTemp, Display, TEXT("Closing process"));
-	if (!useServer) {
-		writeCommandQueued("escape");
-		writeCommandQueued("escape");
-		writeCommandQueued("enter");
-		writeCommandQueued("enter");
-		writeCommandQueued("exit");
-		writeCommandQueued("escape");
-		writeCommandQueued("SHUTDOWN");
+	if (!useServer) { // TODO
+			writeCommand("escape");
+			writeCommand("enter");
+			writeCommand("exit");
+			writeCommand("escape");
+			FPlatformProcess::Sleep(1.0f);
+			FPlatformProcess::TerminateProc(ProcHandle, true);
+			FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
+			FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
 	} else {
 		for (FTimerHandle& TimerHandle : timerHandles) {
 			worldRef->GetTimerManager().ClearTimer(TimerHandle);
@@ -2762,8 +2768,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (!useServer) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
 				writeCommandQueued("escape");
-				writeCommandQueued("escape");
-				writeCommandQueued("enter");
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
@@ -2772,8 +2776,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// If it's the server, just go back to the menu
 			} else {
 				writeCommandQueued("escape");
-				writeCommandQueued("escape");
-				writeCommandQueued("enter");
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 			}
@@ -3675,8 +3677,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (!useServer) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
 				writeCommandQueued("escape");
-				writeCommandQueued("escape");
-				writeCommandQueued("enter");
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
