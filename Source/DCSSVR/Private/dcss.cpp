@@ -2,8 +2,14 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// - spear evoke
-// - item evoke
+// Things that are disabled because they're quite different: 
+//    - Race: coglin 
+//    - Item: wand of digging 
+//    - God: Nemelex
+// Everything should should work as expected
+
+// TODO list
+// - test item evokes
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
@@ -1142,6 +1148,12 @@ FString Adcss::enemyNameToTextureName(FString name) {
 		materialName = materialName.Left(materialName.Len() - 1);
 	}
 
+	// If it's a mutant beast
+	if (materialName.Contains(TEXT("beast")) && !textures.Contains(materialName)) {
+		getTexture(materialName);
+		return "Beast";
+	}
+
 	// In case it's a monster version of a weapon
 	FString itemName = itemNameToTextureName(name);
 	if (!textures.Contains(materialName) && textures.Contains(itemName)) {
@@ -1155,7 +1167,7 @@ FString Adcss::enemyNameToTextureName(FString name) {
 // Called when the actor is destroyed or deleted
 void Adcss::EndPlay(const EEndPlayReason::Type EndPlayReason) {
 	UE_LOG(LogTemp, Display, TEXT("Closing process"));
-	if (!useServer) { // TODO
+	if (!useServer) {
 			writeCommand("escape");
 			writeCommand("enter");
 			writeCommand("exit");
@@ -2771,7 +2783,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
-				writeCommandQueued("SHUTDOWN");
+				writeCommandQueued("CLOSEPROCESS");
 
 			// If it's the server, just go back to the menu
 			} else {
@@ -3680,6 +3692,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
 				writeCommandQueued("escape");
+				writeCommandQueued("CLOSEPROCESS");
 				writeCommandQueued("SHUTDOWN");
 			} else {
 				writeCommand("enter");
@@ -3704,8 +3717,21 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			FString useType = "w";
 			bool isRing = false;
 			bool isScroll = false;
+			bool isEvokableWithTarget = false;
 			if (currentDescription.Contains(TEXT("(worn)"))) {
 				useType = "t";
+			} else if (currentDescription.Contains(TEXT("condenser"))
+					|| currentDescription.Contains(TEXT("box of"))
+					|| currentDescription.Contains(TEXT("sack of"))
+					|| currentDescription.Contains(TEXT("horn of"))
+					|| currentDescription.Contains(TEXT("ziggurat"))
+					|| currentDescription.Contains(TEXT("tin of"))) {
+				useType = "v";
+			} else if (currentDescription.Contains(TEXT("phial"))
+					|| currentDescription.Contains(TEXT("phantom mirror"))
+					|| currentDescription.Contains(TEXT("wand of"))) {
+				useType = "v";
+				isEvokableWithTarget = true;
 			} else if (currentDescription.Contains(TEXT("(weapon)"))) {
 				useType = "u";
 			} else if (currentDescription.Contains(TEXT(" scroll ")) || currentDescription.Contains(TEXT(" scrolls "))) {
@@ -3743,11 +3769,16 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 			bool twoUniqueRings = leftFound.Len() > 0 && rightFound.Len() > 0 && leftFound != rightFound;
 
+			// Disable wand of digging for now TODO
+			if (useType == "v" && itemName.Contains(TEXT("digging"))) {
+				return;
+			}
+
 			// Use the item
 			writeCommandQueued("i");
 			writeCommandQueued(letter);
 			writeCommandQueued(useType);
-			if (!isScroll && !(twoUniqueRings && isRing && useType == "p")) {
+			if (!isEvokableWithTarget && !isScroll && !(twoUniqueRings && isRing && useType == "p")) {
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
 				writeCommandQueued("CLEARINV");
@@ -3759,11 +3790,38 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
+			} else if (isEvokableWithTarget) { // TODO
+				int x = selected.x;
+				int y = selected.y;
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used an evokable with target"));
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Target location: (%d, %d)"), x, y);
+				writeCommandQueued("r");
+				int currentX = LOS;
+				int currentY = LOS;
+				while (currentX != x) {
+					if (currentX < x) {
+						writeCommandQueued("l");
+						currentX++;
+					} else {
+						writeCommandQueued("h");
+						currentX--;
+					}
+				}
+				while (currentY != y) {
+					if (currentY < y) {
+						writeCommandQueued("j");
+						currentY++;
+					} else {
+						writeCommandQueued("k");
+						currentY--;
+					}
+				}
+				writeCommandQueued("enter");
 			} else if (isScroll) {
 				justUsedAScroll = true;
 				locForBlink = FIntVector2(selected.x, selected.y);
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used a scroll"));
-				UE_LOG(LogTemp, Display, TEXT("INPUT - Blink location: (%d, %d)"), locForBlink.X, locForBlink.Y);
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Target location: (%d, %d)"), locForBlink.X, locForBlink.Y);
 			} else if (isRing) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Two rings already equipped"));
 			}
@@ -3772,6 +3830,19 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("") || useType == "q" || isScroll) {
 				refToDescriptionActor->SetActorHiddenInGame(true);
 				thingBeingDragged = SelectedThing();
+			}
+
+			// We may have just equipped something TODO
+			if (useType == "w") {
+				equippedInfo.name = inventoryLetterToName[letter];
+				equippedInfo.type = thingBeingDragged.thingIs;
+				equippedInfo.letter = letter;
+				shouldRedrawHotbar = true;
+			} else if (useType == "u") {
+				equippedInfo.name = "";
+				equippedInfo.type = "";
+				equippedInfo.letter = "";
+				shouldRedrawHotbar = true;
 			}
 
 		// If memorizing a spell 
@@ -4350,6 +4421,37 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("{");
 				writeCommandQueued("enter");
 			}
+
+		// If clicking on a monster and we have a spear equipped TODO
+		} else if (selected.thingIs == "Enemy" && (rightText.Contains(TEXT("spear")) || leftText.Contains(TEXT("spear")))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Enemy clicked whilst holding spear"));
+
+			// Send the commands to target the clicked enemy
+			int x = selected.x;
+			int y = selected.y;
+			writeCommandQueued("v");
+			writeCommandQueued("r");
+			int currentX = LOS;
+			int currentY = LOS;
+			while (currentX != x) {
+				if (currentX < x) {
+					writeCommandQueued("l");
+					currentX++;
+				} else {
+					writeCommandQueued("h");
+					currentX--;
+				}
+			}
+			while (currentY != y) {
+				if (currentY < y) {
+					writeCommandQueued("j");
+					currentY++;
+				} else {
+					writeCommandQueued("k");
+					currentY--;
+				}
+			}
+			writeCommandQueued("enter");
 
 		// If clicking on a monster and we have a ranged or spell quivered
 		} else if (selected.thingIs == "Enemy" && (leftText.Contains(TEXT("Fire:")) || leftText.Contains(TEXT("Cast:")))) {
@@ -6487,13 +6589,14 @@ void Adcss::Tick(float DeltaTime) {
 			UE_LOG(LogTemp, Display, TEXT("Clearing spells"));
 			spellLetters.Empty();
 			spellLetterToInfo.Empty();
-		} else if (command == "SHUTDOWN") {
+		} else if (command == "CLOSEPROCESS") {
 			if (!useServer) {
 				FPlatformProcess::Sleep(1.0f);
 				FPlatformProcess::TerminateProc(ProcHandle, true);
 				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
 				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
 			}
+		} else if (command == "SHUTDOWN") {
 			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
 			UKismetSystemLibrary::QuitGame(worldRef, UGameplayStatics::GetPlayerController(worldRef, 0), QuitPreference, true);	
 		} else if (command == "SKIP") {
@@ -7729,6 +7832,20 @@ void Adcss::Tick(float DeltaTime) {
 					currentUsage = TEXT("Press USE on a adjacent monster to attack with your equipped weapon.");
 				} else if (typeOfThing == TEXT("Item")) {
 					currentUsage = TEXT("Press USE whilst HELD to equip/unequip.\nRELEASE onto a slot or the floor to move it.");
+					targetingRange = 0;
+					bool forceTargeting = false;
+					for (int i = 0; i < charArray.Num(); i++) { // TODO
+						if (charArray[i].Contains(TEXT("phial"))
+							|| charArray[i].Contains(TEXT("phantom mirror"))
+							|| charArray[i].Contains(TEXT("wand of"))
+						) {
+							forceTargeting = true;
+						}
+					}
+					if (forceTargeting) {
+						UE_LOG(LogTemp, Display, TEXT("Forcing targeting range to 10"));
+						targetingRange = 10;
+					}
 				} else if (typeOfThing == TEXT("Spell")) {
 					if (memorizing) {
 						int spellLevelsNeeded = 0;
@@ -8678,6 +8795,8 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Cast which spell?"))
 								|| newLine.Contains(TEXT("Press <"))
 								|| newLine.Contains(TEXT("Wizard Command"))
+								|| newLine.Contains(TEXT("Reach:"))
+								|| newLine.Contains(TEXT("Aim:"))
 								|| newLine.Contains(TEXT("Aiming:"))
 								|| newLine.Contains(TEXT("Casting:"))
 								|| newLine.Contains(TEXT("No monsters, items or features"))
