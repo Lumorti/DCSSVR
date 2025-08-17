@@ -8,9 +8,6 @@ FString version = TEXT("0.1");
 //    - God: Nemelex
 // Everything should should work as expected
 
-// TODO list
-// - test item evokes
-
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
 // "A" == "a"? Are you kidding me?
@@ -346,8 +343,12 @@ void Adcss::writeCommand(FString input) {
 
 // Write a command to the process queue
 void Adcss::writeCommandQueued(FString input) {
-	UE_LOG(LogTemp, Display, TEXT("Adding command to queue: %s"), *input);
 	commandQueue.Add(input);
+	FString fullQueue = TEXT("");
+	for (const FString& command : commandQueue) {
+		fullQueue += command + TEXT(", ");
+	}
+	UE_LOG(LogTemp, Display, TEXT("Added command to queue: %s (%s)"), *input, *fullQueue);
 }
 
 // Toggle the inventory open/closed
@@ -1272,11 +1273,6 @@ void Adcss::init(bool firstTime) {
 	args += TEXT(" -extra-opt-first crawl_dir=\"") + binaryPath + TEXT("\" ");
 	UE_LOG(LogTemp, Display, TEXT("Executable loc: %s"), *exePath);
 	UE_LOG(LogTemp, Display, TEXT("Args: %s"), *args);
-	StdOutReadHandle = nullptr;
-	StdOutWriteHandle = nullptr;
-	StdInReadHandle = nullptr;
-	StdInWriteHandle = nullptr;
-	hasLoaded = false;
 	LOS = 8;
 	maxLogShown = 6;
 	enemyUseCount = 0;
@@ -1366,6 +1362,11 @@ void Adcss::init(bool firstTime) {
 	currentUI = "inventory";
 	if (firstTime) {
 		commandQueue.Empty();
+		StdOutReadHandle = nullptr;
+		StdOutWriteHandle = nullptr;
+		StdInReadHandle = nullptr;
+		StdInWriteHandle = nullptr;
+		hasLoaded = false;
 	}
 	lastCommandTime = 0.0;
 	inventoryOpen = true;
@@ -1687,7 +1688,7 @@ void Adcss::init(bool firstTime) {
 	}
 
     // If we're not using the server, launch the process
-	if (!useServer) {	
+	if (!useServer && firstTime) {	
 		UE_LOG(LogTemp, Display, TEXT("Launching pipes..."));
 		FPlatformProcess::CreatePipe(StdOutReadHandle, StdOutWriteHandle);
 		FPlatformProcess::CreatePipe(StdInReadHandle, StdInWriteHandle, true);
@@ -1698,7 +1699,7 @@ void Adcss::init(bool firstTime) {
 	// Search the saves list
 	// Extra ups are needed because it starts with the most recent save selected
 	int maxSaves = 20;
-	for (int i=0; i<maxSaves+10; i++) {
+	for (int i = 0; i < maxSaves+10; i++) {
 		writeCommandQueued("down");
 	}
 	for (int i = 0; i < maxSaves+10; i++) {
@@ -1786,6 +1787,7 @@ void Adcss::init(bool firstTime) {
 			AActor* floor = worldRef->SpawnActor<AActor>(floorTemplate->GetClass(), SpawnInfo);
 			floor->SetActorLocation(Location);
 			floor->SetActorHiddenInGame(false); 
+			floor->SetActorEnableCollision(true);
 			floorArray[i + LOS][j + LOS] = floor;
 			UStaticMeshComponent* mesh = floor->FindComponentByClass<UStaticMeshComponent>();
 			UMaterialInstanceDynamic* dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -1815,6 +1817,7 @@ void Adcss::init(bool firstTime) {
 			AActor* wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
+			wall->SetActorEnableCollision(false);
 			wallArray[xInd][yInd][0] = wall;
 			UStaticMeshComponent* mesh = wall->FindComponentByClass<UStaticMeshComponent>();
 			UMaterialInstanceDynamic* dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -1826,6 +1829,7 @@ void Adcss::init(bool firstTime) {
 			wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
+			wall->SetActorEnableCollision(false);
 			wallArray[xInd][yInd][1] = wall;
 			mesh = wall->FindComponentByClass<UStaticMeshComponent>();
 			dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -1837,6 +1841,7 @@ void Adcss::init(bool firstTime) {
 			wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
+			wall->SetActorEnableCollision(false);
 			wallArray[xInd][yInd][2] = wall;
 			mesh = wall->FindComponentByClass<UStaticMeshComponent>();
 			dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -1848,6 +1853,7 @@ void Adcss::init(bool firstTime) {
 			wall = worldRef->SpawnActor<AActor>(wallTemplate->GetClass(), Location, Rotation, SpawnInfo);
 			wall->SetActorLocation(Location);
 			wall->SetActorHiddenInGame(true);
+			wall->SetActorEnableCollision(false);
 			wallArray[xInd][yInd][3] = wall;
 			mesh = wall->FindComponentByClass<UStaticMeshComponent>();
 			dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -1865,6 +1871,7 @@ void Adcss::init(bool firstTime) {
 		AActor* wall = worldRef->SpawnActor<AActor>(enemyTemplate->GetClass(), SpawnInfo);
 		wall->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 		wall->SetActorHiddenInGame(true);
+		wall->SetActorEnableCollision(false);
 		enemyArray[i] = wall;
 		UStaticMeshComponent* mesh = wall->FindComponentByClass<UStaticMeshComponent>();
 		UMaterialInstanceDynamic* dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -1880,6 +1887,7 @@ void Adcss::init(bool firstTime) {
 		AActor* wall = worldRef->SpawnActor<AActor>(itemTemplate->GetClass(), SpawnInfo);
 		wall->SetActorScale3D(FVector(0.3f*wallScaling, 0.3f*wallScaling, 1.0f));
 		wall->SetActorHiddenInGame(true);
+		wall->SetActorEnableCollision(false);
 		itemArray[i] = wall;
 		UStaticMeshComponent* mesh = wall->FindComponentByClass<UStaticMeshComponent>();
 		UMaterialInstanceDynamic* dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -1895,6 +1903,7 @@ void Adcss::init(bool firstTime) {
 		AActor* wall = worldRef->SpawnActor<AActor>(effectTemplate->GetClass(), SpawnInfo);
 		wall->SetActorScale3D(FVector(0.66f*wallScaling, 0.66f*wallScaling, 1.0f));
 		wall->SetActorHiddenInGame(true);
+		wall->SetActorEnableCollision(false);
 		effectArray[i] = wall;
 		UStaticMeshComponent* mesh = wall->FindComponentByClass<UStaticMeshComponent>();
 		UMaterialInstanceDynamic* dynamicMaterial = UMaterialInstanceDynamic::Create(mesh->GetMaterial(0), this);
@@ -2044,16 +2053,19 @@ void Adcss::updateLevel() {
 	enemyUseCount = 0;
 	for (int i = 0; i < maxEnemies; i++) {
 		enemyArray[i]->SetActorHiddenInGame(true);
+		enemyArray[i]->SetActorEnableCollision(false);
 		enemyArray[i]->SetActorLocation(FVector(-1000.0f, -1000.0f, -1000.0f));
 	}
 	itemUseCount = 0;
 	for (int i = 0; i < maxItems; i++) {
 		itemArray[i]->SetActorHiddenInGame(true);
+		itemArray[i]->SetActorEnableCollision(false);
 		itemArray[i]->SetActorLocation(FVector(-1000.0f, -1000.0f, -1000.0f));
 	}
 	effectUseCount = 0;
 	for (int i = 0; i < maxEffects; i++) {
 		effectArray[i]->SetActorHiddenInGame(true);
+		effectArray[i]->SetActorEnableCollision(false);
 		effectArray[i]->SetActorLocation(FVector(-1000.0f, -1000.0f, -1000.0f));
 	}
 
@@ -2114,12 +2126,12 @@ void Adcss::updateLevel() {
 			AActor* wallEast = wallArray[i][j][2];
 			AActor* wallWest = wallArray[i][j][3];
 			wallNorth->SetActorHiddenInGame(true);
-			wallSouth->SetActorHiddenInGame(true);
-			wallEast->SetActorHiddenInGame(true);
-			wallWest->SetActorHiddenInGame(true);
 			wallNorth->SetActorEnableCollision(false);
+			wallSouth->SetActorHiddenInGame(true);
 			wallSouth->SetActorEnableCollision(false);
+			wallEast->SetActorHiddenInGame(true);
 			wallEast->SetActorEnableCollision(false);
+			wallWest->SetActorHiddenInGame(true);
 			wallWest->SetActorEnableCollision(false);
 			meshNameToThing.Add(wallNorth->GetName(), SelectedThing(j, i, "Wall", 0, ""));
 			meshNameToThing.Add(wallSouth->GetName(), SelectedThing(j, i, "Wall", 1, ""));
@@ -2143,6 +2155,7 @@ void Adcss::updateLevel() {
 			UMaterialInstanceDynamic* material = (UMaterialInstanceDynamic*)mesh->GetMaterial(0);
 			material->SetTextureParameterValue("TextureImage", texture);
 			floor->SetActorHiddenInGame(false);
+			floor->SetActorEnableCollision(true);
 			meshNameToThing.Add(floor->GetName(), SelectedThing(j, i, "Floor", 0, ""));
 
 			// If we have an effect
@@ -2153,6 +2166,7 @@ void Adcss::updateLevel() {
 
 					// Set up the effect
 					effectArray[effectUseCount]->SetActorHiddenInGame(false);
+					effectArray[effectUseCount]->SetActorEnableCollision(false);
 					FVector effectLocation = FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 3.0f);
 					effectArray[effectUseCount]->SetActorLocation(effectLocation);
 					UStaticMeshComponent* effectMesh = effectArray[effectUseCount]->FindComponentByClass<UStaticMeshComponent>();
@@ -2167,9 +2181,6 @@ void Adcss::updateLevel() {
 					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)effectMesh->GetMaterial(0);
 					material2->SetTextureParameterValue("TextureImage", texture2);
 					material2->SetScalarParameterValue("Transparency", 0.3f);
-
-					// No collision
-					effectArray[effectUseCount]->SetActorEnableCollision(false);
 
 					// Move slightly away from the player for easier selecting of other stuff
 					FVector deltaLoc = effectLocation;
@@ -2194,12 +2205,12 @@ void Adcss::updateLevel() {
 				float yLoc = floorHeight * (j - LOS);
 				float zLoc = wallWidth / 2.0f;
 				wallNorth->SetActorHiddenInGame(false);
-				wallSouth->SetActorHiddenInGame(false);
-				wallEast->SetActorHiddenInGame(false);
-				wallWest->SetActorHiddenInGame(false);
 				wallNorth->SetActorEnableCollision(true);
+				wallSouth->SetActorHiddenInGame(false);
 				wallSouth->SetActorEnableCollision(true);
+				wallEast->SetActorHiddenInGame(false);
 				wallEast->SetActorEnableCollision(true);
+				wallWest->SetActorHiddenInGame(false);
 				wallWest->SetActorEnableCollision(true);
 				wallNorth->SetActorLocation(FVector(xLoc + wallWidth / 2, yLoc, zLoc));
 				wallSouth->SetActorLocation(FVector(xLoc - wallWidth / 2, yLoc, zLoc));
@@ -2261,6 +2272,7 @@ void Adcss::updateLevel() {
 					wallWest->SetActorRotation(FRotator(0.0f, 315.0f, 90.0f));
 					wallEast->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
 					wallNorth->SetActorHiddenInGame(true);
+					wallNorth->SetActorEnableCollision(false);
 
 				//  .
 				// .##
@@ -2273,6 +2285,7 @@ void Adcss::updateLevel() {
 					wallNorth->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
 					wallSouth->SetActorRotation(FRotator(0.0f, 135.0f, 90.0f));
 					wallWest->SetActorHiddenInGame(true);
+					wallWest->SetActorEnableCollision(false);
 
 				//  #
 				// .#.
@@ -2285,6 +2298,7 @@ void Adcss::updateLevel() {
 					wallWest->SetActorRotation(FRotator(0.0f, 135.0f, 90.0f));
 					wallEast->SetActorRotation(FRotator(0.0f, 45.0f, 90.0f));
 					wallSouth->SetActorHiddenInGame(true);
+					wallSouth->SetActorEnableCollision(false);
 
 				//  .
 				// ##.
@@ -2297,6 +2311,7 @@ void Adcss::updateLevel() {
 					wallNorth->SetActorRotation(FRotator(0.0f, 45.0f, 90.0f));
 					wallSouth->SetActorRotation(FRotator(0.0f, 315.0f, 90.0f));
 					wallEast->SetActorHiddenInGame(true);
+					wallEast->SetActorEnableCollision(false);
 
 				// . #
 				//   .
@@ -2305,7 +2320,9 @@ void Adcss::updateLevel() {
 					wallSouth->SetActorRotation(FRotator(0.0f, 135.0f, 90.0f));
 					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
 					wallSouth->SetActorHiddenInGame(false);
+					wallSouth->SetActorEnableCollision(true);
 					wallWest->SetActorHiddenInGame(true);
+					wallWest->SetActorEnableCollision(false);
 
 				// # .
 				// .  
@@ -2314,7 +2331,9 @@ void Adcss::updateLevel() {
 					wallSouth->SetActorRotation(FRotator(0.0f, 45.0f, 90.0f));
 					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
 					wallSouth->SetActorHiddenInGame(false);
+					wallSouth->SetActorEnableCollision(true);
 					wallEast->SetActorHiddenInGame(true);
+					wallEast->SetActorEnableCollision(false);
 
 				// . 
 				// # .
@@ -2323,7 +2342,9 @@ void Adcss::updateLevel() {
 					wallNorth->SetActorRotation(FRotator(0.0f, 315.0f, 90.0f));
 					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
 					wallNorth->SetActorHiddenInGame(false);
+					wallNorth->SetActorEnableCollision(true);
 					wallEast->SetActorHiddenInGame(true);
+					wallEast->SetActorEnableCollision(false);
 
 
 				//   .
@@ -2333,14 +2354,19 @@ void Adcss::updateLevel() {
 					wallNorth->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
 					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
 					wallWest->SetActorHiddenInGame(true);
+					wallWest->SetActorEnableCollision(false);
 				}
 
 			// If it's a door
 			} else if (ascii == TEXT("+") || ascii == TEXT("'")) {
 				wallNorth->SetActorHiddenInGame(false);
+				wallNorth->SetActorEnableCollision(true);
 				wallSouth->SetActorHiddenInGame(false);
+				wallSouth->SetActorEnableCollision(true);
 				wallEast->SetActorHiddenInGame(true);
+				wallEast->SetActorEnableCollision(false);
 				wallWest->SetActorHiddenInGame(true);
+				wallWest->SetActorEnableCollision(false);
 				UE_LOG(LogTemp, Display, TEXT("Door at (%d, %d)"), i, j);
 				wallNorth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), wallWidth / 2.0f));;
 				wallSouth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight* (j - LOS), wallWidth / 2.0f));
@@ -2421,6 +2447,7 @@ void Adcss::updateLevel() {
 				// Add an enemy
 				if (enemyUseCount < maxEnemies) {
 					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
+					enemyArray[enemyUseCount]->SetActorEnableCollision(true);
 					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + 1, floorHeight * (j - LOS) + 1, floorWidth / 4.0f));
 					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
                     if (ascii == TEXT("P")) {
@@ -2444,6 +2471,7 @@ void Adcss::updateLevel() {
 				// Create an enemy to act as a ladder
 				if (enemyUseCount < maxEnemies) {
 					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
+					enemyArray[enemyUseCount]->SetActorEnableCollision(true);
 					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 5.0f));
 					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
 					UTexture2D* texture2 = getTexture("LadderDown");
@@ -2461,6 +2489,7 @@ void Adcss::updateLevel() {
 				// Create an enemy to act as a ladder
 				if (enemyUseCount < maxEnemies) {
 					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
+					enemyArray[enemyUseCount]->SetActorEnableCollision(true);
 					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorWidth / 1.0f));
 					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
 					UTexture2D* texture2 = getTexture("LadderUp");
@@ -2482,6 +2511,7 @@ void Adcss::updateLevel() {
 
 					// Set up the enemy
 					enemyArray[enemyUseCount]->SetActorHiddenInGame(false);
+					enemyArray[enemyUseCount]->SetActorEnableCollision(true);
 					enemyArray[enemyUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + 1, floorHeight * (j - LOS) + 1, floorWidth / 3.0f));
 					UStaticMeshComponent* enemyMesh = enemyArray[enemyUseCount]->FindComponentByClass<UStaticMeshComponent>();
 					meshNameToThing.Add(enemyArray[enemyUseCount]->GetName(), SelectedThing(j, i, "Enemy", 0, ""));
@@ -2509,6 +2539,7 @@ void Adcss::updateLevel() {
 
 						// Setup the item
 						itemArray[itemUseCount]->SetActorHiddenInGame(false);
+						itemArray[itemUseCount]->SetActorEnableCollision(true);
 						FVector itemDelta = itemLocs[levelInfo[i][j].items.Num()][k];
 						itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS) + itemDelta.X, floorHeight * (j - LOS) + itemDelta.Y, itemDelta.Z));
 						UStaticMeshComponent* itemMesh = itemArray[itemUseCount]->FindComponentByClass<UStaticMeshComponent>();
@@ -2763,7 +2794,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// Main menu button
 		if (selected.thingIs == "ButtonMainMenu") {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu button clicked"));
-			needMenu = true;
+
+			// needMenu = true;
 			refToUIActor->SetActorHiddenInGame(true);
 			refToUIActor->SetActorEnableCollision(false);
 			refToTutorialActor->SetActorHiddenInGame(true);
@@ -2778,39 +2810,20 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// If it's the process, close it
 			if (!useServer) {
-				UE_LOG(LogTemp, Display, TEXT("INPUT - Closing process"));
-				writeCommandQueued("escape");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
-				writeCommandQueued("escape");
-				writeCommandQueued("CLOSEPROCESS");
+				writeCommandQueued("RESET");
 
 			// If it's the server, just go back to the menu
 			} else {
-				writeCommandQueued("escape");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 				writeCommandQueued("enter");
 				writeCommandQueued("exit");
+				writeCommandQueued("RESET");
 			}
-
-			// Remove all the actors
-			for (int i = 0; i < maxEnemies; i++) {
-				enemyArray[i]->Destroy();
-			}
-			for (int i = 0; i < maxItems; i++) {
-				itemArray[i]->Destroy();
-			}
-			for (int i = 0; i < gridWidth; i++) {
-				for (int j = 0; j < gridWidth; j++) {
-					wallArray[i][j][0]->Destroy();
-					wallArray[i][j][1]->Destroy();
-					wallArray[i][j][2]->Destroy();
-					wallArray[i][j][3]->Destroy();
-					floorArray[i][j]->Destroy();
-				}
-			}
-
-			// Start everything up again
-			init(false);
 
 		// Debug buttons
 		} else if (selected.thingIs.Contains(TEXT("Debug"))) {
@@ -3708,6 +3721,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			if (letter == TEXT("") || !inventoryLetterToName.Contains(letter)) {
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Item not valid"));
 				refToDescriptionActor->SetActorHiddenInGame(true);
+				refToDescriptionActor->SetActorEnableCollision(false);
 				thingBeingDragged = SelectedThing();
 				return;
 			}
@@ -3769,7 +3783,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 			bool twoUniqueRings = leftFound.Len() > 0 && rightFound.Len() > 0 && leftFound != rightFound;
 
-			// Disable wand of digging for now TODO
+			// Disable wand of digging for now
 			if (useType == "v" && itemName.Contains(TEXT("digging"))) {
 				return;
 			}
@@ -3790,7 +3804,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(">");
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
-			} else if (isEvokableWithTarget) { // TODO
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
+			} else if (isEvokableWithTarget) {
 				int x = selected.x;
 				int y = selected.y;
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used an evokable with target"));
@@ -3817,6 +3833,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					}
 				}
 				writeCommandQueued("enter");
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 			} else if (isScroll) {
 				justUsedAScroll = true;
 				locForBlink = FIntVector2(selected.x, selected.y);
@@ -3829,10 +3847,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
    			// Reset some things if we used the item
 			if (inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x] == TEXT("") || useType == "q" || isScroll) {
 				refToDescriptionActor->SetActorHiddenInGame(true);
+				refToDescriptionActor->SetActorEnableCollision(false);
 				thingBeingDragged = SelectedThing();
 			}
 
-			// We may have just equipped something TODO
+			// We may have just equipped something
 			if (useType == "w") {
 				equippedInfo.name = inventoryLetterToName[letter];
 				equippedInfo.type = thingBeingDragged.thingIs;
@@ -3888,6 +3907,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Reset some things
 			refToDescriptionActor->SetActorHiddenInGame(true);
+			refToDescriptionActor->SetActorEnableCollision(false);
 			thingBeingDragged = SelectedThing();
 
 		// If we're holding a spell, use it
@@ -4378,8 +4398,15 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 						// Write the seed
 						UE_LOG(LogTemp, Display, TEXT("Putting seed: %s"), *currentSeed);
-						for (int i = 0; i < currentSeed.Len(); i++) {
-							writeCommandQueued(currentSeed.Mid(i, 1));
+						int seedAsInt = 0;
+						for (int i = 0; i < FMath::Min(currentSeed.Len(), 20); i++) {
+							seedAsInt += int(currentSeed[i]) * FMath::Pow(2.0, i);
+						}
+						FString seedAsIntAsString = FString::FromInt(seedAsInt);
+						UE_LOG(LogTemp, Display, TEXT("Converted seed to: %s"), *seedAsIntAsString);
+						writeCommandQueued("-");
+						for (int i = 0; i < seedAsIntAsString.Len(); i++) {
+							writeCommandQueued(seedAsIntAsString.Mid(i, 1));
 						}
 
 						// Start the run
@@ -4422,7 +4449,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 			}
 
-		// If clicking on a monster and we have a spear equipped TODO
+		// If clicking on a monster and we have a spear equipped
 		} else if (selected.thingIs == "Enemy" && (rightText.Contains(TEXT("spear")) || leftText.Contains(TEXT("spear")))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Enemy clicked whilst holding spear"));
 
@@ -4742,6 +4769,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				} else if (selected.y > LOS) {
 					writeCommandQueued("j");
 				}
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 			}
 		}
 
@@ -4791,6 +4820,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 					}
 					refToDescriptionActor->SetActorHiddenInGame(false);
+					refToDescriptionActor->SetActorEnableCollision(false);
 
 				}
 
@@ -4835,6 +4865,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					}
 				}
 				refToDescriptionActor->SetActorHiddenInGame(false);
+				refToDescriptionActor->SetActorEnableCollision(false);
 
 			}
 
@@ -4921,6 +4952,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 					}
 					refToDescriptionActor->SetActorHiddenInGame(false);
+					refToDescriptionActor->SetActorEnableCollision(false);
 				}
 
 			}
@@ -4965,6 +4997,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 					}
 					refToDescriptionActor->SetActorHiddenInGame(false);
+					refToDescriptionActor->SetActorEnableCollision(false);
 
 				}
 			}
@@ -5032,6 +5065,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						}
 					}
 					refToDescriptionActor->SetActorHiddenInGame(false);
+					refToDescriptionActor->SetActorEnableCollision(false);
 
 				}
 			}
@@ -5115,6 +5149,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							}
 						}
 						refToDescriptionActor->SetActorHiddenInGame(false);
+						refToDescriptionActor->SetActorEnableCollision(false);
 					}
 
 				}
@@ -5161,6 +5196,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					}
 				}
 				refToDescriptionActor->SetActorHiddenInGame(false);
+				refToDescriptionActor->SetActorEnableCollision(false);
 
 			}
 
@@ -5191,6 +5227,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 			refToDescriptionActor->SetActorHiddenInGame(false);
+			refToDescriptionActor->SetActorEnableCollision(false);
 
 		// Describing something
 		} else if (selected.x != -1 && selected.y != -1 && selected.thingIs != TEXT("Floor") && selected.thingIs != TEXT("Effect")) {
@@ -5249,6 +5286,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 			}
 			refToDescriptionActor->SetActorHiddenInGame(false);
+			refToDescriptionActor->SetActorEnableCollision(false);
 		}
 
 	} else if (key == "rmbUp") {
@@ -5448,14 +5486,14 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		targetingRange = -1;
 		draggingInventory = false;
 		refToDescriptionActor->SetActorHiddenInGame(true);
+		refToDescriptionActor->SetActorEnableCollision(false);
 		thingBeingDragged = SelectedThing();
 
 	// The debug key
 	} else if (key == "debug") {
-
-		// show everything
 		writeCommandQueued("ctrl-X");
 
+	// Otherwise just do that key
 	} else {
 		writeCommandQueued(key);
 	}
@@ -5627,6 +5665,7 @@ void Adcss::Tick(float DeltaTime) {
 	
 	// Checking what the player is looking at
 	refToNameTagActor->SetActorHiddenInGame(true);
+	refToNameTagActor->SetActorEnableCollision(false);
 	FVector Start = playerLocation;
 	FVector End = Start + playerForward * 3000.0f;
 	if (vrEnabled) {
@@ -6589,6 +6628,23 @@ void Adcss::Tick(float DeltaTime) {
 			UE_LOG(LogTemp, Display, TEXT("Clearing spells"));
 			spellLetters.Empty();
 			spellLetterToInfo.Empty();
+		} else if (command == "RESET") {
+			for (int i = 0; i < maxEnemies; i++) {
+				enemyArray[i]->Destroy();
+			}
+			for (int i = 0; i < maxItems; i++) {
+				itemArray[i]->Destroy();
+			}
+			for (int i = 0; i < gridWidth; i++) {
+				for (int j = 0; j < gridWidth; j++) {
+					wallArray[i][j][0]->Destroy();
+					wallArray[i][j][1]->Destroy();
+					wallArray[i][j][2]->Destroy();
+					wallArray[i][j][3]->Destroy();
+					floorArray[i][j]->Destroy();
+				}
+			}
+			init(false);
 		} else if (command == "CLOSEPROCESS") {
 			if (!useServer) {
 				FPlatformProcess::Sleep(1.0f);
@@ -6597,6 +6653,12 @@ void Adcss::Tick(float DeltaTime) {
 				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
 			}
 		} else if (command == "SHUTDOWN") {
+			if (!useServer) {
+				FPlatformProcess::Sleep(1.0f);
+				FPlatformProcess::TerminateProc(ProcHandle, true);
+				FPlatformProcess::ClosePipe(StdInReadHandle, StdInWriteHandle);
+				FPlatformProcess::ClosePipe(StdOutReadHandle, StdOutWriteHandle);
+			}
 			TEnumAsByte<EQuitPreference::Type> QuitPreference = EQuitPreference::Quit;
 			UKismetSystemLibrary::QuitGame(worldRef, UGameplayStatics::GetPlayerController(worldRef, 0), QuitPreference, true);	
 		} else if (command == "SKIP") {
@@ -7834,7 +7896,7 @@ void Adcss::Tick(float DeltaTime) {
 					currentUsage = TEXT("Press USE whilst HELD to equip/unequip.\nRELEASE onto a slot or the floor to move it.");
 					targetingRange = 0;
 					bool forceTargeting = false;
-					for (int i = 0; i < charArray.Num(); i++) { // TODO
+					for (int i = 0; i < charArray.Num(); i++) {
 						if (charArray[i].Contains(TEXT("phial"))
 							|| charArray[i].Contains(TEXT("phantom mirror"))
 							|| charArray[i].Contains(TEXT("wand of"))
