@@ -1,9 +1,9 @@
 type = normal
-name = Viaptikk
-species = Spriggan
-background = Monk
-weapon = falchion
-game_seed = 20250802
+name = Test
+species = Demonspawn
+background = Fighter
+weapon = long sword
+game_seed = 1674
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

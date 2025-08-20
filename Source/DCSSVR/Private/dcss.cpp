@@ -1255,6 +1255,7 @@ void Adcss::init(bool firstTime) {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=(here) ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=trap ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=arch ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=tree ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=idol ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=statue ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=fountain ");
@@ -6824,11 +6825,11 @@ void Adcss::Tick(float DeltaTime) {
 			// If we need to press enter to read the rest
 			if (extracted.Contains(TEXT("--more--"))) {
 				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
 			}
 
 			// If we have died
 			if (extracted.Contains(TEXT("You die..."))) {
-				writeCommandQueued(TEXT("enter"));
 				writeCommandQueued(TEXT("enter"));
 				writeCommandQueued(TEXT("enter"));
 				writeCommandQueued(TEXT("escape"));
@@ -7126,6 +7127,8 @@ void Adcss::Tick(float DeltaTime) {
 				refToInventoryActor->SetActorEnableCollision(false);
 				refToUIActor->SetActorHiddenInGame(true);
 				refToUIActor->SetActorEnableCollision(false);
+				refToDescriptionActor->SetActorHiddenInGame(true);
+				refToDescriptionActor->SetActorEnableCollision(false);
 
 			}
 
