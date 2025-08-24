@@ -1,9 +1,9 @@
 type = normal
-name = Test
-species = Demonspawn
+name = Utoigaf
+species = Draconian
 background = Fighter
-weapon = long sword
-game_seed = 1674
+weapon = flail
+game_seed = 575072
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

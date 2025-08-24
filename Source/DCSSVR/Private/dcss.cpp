@@ -3,10 +3,10 @@ FString version = TEXT("0.1");
 
 // 0.1 Initial Release
 // Things that are disabled because they're quite different: 
-//    - Race: coglin 
-//    - Item: wand of digging 
-//    - God: Nemelex
-// Everything should should work as expected
+//    - Playing as a Coglin 
+//    - Using a wand of digging 
+//    - Worshipping Nemelex
+// Everything should should work as expected, but probably it won't
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
@@ -120,7 +120,6 @@ int currentHP;
 int maxHP;
 int currentMP;
 int maxMP;
-bool inMainMenu;
 FString fullName;
 UWorld* worldRef;
 FString leftText;
@@ -1267,7 +1266,7 @@ void Adcss::init(bool firstTime) {
 	args += TEXT(" -extra-opt-first reduce_animations=true ");
 	args += TEXT(" -extra-opt-first force_spell_targeter=all ");
 	args += TEXT(" -extra-opt-first force_ability_targeter=all ");
-	args += TEXT(" -extra-opt-first default_autopickup=false ");
+	// args += TEXT(" -extra-opt-first default_autopickup=false ");
 	args += TEXT(" -extra-opt-first fail_severity_to_confirm=0 ");
 	args += TEXT(" -extra-opt-first wiz_mode=yes ");
 	args += TEXT(" -extra-opt-first char_set=ascii ");
@@ -1293,7 +1292,6 @@ void Adcss::init(bool firstTime) {
 	inventoryRelRot = FRotator(0.0f, -90.0f, 0.0f);
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
 	halfDiagWallScaling = sqrt(0.5 * wallScaling * wallScaling);
-	inMainMenu = true;
 	thingsThatCountAsWalls = "#+' ";
 	thingsThatCountAsDoors = "+'";
 	thingsThatCountAsItems = "()|%[?O:/}!=\"";
@@ -2200,8 +2198,8 @@ void Adcss::updateLevel() {
 
 			}
 
-			// If the ascii character is a wall
-			if (ascii == TEXT("#")) {
+			// If the ascii character is a wall TODO transparent
+			if (ascii == TEXT("#") || ascii == TEXT("##")) {
 				float xLoc = -floorWidth * (i - LOS);
 				float yLoc = floorHeight * (j - LOS);
 				float zLoc = wallWidth / 2.0f;
@@ -2233,6 +2231,9 @@ void Adcss::updateLevel() {
 				if (currentBranch == "Abyss") {
 					int randNum = FMath::Abs((i + j) % 6);
 					texture2 = getTexture("WallAbyss" + FString::FromInt(randNum));
+				}
+				if (ascii == TEXT("##")) {
+					texture2 = getTexture("WallGlass");
 				}
 				UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)wallMeshNorth->GetMaterial(0);
 				material2->SetTextureParameterValue("TextureImage", texture2);
@@ -2361,16 +2362,17 @@ void Adcss::updateLevel() {
 			// If it's a door
 			} else if (ascii == TEXT("+") || ascii == TEXT("'")) {
 				wallNorth->SetActorHiddenInGame(false);
-				wallNorth->SetActorEnableCollision(true);
+				wallNorth->SetActorEnableCollision(false);
 				wallSouth->SetActorHiddenInGame(false);
-				wallSouth->SetActorEnableCollision(true);
-				wallEast->SetActorHiddenInGame(true);
+				wallSouth->SetActorEnableCollision(false);
+				wallEast->SetActorHiddenInGame(false);
 				wallEast->SetActorEnableCollision(false);
-				wallWest->SetActorHiddenInGame(true);
+				wallWest->SetActorHiddenInGame(false);
 				wallWest->SetActorEnableCollision(false);
-				UE_LOG(LogTemp, Display, TEXT("Door at (%d, %d)"), i, j);
-				wallNorth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), wallWidth / 2.0f));;
+				wallNorth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), wallWidth / 2.0f));
 				wallSouth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight* (j - LOS), wallWidth / 2.0f));
+				wallNorth->SetActorScale3D(FVector(wallScaling, wallScaling, 1.0f));
+				wallSouth->SetActorScale3D(FVector(wallScaling, wallScaling, 1.0f));
 				UStaticMeshComponent* wallMeshNorth = wallNorth->FindComponentByClass<UStaticMeshComponent>();
 				UStaticMeshComponent* wallMeshSouth = wallSouth->FindComponentByClass<UStaticMeshComponent>();
 
@@ -2441,6 +2443,7 @@ void Adcss::updateLevel() {
 				material2->SetTextureParameterValue("TextureImage", texture2);
 				material2 = (UMaterialInstanceDynamic*)wallMeshSouth->GetMaterial(0);
 				material2->SetTextureParameterValue("TextureImage", texture2);
+				UE_LOG(LogTemp, Display, TEXT("Door at (%d, %d), type %s"), i, j, *matName);
 
 			// If it's a plant
             } else if (levelInfo[i][j].enemy.Len() == 0 && (ascii == TEXT("P") || ascii == TEXT("7")  || ascii == TEXT("c") || ascii == TEXT("C"))) {
@@ -3749,12 +3752,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				isEvokableWithTarget = true;
 			} else if (currentDescription.Contains(TEXT("(weapon)"))) {
 				useType = "u";
-			} else if (currentDescription.Contains(TEXT(" scroll ")) || currentDescription.Contains(TEXT(" scrolls "))) {
+			} else if (currentDescription.Contains(TEXT("scroll ")) || currentDescription.Contains(TEXT(" scroll")) || currentDescription.Contains(TEXT("scrolls "))) {
 				useType = "r";
 				isScroll = true;
-			} else if (currentDescription.Contains(TEXT(" potion ")) || currentDescription.Contains(TEXT(" potions "))) {
+			} else if (currentDescription.Contains(TEXT(" potion")) || currentDescription.Contains(TEXT("potions ")) || currentDescription.Contains(TEXT("potion "))) {
 				useType = "q";
-			} else if (currentDescription.Contains(TEXT(" ring "))) {
+			} else if (currentDescription.Contains(TEXT(" ring")) || currentDescription.Contains(TEXT("ring "))) {
 				isRing = true;
 				if (currentDescription.Contains(TEXT("(left hand)")) || currentDescription.Contains(TEXT("(right hand)"))) {
 					useType = "r";
@@ -5375,6 +5378,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				equippedInfo.name = inventoryLetterToName[letter];
 				equippedInfo.type = thingBeingDragged.thingIs;
 				equippedInfo.letter = letter;
+				shouldRedrawHotbar = true;
 
 			// If it's an ability
 			} else if (thingBeingDragged.thingIs == "Ability") {
@@ -5394,6 +5398,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				equippedInfo.type = thingBeingDragged.thingIs;
 				equippedInfo.letter = letter;
 				equippedInfo.name = abilityLetterToInfo[letter].name;
+				shouldRedrawHotbar = true;
 
 				// Quiver the thing
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Quivering ability via drag onto equip slot %s"), *abilityLetterToInfo[abilityLetters[thingBeingDragged.thingIndex]].name);
@@ -5419,6 +5424,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				equippedInfo.type = thingBeingDragged.thingIs;
 				equippedInfo.letter = letter;
 				equippedInfo.name = spellLetterToInfo[letter].name;
+				shouldRedrawHotbar = true;
 
 				// Quiver the thing
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Quivering spell via drag onto equip slot %s"), *spellLetterToInfo[spellLetters[thingBeingDragged.thingIndex]].name);
@@ -5680,7 +5686,7 @@ void Adcss::Tick(float DeltaTime) {
 		selected = SelectedThing();
 	}
 	FCollisionResponseParams CollRes;
-	if (!inMainMenu && worldRef->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, COQP, CollRes)) {
+	if (!isMenu && worldRef->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, COQP, CollRes)) {
 		if (HitResult.bBlockingHit) {
 			AActor* hitActor = HitResult.GetActor();
 			if (hitActor != nullptr) {
@@ -6897,7 +6903,6 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 			if (hasSaves) {
-				inMainMenu = true;
 
 				// We have started
 				if (!crawlHasStarted) {
@@ -6992,8 +6997,6 @@ void Adcss::Tick(float DeltaTime) {
 					}
 				}
 
-			} else {
-				inMainMenu = false;
 			}
 
 			// If we just used a scroll and it's asking us where to blink to
@@ -8261,6 +8264,23 @@ void Adcss::Tick(float DeltaTime) {
 						}
 					}
 
+					// If there's an equipped weapon and our equip info is empty
+					if (equippedInfo.name.Len() == 0) {
+						FString letter = TEXT("");
+						for (auto& Elem : inventoryLetterToName) {
+							if (Elem.Value.Contains(TEXT("(weapon)"))) {
+								letter = Elem.Key;
+								break;
+							}
+						}
+						if (letter.Len() != 0) {
+							equippedInfo.name = inventoryLetterToName[letter];
+							equippedInfo.type = "InventoryItem";
+							equippedInfo.letter = letter;
+							shouldRedrawHotbar = true;
+						}
+					}
+
 					// We should redraw
 					shouldRedrawInventory = true;
 					shouldRedrawHotbar = true;
@@ -8623,6 +8643,11 @@ void Adcss::Tick(float DeltaTime) {
 								// Closed door
 								} else if (description.Contains(TEXT("closed door"))) {
 									levelInfo[yCoord][xCoord].currentChar = TEXT("+");
+									levelInfo[yCoord][xCoord].floorChar = TEXT(".");
+
+								// Translucent wall
+								} else if (description.Contains(TEXT("translucent"))) {
+									levelInfo[yCoord][xCoord].currentChar = TEXT("##");
 									levelInfo[yCoord][xCoord].floorChar = TEXT(".");
 
 								// Stairs down
