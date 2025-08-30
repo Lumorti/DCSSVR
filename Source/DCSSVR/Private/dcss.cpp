@@ -353,6 +353,11 @@ void Adcss::writeCommandQueued(FString input) {
 // Toggle the inventory open/closed
 void Adcss::toggleInventory() {
 
+	// If in a menu, don't do anything
+	if (isMenu) {
+		return;
+	}
+
 	// Toggle it
 	inventoryOpen = !inventoryOpen;
 	if (refToInventoryActor != nullptr) {
@@ -393,6 +398,7 @@ void Adcss::toggleInventory() {
 			selected.thingIs = "OpenButton";
 		}
 	}
+
 }
 
 // From https://dev.epicgames.com/community/learning/tutorials/R6rv/unreal-engine-upload-an-image-using-http-post-request-c
@@ -2198,7 +2204,7 @@ void Adcss::updateLevel() {
 
 			}
 
-			// If the ascii character is a wall TODO transparent
+			// If the ascii character is a wall
 			if (ascii == TEXT("#") || ascii == TEXT("##")) {
 				float xLoc = -floorWidth * (i - LOS);
 				float yLoc = floorHeight * (j - LOS);
@@ -2365,9 +2371,9 @@ void Adcss::updateLevel() {
 				wallNorth->SetActorEnableCollision(false);
 				wallSouth->SetActorHiddenInGame(false);
 				wallSouth->SetActorEnableCollision(false);
-				wallEast->SetActorHiddenInGame(false);
+				wallEast->SetActorHiddenInGame(true);
 				wallEast->SetActorEnableCollision(false);
-				wallWest->SetActorHiddenInGame(false);
+				wallWest->SetActorHiddenInGame(true);
 				wallWest->SetActorEnableCollision(false);
 				wallNorth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), wallWidth / 2.0f));
 				wallSouth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight* (j - LOS), wallWidth / 2.0f));
@@ -2560,7 +2566,11 @@ void Adcss::updateLevel() {
 						|| levelInfo[i][j].items[k].Contains(TEXT(" boutique")) 
 						|| levelInfo[i][j].items[k].Contains(TEXT(" antiques")) 
 						|| levelInfo[i][j].items[k].Contains(TEXT(" store"))) {
-							typeName = "Shop";
+							if (levelInfo[i][j].items[k].Contains(TEXT("Abandoned"))) {
+								typeName = "AbandonedShop";
+							} else {
+								typeName = "Shop";
+							}
 						}
 						meshNameToThing.Add(itemArray[itemUseCount]->GetName(), SelectedThing(j, i, typeName, k, ""));
 
@@ -2594,7 +2604,7 @@ void Adcss::updateLevel() {
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.33f));
 						
 						// Altars and shop are a bit bigger
-						} else if (typeName == "Altar" || typeName == "Shop") {
+						} else if (typeName == "Altar" || typeName.Contains("Shop")) {
 							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 90.0f));
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.6f*wallScaling, 0.6f*wallScaling, 1.0f));
 							itemArray[itemUseCount]->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), floorHeight*0.3f));
@@ -2799,7 +2809,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		if (selected.thingIs == "ButtonMainMenu") {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu button clicked"));
 
-			// needMenu = true;
+			// Hide everything
 			refToUIActor->SetActorHiddenInGame(true);
 			refToUIActor->SetActorEnableCollision(false);
 			refToTutorialActor->SetActorHiddenInGame(true);
@@ -2812,22 +2822,32 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			refToMainInfoActor->SetActorEnableCollision(true);
 			inventoryOpen = false;
 
-			// If it's the process, close it
-			if (!useServer) {
-				writeCommandQueued("enter");
-				writeCommandQueued("enter");
-				writeCommandQueued("enter");
-				writeCommandQueued("exit");
-				writeCommandQueued("RESET");
+			// Send the commands to return to the menu
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
+			writeCommandQueued("exit");
+			writeCommandQueued("RESET");
 
-			// If it's the server, just go back to the menu
-			} else {
-				writeCommandQueued("enter");
-				writeCommandQueued("enter");
-				writeCommandQueued("enter");
-				writeCommandQueued("exit");
-				writeCommandQueued("RESET");
-			}
+		// Main menu button from the death screen
+		} else if (selected.thingIs == "ButtonMainMenuDeath") {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Main menu from death button clicked"));
+
+			// Hide everything
+			refToUIActor->SetActorHiddenInGame(true);
+			refToUIActor->SetActorEnableCollision(false);
+			refToTutorialActor->SetActorHiddenInGame(true);
+			refToTutorialActor->SetActorEnableCollision(false);
+			refToInventoryActor->SetActorHiddenInGame(true);
+			refToInventoryActor->SetActorEnableCollision(false);
+			refToMainMenuActor->SetActorHiddenInGame(false);
+			refToMainMenuActor->SetActorEnableCollision(true);
+			refToMainInfoActor->SetActorHiddenInGame(false);
+			refToMainInfoActor->SetActorEnableCollision(true);
+			inventoryOpen = false;
+
+			// Send the commands to return to the menu
+			writeCommandQueued("RESET");
 
 		// Debug buttons
 		} else if (selected.thingIs.Contains(TEXT("Debug"))) {
@@ -3561,7 +3581,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 		
 		// If it's an shop
-		} else if (thingBeingDragged.thingIs.Contains(TEXT("Shop")) || selected.thingIs.Contains(TEXT("Shop"))) {
+		} else if (thingBeingDragged.thingIs == TEXT("Shop") || selected.thingIs == TEXT("Shop")) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Shop clicked: (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
 			showNextShop = true;
 			if (thingBeingDragged.x == LOS && thingBeingDragged.y == LOS) {
@@ -3752,6 +3772,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				isEvokableWithTarget = true;
 			} else if (currentDescription.Contains(TEXT("(weapon)"))) {
 				useType = "u";
+			} else if (currentDescription.Contains(TEXT("Base accuracy"))) {
+				useType = "w";
 			} else if (currentDescription.Contains(TEXT("scroll ")) || currentDescription.Contains(TEXT(" scroll")) || currentDescription.Contains(TEXT("scrolls "))) {
 				useType = "r";
 				isScroll = true;
@@ -4406,6 +4428,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						for (int i = 0; i < FMath::Min(currentSeed.Len(), 20); i++) {
 							seedAsInt += int(currentSeed[i]) * FMath::Pow(2.0, i);
 						}
+						if (currentSeed.Len() == 0 || currentSeed == defaultSeedText) {
+							seedAsInt = FMath::Rand() % 10000;
+						}
 						FString seedAsIntAsString = FString::FromInt(seedAsInt);
 						UE_LOG(LogTemp, Display, TEXT("Converted seed to: %s"), *seedAsIntAsString);
 						writeCommandQueued("-");
@@ -4454,7 +4479,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 		// If clicking on a monster and we have a spear equipped
-		} else if (selected.thingIs == "Enemy" && (rightText.Contains(TEXT("spear")) || leftText.Contains(TEXT("spear")))) {
+		} else if (selected.thingIs == "Enemy" && (
+			rightText.Contains(TEXT("spear")) || leftText.Contains(TEXT("spear")) || 
+			rightText.Contains(TEXT("halberd")) || leftText.Contains(TEXT("halberd"))
+		)) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Enemy clicked whilst holding spear"));
 
 			// Send the commands to target the clicked enemy
@@ -4547,6 +4575,16 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				}
 				shouldRedrawPassives = true;
 			}
+
+		// If clicking on the sleep button
+		} else if (selected.thingIs == "SleepButton") {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Sleep button clicked"));
+			writeCommandQueued("5");
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
+			writeCommandQueued("enter");
 
 		// If clicking on an inventory button
 		} else if (selected.thingIs.Contains(TEXT("Button")) && inventoryOpen) {
@@ -4755,7 +4793,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		} else if (!shiftOn) {
 			if (selected.x != -1 && selected.y != -1) {
 				if (selected.x == LOS && selected.y == LOS) {
-					writeCommandQueued("5");
+					writeCommandQueued(".");
 				} else if (selected.x < LOS && selected.y < LOS) {
 					writeCommandQueued("y");
 				} else if (selected.x > LOS && selected.y < LOS) {
@@ -5237,6 +5275,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		} else if (selected.x != -1 && selected.y != -1 && selected.thingIs != TEXT("Floor") && selected.thingIs != TEXT("Effect")) {
 
 			// Send the commands to get the description
+			bool found = true;
 			if (selected.thingIs == "Enemy") {
 				writeCommandQueued("SKIP");
 				writeCommandQueued("ctrl-X");
@@ -5269,28 +5308,33 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(levelInfo[selected.y][selected.x].itemHotkeys[selected.thingIndex]);
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
+			} else {
+				found = false;
 			}
 			thingBeingDragged = selected;
 
 			// Show the description
-			currentDescription = TEXT("");
-			currentUsage = TEXT("");
-			UWidgetComponent* WidgetComponentDesc = Cast<UWidgetComponent>(refToDescriptionActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-			if (WidgetComponentDesc != nullptr) {
-				UUserWidget* UserWidgetDesc = WidgetComponentDesc->GetUserWidgetObject();
-				if (UserWidgetDesc != nullptr) {
-					UTextBlock* TextBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Description")));
-					if (TextBox != nullptr) {
-						TextBox->SetText(FText::FromString(currentDescription));
-					}
-					UTextBlock* UsageBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Usage")));
-					if (UsageBox != nullptr) {
-						UsageBox->SetText(FText::FromString(currentUsage));
+			if (found) {
+				currentDescription = TEXT("");
+				currentUsage = TEXT("");
+				UWidgetComponent* WidgetComponentDesc = Cast<UWidgetComponent>(refToDescriptionActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+				if (WidgetComponentDesc != nullptr) {
+					UUserWidget* UserWidgetDesc = WidgetComponentDesc->GetUserWidgetObject();
+					if (UserWidgetDesc != nullptr) {
+						UTextBlock* TextBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Description")));
+						if (TextBox != nullptr) {
+							TextBox->SetText(FText::FromString(currentDescription));
+						}
+						UTextBlock* UsageBox = Cast<UTextBlock>(UserWidgetDesc->GetWidgetFromName(TEXT("Usage")));
+						if (UsageBox != nullptr) {
+							UsageBox->SetText(FText::FromString(currentUsage));
+						}
 					}
 				}
+				refToDescriptionActor->SetActorHiddenInGame(false);
+				refToDescriptionActor->SetActorEnableCollision(false);
 			}
-			refToDescriptionActor->SetActorHiddenInGame(false);
-			refToDescriptionActor->SetActorEnableCollision(false);
+
 		}
 
 	} else if (key == "rmbUp") {
@@ -5317,8 +5361,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// If we're selecting an item from the ground and dropping it into the inventory
 		} else if (thingBeingDragged.x == 8 && thingBeingDragged.y == 8 
 			      && thingBeingDragged.thingIs == "Item" 
-				  && selected.thingIs.Contains(TEXT("ItemButton"))
+				  && (selected.thingIs.Contains(TEXT("ItemButton")) || selected.thingIs == TEXT("Inventory"))
 				  && levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys.Num() > thingBeingDragged.thingIndex) {
+
+			// Get the letter of the item
 			FString letter = levelInfo[thingBeingDragged.y][thingBeingDragged.x].itemHotkeys[thingBeingDragged.thingIndex];
 			UE_LOG(LogTemp, Display, TEXT("Picking up item with letter %s"), *letter);
 			writeCommandQueued("SKIP");
@@ -5339,17 +5385,27 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("escape");
 
 			// Note the location so that it goes into the right spot
-			TArray<FString> parts;
-			selected.thingIs.ParseIntoArray(parts, TEXT("_"), true);
-			int32 row = FCString::Atoi(*parts[1])-1;
-			int32 col = FCString::Atoi(*parts[2])-1;
-			inventoryNextSpot = FIntVector2(row, col);
+			if (selected.thingIs.Contains(TEXT("ItemButton"))) {
+				TArray<FString> parts;
+				selected.thingIs.ParseIntoArray(parts, TEXT("_"), true);
+				int32 row = FCString::Atoi(*parts[1])-1;
+				int32 col = FCString::Atoi(*parts[2])-1;
+				inventoryNextSpot = FIntVector2(row, col);
+			} else {
+				inventoryNextSpot = FIntVector2(-1, -1);
+			}
 
 		// If dragging something onto one of the equipped slot
 		} else if ((thingBeingDragged.thingIs == "InventoryItem" || thingBeingDragged.thingIs == "Ability" || thingBeingDragged.thingIs == "Spell") && selected.thingIs.Contains(TEXT("EquippedButton"))) {
 
 			// If it's an inventory item
-			if (thingBeingDragged.thingIs == "InventoryItem") { 
+			if (thingBeingDragged.thingIs == "InventoryItem") {
+
+				// Make sure the location is valid
+				if (thingBeingDragged.x < 0 || thingBeingDragged.y < 0 || thingBeingDragged.y >= inventoryLocToLetter.Num() || thingBeingDragged.x >= inventoryLocToLetter[thingBeingDragged.y].Num()) {
+					UE_LOG(LogTemp, Warning, TEXT("INPUT - Invalid inventory location (%d, %d)"), thingBeingDragged.x, thingBeingDragged.y);
+					return;
+				}
 
 				// Get the letter of the item
 				FString letter = inventoryLocToLetter[thingBeingDragged.y][thingBeingDragged.x];
@@ -5374,6 +5430,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 				}
 
+				// Make sure it's valid
+				if (!inventoryLetterToName.Contains(letter)) {
+					UE_LOG(LogTemp, Warning, TEXT("INPUT - Inventory letter %s not found in inventoryLetterToName"), *letter);
+					return;
+				}
+
 				// Update the info
 				equippedInfo.name = inventoryLetterToName[letter];
 				equippedInfo.type = thingBeingDragged.thingIs;
@@ -5391,6 +5453,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					letter = abilityLetters[thingBeingDragged.thingIndex];
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("INPUT - Ability letter not found for index %d"), thingBeingDragged.thingIndex);
+					return;
+				}
+
+				// Make sure it's valid
+				if (!abilityLetterToInfo.Contains(letter)) {
+					UE_LOG(LogTemp, Warning, TEXT("INPUT - Ability letter %s not found in abilityLetterToInfo"), *letter);
 					return;
 				}
 
@@ -5417,6 +5485,12 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					letter = spellLetters[thingBeingDragged.thingIndex];
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("INPUT - Spell letter not found for index %d"), thingBeingDragged.thingIndex);
+					return;
+				}
+
+				// Make sure it's valid
+				if (!spellLetterToInfo.Contains(letter)) {
+					UE_LOG(LogTemp, Warning, TEXT("INPUT - Spell letter %s not found in spell info"), *letter);
 					return;
 				}
 
@@ -5660,6 +5734,31 @@ void Adcss::Tick(float DeltaTime) {
 	if (playerPawn == nullptr) {
 		UE_LOG(LogTemp, Warning, TEXT("Player pawn is null"));
 		return;
+	}
+
+	// If flying, move the player up a bit TODO
+	if (statusText.Contains(TEXT("Fly"))) {
+		FVector newLoc = playerPawn->GetActorLocation();
+		newLoc.Z = 140.0f;
+		playerPawn->SetActorLocation(newLoc);
+
+	// Shallow water
+	} else if (levelInfo[LOS][LOS].currentChar == "~") {
+		FVector newLoc = playerPawn->GetActorLocation();
+		newLoc.Z = 110.0f;
+		playerPawn->SetActorLocation(newLoc);
+
+	// Deep water
+	} else if (levelInfo[LOS][LOS].currentChar == "H") {
+		FVector newLoc = playerPawn->GetActorLocation();
+		newLoc.Z = 110.0f;
+		playerPawn->SetActorLocation(newLoc);
+
+	// Default height
+	} else {
+		FVector newLoc = playerPawn->GetActorLocation();
+		newLoc.Z = 126.0f;
+		playerPawn->SetActorLocation(newLoc);
 	}
 
 	// Quantities used for various things
@@ -6065,6 +6164,16 @@ void Adcss::Tick(float DeltaTime) {
 	shopRotation.Yaw += 180.0f;
 	shopRotation.Roll = 0.0f;
 	refToShopActor->SetActorRotation(shopRotation);
+
+	// The death screen should also snap
+	FVector deathLocation = dir * 100.0f;
+	deathLocation.Z = 150.0f;
+	refToDeathActor->SetActorLocation(deathLocation);
+	FRotator deathRotation = dir.Rotation();
+	deathRotation.Pitch = 0.0f;
+	deathRotation.Yaw += 180.0f;
+	deathRotation.Roll = 0.0f;
+	refToDeathActor->SetActorRotation(deathRotation);
 
 	// If told to redraw the inventory
 	if (shouldRedrawInventory) {
@@ -6797,9 +6906,6 @@ void Adcss::Tick(float DeltaTime) {
 				break;
 			}
 
-			// Check if it's the menu
-			isMenu = extracted.Contains(TEXT("===MENU===")) || extracted.Contains(TEXT("Linley Henzell"));
-
 			// Remove the extracted text from the buffer
 			outputBuffer = outputBuffer.Mid(end + 8);
 			numProcessed++;
@@ -6828,6 +6934,9 @@ void Adcss::Tick(float DeltaTime) {
 				}
 			}
 
+			// Check if it's the menu
+			isMenu = extracted.Contains(TEXT("===MENU===")) || extracted.Contains(TEXT("Linley Henzell"));
+
 			// If we need to press enter to read the rest
 			if (extracted.Contains(TEXT("--more--"))) {
 				writeCommandQueued(TEXT("enter"));
@@ -6836,16 +6945,23 @@ void Adcss::Tick(float DeltaTime) {
 
 			// If we have died
 			if (extracted.Contains(TEXT("You die..."))) {
+				commandQueue.Empty();
 				writeCommandQueued(TEXT("enter"));
 				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("escape"));
 				writeCommandQueued(TEXT("escape"));
 			}
 
 			// If we have won
 			if (extracted.Contains(TEXT("You have escaped!"))) {
+				commandQueue.Empty();
 				writeCommandQueued(TEXT("enter"));
 				writeCommandQueued(TEXT("enter"));
 				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("enter"));
+				writeCommandQueued(TEXT("escape"));
 				writeCommandQueued(TEXT("escape"));
 			}
 
@@ -7734,7 +7850,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("possesses the following magical abilities"))
 				|| charArray[i].Contains(TEXT("Clouds of this kind"))
 				|| charArray[i].Contains(TEXT("standing here, you can enter"))
-				|| charArray[i].Contains(TEXT("A decorative fountain"))
+				|| charArray[i].Contains(TEXT("decorative fountain"))
 				|| charArray[i].Contains(TEXT("It can be dug through"))
 				|| charArray[i].Contains(TEXT("(i)nscribe"))
 				|| charArray[i].Contains(TEXT("Range:"))
@@ -7758,7 +7874,11 @@ void Adcss::Tick(float DeltaTime) {
 					if (charArray[i].Contains(TEXT("Threat:"))) {
 						typeOfThing = TEXT("Enemy");
 					} else if (charArray[i].Contains(TEXT(" shop"))) {
-						typeOfThing = TEXT("Shop");
+						if (charArray[i].Contains(TEXT("abandoned"))) {
+							typeOfThing = TEXT("AbandonedShop");
+						} else {
+							typeOfThing = TEXT("Shop");
+						}
 					} else if (charArray[i].Contains(TEXT("Base accuracy"))) {
 						typeOfThing = TEXT("Item");
 					} else if (charArray[i].Contains(TEXT("Range:"))) {
@@ -8950,7 +9070,9 @@ void Adcss::Tick(float DeltaTime) {
 			// If we have the welcome text, we should pretend as though it's new
 			bool hasWelcomeText = false;
 			for (int i = 0; i < charArray.Num(); i++) {
-				if (charArray[i].Contains(TEXT("Welcome"), ESearchCase::CaseSensitive)) {
+				if (charArray[i].Contains(TEXT("Welcome "), ESearchCase::CaseSensitive)
+				|| charArray[i].Contains(TEXT("Press ? for a list of commands and other information"))
+			) {
 					hasWelcomeText = true;
 					break;
 				}
