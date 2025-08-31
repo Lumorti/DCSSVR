@@ -73,6 +73,8 @@ public:
 	AActor* refToSettingsActor;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	AActor* refToChoiceActor;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	AActor* refToDebugActor;
 
 	// The references to the lights
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)

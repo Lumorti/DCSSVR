@@ -120,6 +120,9 @@ int currentHP;
 int maxHP;
 int currentMP;
 int maxMP;
+int currentLevel;
+int currentXP;
+bool debugEnabled;
 FString fullName;
 UWorld* worldRef;
 FString leftText;
@@ -365,7 +368,7 @@ void Adcss::toggleInventory() {
 		refToInventoryActor->SetActorEnableCollision(inventoryOpen);
 	}
 
-	// Depending on the current tab
+	// Depending on the current tab TODO
 	if (inventoryOpen) {
 		UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory opened, current UI: %s"), *currentUI);
 		if (currentUI == "inventory") {
@@ -384,7 +387,7 @@ void Adcss::toggleInventory() {
 			selected.thingIs = "ButtonSkills";
 			keyPressed("lmb", FVector2D(0.0f, 0.0f));
 			selected.thingIs = "OpenButton";
-		} else if (currentUI == "character") {
+		} else if (currentUI == "character" || currentUI == "overview" || currentUI == "religion" || currentUI == "passives") {
 			selected.thingIs = "ButtonCharacter";
 			keyPressed("lmb", FVector2D(0.0f, 0.0f));
 			selected.thingIs = "OpenButton";
@@ -967,6 +970,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("Antimagic"), TEXT(""));
 	itemName = itemName.Replace(TEXT("polished"), TEXT(""));
 	itemName = itemName.Replace(TEXT("shiny"), TEXT(""));
+	itemName = itemName.Replace(TEXT("weird"), TEXT(""));
 	itemName = itemName.Replace(TEXT("pair of "), TEXT(""));
 	itemName = itemName.Replace(TEXT("not visited"), TEXT(""));
 	itemName = itemName.Replace(TEXT("not visit"), TEXT(""));
@@ -1294,6 +1298,7 @@ void Adcss::init(bool firstTime) {
 	crawlHasStarted = !firstTime;
 	hasBeenWelcomed = false;
 	isMenu = true;
+	debugEnabled = false;
 	inventoryRelLoc = FVector(0.0f, 150.0f, 200.0f);
 	inventoryRelRot = FRotator(0.0f, -90.0f, 0.0f);
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
@@ -1966,6 +1971,14 @@ void Adcss::init(bool firstTime) {
 	if (refToTutorialActor != nullptr) {
 		refToTutorialActor->SetActorHiddenInGame(true);
 		refToTutorialActor->SetActorEnableCollision(false);
+	}
+	if (refToDebugActor != nullptr) {
+		refToDebugActor->SetActorHiddenInGame(true);
+		refToDebugActor->SetActorEnableCollision(false);
+	}
+	if (refToTextActor != nullptr) {
+		refToTextActor->SetActorHiddenInGame(true);
+		refToTextActor->SetActorEnableCollision(false);
 	}
 
 	// Close the keyboard
@@ -2848,6 +2861,51 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 
 			// Send the commands to return to the menu
 			writeCommandQueued("RESET");
+
+		// Toggling debug mode TODO
+		} else if (selected.thingIs.Contains(TEXT("ButtonDebugMode"))) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Debug mode button clicked: %s"), *selected.thingIs);
+
+			// Toggle
+			debugEnabled = !debugEnabled;
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Debug mode toggled: %s"), debugEnabled ? TEXT("enabled") : TEXT("disabled"));
+
+			// If it's enabled, show the things
+			if (debugEnabled) {
+				if (refToDebugActor != nullptr) {
+					refToDebugActor->SetActorHiddenInGame(false);
+					refToDebugActor->SetActorEnableCollision(true);
+				}
+				if (refToTextActor != nullptr) {
+					refToTextActor->SetActorHiddenInGame(false);
+					refToTextActor->SetActorEnableCollision(true);
+				}
+			} else {
+				if (refToDebugActor != nullptr) {
+					refToDebugActor->SetActorHiddenInGame(true);
+					refToDebugActor->SetActorEnableCollision(false);
+				}
+				if (refToTextActor != nullptr) {
+					refToTextActor->SetActorHiddenInGame(true);
+					refToTextActor->SetActorEnableCollision(false);
+				}
+			}
+
+			// Set the button text
+			UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+			if (WidgetComponent != nullptr) {
+				UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+				if (UserWidget != nullptr) {
+					UTextBlock* ButtonText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextDebugMode")));
+					if (ButtonText != nullptr) {
+						if (debugEnabled) {
+							ButtonText->SetText(FText::FromString("enabled"));
+						} else {
+							ButtonText->SetText(FText::FromString("disabled"));
+						}
+					}
+				}
+			}
 
 		// Debug buttons
 		} else if (selected.thingIs.Contains(TEXT("Debug"))) {
@@ -3756,6 +3814,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			bool isRing = false;
 			bool isScroll = false;
 			bool isEvokableWithTarget = false;
+			bool isThrowable = false;
 			if (currentDescription.Contains(TEXT("(worn)"))) {
 				useType = "t";
 			} else if (currentDescription.Contains(TEXT("condenser"))
@@ -3770,6 +3829,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					|| currentDescription.Contains(TEXT("wand of"))) {
 				useType = "v";
 				isEvokableWithTarget = true;
+			} else if (currentDescription.Contains(TEXT("boomerang"))
+					|| currentDescription.Contains(TEXT("javelin"))
+					|| currentDescription.Contains(TEXT("dart"))) {
+				useType = "F";
+				isThrowable = true;
 			} else if (currentDescription.Contains(TEXT("(weapon)"))) {
 				useType = "u";
 			} else if (currentDescription.Contains(TEXT("Base accuracy"))) {
@@ -3815,10 +3879,15 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 
 			// Use the item
-			writeCommandQueued("i");
-			writeCommandQueued(letter);
-			writeCommandQueued(useType);
-			if (!isEvokableWithTarget && !isScroll && !(twoUniqueRings && isRing && useType == "p")) {
+			if (isThrowable) {
+				writeCommandQueued("F");
+				writeCommandQueued(letter);
+			} else {
+				writeCommandQueued("i");
+				writeCommandQueued(letter);
+				writeCommandQueued(useType);
+			}
+			if (!isEvokableWithTarget && !isThrowable && !isScroll && !(twoUniqueRings && isRing && useType == "p")) {
 				writeCommandQueued("escape");
 				writeCommandQueued("escape");
 				writeCommandQueued("CLEARINV");
@@ -3832,10 +3901,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("escape");
 				writeCommandQueued("enter");
 				writeCommandQueued("enter");
-			} else if (isEvokableWithTarget) {
+			} else if (isEvokableWithTarget || isThrowable) {
 				int x = selected.x;
 				int y = selected.y;
-				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used an evokable with target"));
+				UE_LOG(LogTemp, Display, TEXT("INPUT - Just used an evokable/throwable with target"));
 				UE_LOG(LogTemp, Display, TEXT("INPUT - Target location: (%d, %d)"), x, y);
 				writeCommandQueued("r");
 				int currentX = LOS;
@@ -4512,9 +4581,9 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			}
 			writeCommandQueued("enter");
 
-		// If clicking on a monster and we have a ranged or spell quivered
+		// If clicking on a monster and we have a ranged weapon or spell quivered
 		} else if (selected.thingIs == "Enemy" && (leftText.Contains(TEXT("Fire:")) || leftText.Contains(TEXT("Cast:")))) {
-			UE_LOG(LogTemp, Display, TEXT("INPUT - Enemy clicked whilst holding ranged quivered"));
+			UE_LOG(LogTemp, Display, TEXT("INPUT - Enemy clicked whilst holding ranged weapon or spell quivered"));
 
 			// Send the commands to target the clicked enemy
 			int x = selected.x;
@@ -6697,6 +6766,12 @@ void Adcss::Tick(float DeltaTime) {
 				ManaBar->SetPercent(float(currentMP) / float(maxMP));
 			}
 
+			// Set the xp bar value
+			UProgressBar* XPBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarLevel")));
+			if (XPBar != nullptr) {
+				XPBar->SetPercent(float(currentXP) / 100.0f);
+			}
+
 			// Set the HP text
 			UTextBlock* HPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextHP")));
 			if (HPText != nullptr) {
@@ -6707,6 +6782,12 @@ void Adcss::Tick(float DeltaTime) {
 			UTextBlock* MPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMP")));
 			if (MPText != nullptr) {
 				MPText->SetText(FText::FromString(FString::FromInt(currentMP) + "/" + FString::FromInt(maxMP)));
+			}
+
+			// Set the level text
+			UTextBlock* LevelText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextLevel")));
+			if (LevelText != nullptr) {
+				LevelText->SetText(FText::FromString("lvl " + FString::FromInt(currentLevel)));
 			}
 
 			// Set the left text
@@ -8025,6 +8106,9 @@ void Adcss::Tick(float DeltaTime) {
 					for (int i = 0; i < charArray.Num(); i++) {
 						if (charArray[i].Contains(TEXT("phial"))
 							|| charArray[i].Contains(TEXT("phantom mirror"))
+							|| charArray[i].Contains(TEXT("dart"))
+							|| charArray[i].Contains(TEXT("javelin"))
+							|| charArray[i].Contains(TEXT("boomerang"))
 							|| charArray[i].Contains(TEXT("wand of"))
 						) {
 							forceTargeting = true;
@@ -8559,8 +8643,8 @@ void Adcss::Tick(float DeltaTime) {
 				if (charArray[i].Contains(TEXT("Are you sure you want to"))
 				|| charArray[i].Contains(TEXT("Really renounce your faith"))
 				|| charArray[i].Contains(TEXT("Do you wish to receive"))
-				|| charArray[i].Contains(TEXT("Do you really want to"))
-			) {
+				|| charArray[i].Contains(TEXT("Continue?"))
+				|| charArray[i].Contains(TEXT("Do you really want to"))) {
 					isYesNo = true;
 				}
 				if (isYesNo && (charArray[i].Contains(TEXT("Okay")) || charArray[i].Contains(TEXT("You have lost your religion")))) {
@@ -8881,6 +8965,16 @@ void Adcss::Tick(float DeltaTime) {
 						maxMP = FCString::Atoi(*wordsMP[1]);
 					}
 
+					// Extract the level and XP TODO
+					FString levelLine = charArray[8].Mid(37).Replace(TEXT("%"), TEXT(""));
+					UE_LOG(LogTemp, Display, TEXT("STATUS - level line -> %s"), *levelLine);
+					TArray<FString> wordsLevel;
+					levelLine.ParseIntoArray(wordsLevel, TEXT(" "), true);
+					if (wordsLevel.Num() >= 4) {
+						currentLevel = FCString::Atoi(*wordsLevel[1]);
+						currentXP = FCString::Atoi(*wordsLevel[3]);
+					}
+
 					// Extract the branch info
 					FString branchLine = charArray[8].Mid(55);
 					UE_LOG(LogTemp, Display, TEXT("STATUS - branch line -> %s"), *branchLine);
@@ -9067,6 +9161,11 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued(TEXT("enter"));
 			}
 
+			// If something was out of range TODO
+			if (lastLine.Contains(TEXT("Out of range"))) {
+				writeCommandQueued(TEXT("escape"));
+			}
+
 			// If we have the welcome text, we should pretend as though it's new
 			bool hasWelcomeText = false;
 			for (int i = 0; i < charArray.Num(); i++) {
@@ -9079,6 +9178,8 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (!isMenu && hasWelcomeText && !hasBeenWelcomed) {
 				UE_LOG(LogTemp, Display, TEXT("Getting initial list of things..."));
+				writeCommandQueued("enter");
+				writeCommandQueued("enter");
 				writeCommandQueued("CLEAR");
 				writeCommandQueued("ctrl-X");
 				writeCommandQueued(">");
@@ -9093,9 +9194,24 @@ void Adcss::Tick(float DeltaTime) {
 			}
 
 			// If something has changed in the level
+			bool hasChanged = false;
+			FString changesToIgnore = TEXT("*");
+			for (int i = 0; i < gridWidth; i++) {
+				for (int j = 0; j < gridWidth; j++) {
+					if (levelAscii[i][j] != levelAsciiPrev[i][j] 
+						&& !changesToIgnore.Contains(levelAscii[i][j], ESearchCase::CaseSensitive) 
+						&& !changesToIgnore.Contains(levelAsciiPrev[i][j], ESearchCase::CaseSensitive)) {
+						hasChanged = true;
+						break;
+					}
+				}
+				if (hasChanged) {
+					break;
+				}
+			}
 			UE_LOG(LogTemp, Display, TEXT("Is map? %d"), isMap);
-			UE_LOG(LogTemp, Display, TEXT("Level ascii are different? %d"), levelAscii != levelAsciiPrev);
-			if (isMap && levelAscii != levelAsciiPrev && hasLoaded) {
+			UE_LOG(LogTemp, Display, TEXT("Level ascii are different? %d"), hasChanged);
+			if (isMap && hasChanged && hasLoaded) {
 
 				// Copy into the level info
 				FString thingsThatCountAsFloors = TEXT(".H~");
@@ -9146,6 +9262,8 @@ void Adcss::Tick(float DeltaTime) {
 				// Send the commands to list everything
 				if (!isMenu) {
 					UE_LOG(LogTemp, Display, TEXT("Getting list of things..."));
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
 					writeCommandQueued("CLEAR");
 					writeCommandQueued("ctrl-X");
 					writeCommandQueued(">");
