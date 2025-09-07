@@ -368,7 +368,7 @@ void Adcss::toggleInventory() {
 		refToInventoryActor->SetActorEnableCollision(inventoryOpen);
 	}
 
-	// Depending on the current tab TODO
+	// Depending on the current tab
 	if (inventoryOpen) {
 		UE_LOG(LogTemp, Display, TEXT("INPUT - Inventory opened, current UI: %s"), *currentUI);
 		if (currentUI == "inventory") {
@@ -1268,6 +1268,8 @@ void Adcss::init(bool firstTime) {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=idol ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=statue ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=fountain ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=water ");
+	args += TEXT(" -extra-opt-first monster_item_view_features+=lava ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=translucent ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=abandoned ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
@@ -1303,7 +1305,7 @@ void Adcss::init(bool firstTime) {
 	inventoryRelRot = FRotator(0.0f, -90.0f, 0.0f);
 	diagWallScaling = sqrt(2 * wallScaling * wallScaling);
 	halfDiagWallScaling = sqrt(0.5 * wallScaling * wallScaling);
-	thingsThatCountAsWalls = "#+' ";
+	thingsThatCountAsWalls = "##+' ";
 	thingsThatCountAsDoors = "+'";
 	thingsThatCountAsItems = "()|%[?O:/}!=\"";
 	currentType = TEXT("Monsters");
@@ -1391,6 +1393,9 @@ void Adcss::init(bool firstTime) {
 	spellLetterToInfo.Empty();
 	abilityLetterToInfo.Empty();
 	passives.Empty();
+	equippedInfo.name = "";
+	equippedInfo.type = "";
+	equippedInfo.letter = "";
 	shouldRedrawAbilities = true;
 	shouldRedrawOverview = true;
 	shouldRedrawSpells = true;
@@ -2168,7 +2173,9 @@ void Adcss::updateLevel() {
 			if (levelInfo[i][j].floorChar == TEXT("H")) {
 				texture = getTexture("WaterDeep");
 			} else if (levelInfo[i][j].floorChar == TEXT("~")) {
-				texture = getTexture("WaterDeep");
+				texture = getTexture("WaterShallow");
+			} else if (levelInfo[i][j].floorChar == TEXT("L")) {
+				texture = getTexture("Lava");
 			}
 			UMaterialInstanceDynamic* material = (UMaterialInstanceDynamic*)mesh->GetMaterial(0);
 			material->SetTextureParameterValue("TextureImage", texture);
@@ -2193,12 +2200,11 @@ void Adcss::updateLevel() {
 					// Set the texture
 					FString effect = levelInfo[i][j].effect;
 					FString textureName = itemNameToTextureName(effect);
-					UE_LOG(LogTemp, Display, TEXT("Effect: %s"), *effect);
-					UE_LOG(LogTemp, Display, TEXT("Texture name: %s"), *textureName);
+					UE_LOG(LogTemp, Display, TEXT("Effect to texture name: %s -> %s"), *effect, *textureName);
 					UTexture2D* texture2 = getTexture(textureName);
 					UMaterialInstanceDynamic* material2 = (UMaterialInstanceDynamic*)effectMesh->GetMaterial(0);
 					material2->SetTextureParameterValue("TextureImage", texture2);
-					material2->SetScalarParameterValue("Transparency", 0.3f);
+					material2->SetScalarParameterValue("Transparency", 0.5f);
 
 					// Move slightly away from the player for easier selecting of other stuff
 					FVector deltaLoc = effectLocation;
@@ -2269,6 +2275,18 @@ void Adcss::updateLevel() {
 				bool southNotWall = i < gridWidth - 1 && (!thingsThatCountAsWalls.Contains(levelInfo[i + 1][j].currentChar, ESearchCase::CaseSensitive) || levelInfo[i - 1][j].currentChar == TEXT("@"));;
 				bool westNotWall = j > 0 && (!thingsThatCountAsWalls.Contains(levelInfo[i][j - 1].currentChar, ESearchCase::CaseSensitive) || levelInfo[i - 1][j].currentChar == TEXT("@"));;
 
+				// Check for doors
+				bool northIsDoor = i > 0 && (levelInfo[i - 1][j].currentChar == TEXT("+") || levelInfo[i - 1][j].currentChar == TEXT("'"));
+				bool eastIsDoor = j < gridWidth - 1 && (levelInfo[i][j + 1].currentChar == TEXT("+") || levelInfo[i][j + 1].currentChar == TEXT("'"));
+				bool southIsDoor = i < gridWidth - 1 && (levelInfo[i + 1][j].currentChar == TEXT("+") || levelInfo[i + 1][j].currentChar == TEXT("'"));
+				bool westIsDoor = j > 0 && (levelInfo[i][j - 1].currentChar == TEXT("+") || levelInfo[i][j - 1].currentChar == TEXT("'"));
+
+				// Check the diagonal walls
+				bool northEastNotWall = i > 0 && j < gridWidth - 1 && (!thingsThatCountAsWalls.Contains(levelInfo[i - 1][j + 1].currentChar, ESearchCase::CaseSensitive) || levelInfo[i - 1][j + 1].currentChar == TEXT("@"));
+				bool southEastNotWall = i < gridWidth - 1 && j < gridWidth - 1 && (!thingsThatCountAsWalls.Contains(levelInfo[i + 1][j + 1].currentChar, ESearchCase::CaseSensitive) || levelInfo[i + 1][j + 1].currentChar == TEXT("@"));
+				bool southWestNotWall = i < gridWidth - 1 && j > 0 && (!thingsThatCountAsWalls.Contains(levelInfo[i + 1][j - 1].currentChar, ESearchCase::CaseSensitive) || levelInfo[i + 1][j - 1].currentChar == TEXT("@"));
+				bool northWestNotWall = i > 0 && j > 0 && (!thingsThatCountAsWalls.Contains(levelInfo[i - 1][j - 1].currentChar, ESearchCase::CaseSensitive) || levelInfo[i - 1][j - 1].currentChar == TEXT("@"));
+
 				//  .
 				// .#.
 				//  .
@@ -2281,6 +2299,103 @@ void Adcss::updateLevel() {
 					wallSouth->SetActorLocation(FVector(xLoc - wallWidth / 4.0f, yLoc, zLoc));
 					wallEast->SetActorLocation(FVector(xLoc, yLoc + wallWidth / 4.0f, zLoc));
 					wallWest->SetActorLocation(FVector(xLoc, yLoc - wallWidth / 4.0f, zLoc));
+
+				//   
+				// .#.
+				// #+.  
+				} else if (eastNotWall && westNotWall && southIsDoor && !southWestNotWall) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 135.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallSouth->SetActorHiddenInGame(false);
+					wallSouth->SetActorEnableCollision(true);
+					wallWest->SetActorHiddenInGame(true);
+					wallWest->SetActorEnableCollision(false);
+
+				//  .#
+				//  #+ 
+				//  .
+				} else if (northNotWall && southNotWall && eastIsDoor && !northEastNotWall) {
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 315.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorHiddenInGame(false);
+					wallNorth->SetActorEnableCollision(true);
+					wallEast->SetActorHiddenInGame(true);
+					wallEast->SetActorEnableCollision(false);
+
+				//   
+				// .#. 
+				// .+#  
+				} else if (eastNotWall && westNotWall && southIsDoor && !southEastNotWall) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 45.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallSouth->SetActorHiddenInGame(false);
+					wallSouth->SetActorEnableCollision(true);
+					wallEast->SetActorHiddenInGame(true);
+					wallEast->SetActorEnableCollision(false);
+
+				// #.  
+				// +#  
+				//  .   
+				} else if (northNotWall && southNotWall && westIsDoor && !northWestNotWall) {
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorHiddenInGame(false);
+					wallNorth->SetActorEnableCollision(true);
+					wallWest->SetActorHiddenInGame(true);
+					wallWest->SetActorEnableCollision(false);
+
+				//  +#  
+				// .#. 
+				//      
+				} else if (eastNotWall && westNotWall && northIsDoor && !northEastNotWall) {
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 315.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorHiddenInGame(false);
+					wallNorth->SetActorEnableCollision(true);
+					wallEast->SetActorHiddenInGame(true);
+					wallEast->SetActorEnableCollision(false);
+
+				//  .   
+				// +#  
+				// #.
+				} else if (southNotWall && northNotWall && westIsDoor && !southWestNotWall) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 135.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallSouth->SetActorHiddenInGame(false);
+					wallSouth->SetActorEnableCollision(true);
+					wallWest->SetActorHiddenInGame(true);
+					wallWest->SetActorEnableCollision(false);
+
+				//  .  
+				//  #+  
+				//  .#
+				} else if (southNotWall && northNotWall && eastIsDoor && !southEastNotWall) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 45.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallSouth->SetActorHiddenInGame(false);
+					wallSouth->SetActorEnableCollision(true);
+					wallEast->SetActorHiddenInGame(true);
+					wallEast->SetActorEnableCollision(false);
+
+
+				// #+ 
+				// .#.  
+				//     
+				} else if (eastNotWall && westNotWall && northIsDoor && !northWestNotWall) {
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorHiddenInGame(false);
+					wallNorth->SetActorEnableCollision(true);
+					wallWest->SetActorHiddenInGame(true);
+					wallWest->SetActorEnableCollision(false);
 
 				//  .
 				// .#.
@@ -2367,15 +2482,17 @@ void Adcss::updateLevel() {
 					wallEast->SetActorHiddenInGame(true);
 					wallEast->SetActorEnableCollision(false);
 
-
 				//   .
 				// . #
 				} else if (northNotWall && westNotWall) {
 					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
 					wallNorth->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
 					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorHiddenInGame(false);
+					wallNorth->SetActorEnableCollision(true);
 					wallWest->SetActorHiddenInGame(true);
 					wallWest->SetActorEnableCollision(false);
+
 				}
 
 			// If it's a door
@@ -2451,6 +2568,34 @@ void Adcss::updateLevel() {
 							matName += "Right";
 						}
 					}
+				} else if (north && west) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 45.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+				} else if (north && east) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 135.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 315.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+				} else if (south && east) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 45.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 225.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+				} else if (south && west) {
+					wallSouth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallSouth->SetActorRotation(FRotator(0.0f, 135.0f, 90.0f));
+					wallSouth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
+					wallNorth->SetActorScale3D(FVector(diagWallScaling, wallScaling, 1.0f));
+					wallNorth->SetActorRotation(FRotator(0.0f, 315.0f, 90.0f));
+					wallNorth->SetActorLocation(FVector(-(i - LOS) * floorWidth, (j - LOS) * floorHeight, wallWidth / 2.0f));
 				}
 				if (ascii == TEXT("+")) {
 					matName += "Closed";
@@ -2862,7 +3007,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// Send the commands to return to the menu
 			writeCommandQueued("RESET");
 
-		// Toggling debug mode TODO
+		// Toggling debug mode
 		} else if (selected.thingIs.Contains(TEXT("ButtonDebugMode"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Debug mode button clicked: %s"), *selected.thingIs);
 
@@ -3151,6 +3296,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued("y");
 					writeCommandQueued("CLEAR");
 					writeCommandQueued("ctrl-X");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued(">");
@@ -5425,6 +5572,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
+			writeCommandQueued(">");
+			writeCommandQueued(">");
 			writeCommandQueued("escape");
 
 		// If we're selecting an item from the ground and dropping it into the inventory
@@ -5448,6 +5597,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			writeCommandQueued("escape");
 			writeCommandQueued("CLEAR");
 			writeCommandQueued("ctrl-X");
+			writeCommandQueued(">");
+			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
 			writeCommandQueued(">");
@@ -5576,9 +5727,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued(letter);
 
 			}
-
-			// We need to redraw the hotbar
-			shouldRedrawHotbar = true;
 
 		// If dragging something onto one of the hotbar slots
 		} else if ((thingBeingDragged.thingIs == "InventoryItem" || thingBeingDragged.thingIs == "Ability" || thingBeingDragged.thingIs == "Spell") && selected.thingIs.Contains(TEXT("SlotButton"))) {
@@ -5805,28 +5953,29 @@ void Adcss::Tick(float DeltaTime) {
 		return;
 	}
 
-	// If flying, move the player up a bit TODO
+	// If flying, move the player up a bit
+	float defaultZ = 135.0f;
 	if (statusText.Contains(TEXT("Fly"))) {
 		FVector newLoc = playerPawn->GetActorLocation();
-		newLoc.Z = 140.0f;
+		newLoc.Z = defaultZ + 20.0f;
 		playerPawn->SetActorLocation(newLoc);
 
 	// Shallow water
-	} else if (levelInfo[LOS][LOS].currentChar == "~") {
+	} else if (levelInfo[LOS][LOS].floorChar == "~") {
 		FVector newLoc = playerPawn->GetActorLocation();
-		newLoc.Z = 110.0f;
+		newLoc.Z = defaultZ - 10.0f;
 		playerPawn->SetActorLocation(newLoc);
 
-	// Deep water
-	} else if (levelInfo[LOS][LOS].currentChar == "H") {
+	// Deep water or lava
+	} else if (levelInfo[LOS][LOS].floorChar == "H" || levelInfo[LOS][LOS].floorChar == "L") {
 		FVector newLoc = playerPawn->GetActorLocation();
-		newLoc.Z = 110.0f;
+		newLoc.Z = defaultZ - 20.0f;
 		playerPawn->SetActorLocation(newLoc);
 
 	// Default height
 	} else {
 		FVector newLoc = playerPawn->GetActorLocation();
-		newLoc.Z = 126.0f;
+		newLoc.Z = defaultZ;
 		playerPawn->SetActorLocation(newLoc);
 	}
 
@@ -8874,6 +9023,11 @@ void Adcss::Tick(float DeltaTime) {
 									levelInfo[yCoord][xCoord].currentChar = TEXT("~");
 									levelInfo[yCoord][xCoord].floorChar = TEXT("~");
 
+								// Lava
+								} else if (description.Contains(TEXT("lava"))) {
+									levelInfo[yCoord][xCoord].currentChar = TEXT("L");
+									levelInfo[yCoord][xCoord].floorChar = TEXT("L");
+
 								// Shops
 								} else if (description.Contains(TEXT(" shop")) 
 									|| description.Contains(TEXT(" bazaar")) 
@@ -8956,8 +9110,8 @@ void Adcss::Tick(float DeltaTime) {
 
 					// Extract the mana
 					FString manaLine = charArray[4].Mid(45);
-					UE_LOG(LogTemp, Display, TEXT("STATUS - mana line -> %s"), *manaLine);
 					manaLine = manaLine.Replace(TEXT("/"), TEXT(" "));
+					UE_LOG(LogTemp, Display, TEXT("STATUS - mana line -> %s"), *manaLine);
 					TArray<FString> wordsMP;
 					manaLine.ParseIntoArray(wordsMP, TEXT(" "), true);
 					if (wordsMP.Num() >= 2) {
@@ -8965,7 +9119,7 @@ void Adcss::Tick(float DeltaTime) {
 						maxMP = FCString::Atoi(*wordsMP[1]);
 					}
 
-					// Extract the level and XP TODO
+					// Extract the level and XP
 					FString levelLine = charArray[8].Mid(37).Replace(TEXT("%"), TEXT(""));
 					UE_LOG(LogTemp, Display, TEXT("STATUS - level line -> %s"), *levelLine);
 					TArray<FString> wordsLevel;
@@ -9003,9 +9157,9 @@ void Adcss::Tick(float DeltaTime) {
 					UE_LOG(LogTemp, Display, TEXT("STATUS - left line -> %s"), *leftText);
 					UE_LOG(LogTemp, Display, TEXT("STATUS - right line -> %s"), *rightText);
 					UE_LOG(LogTemp, Display, TEXT("STATUS - status line -> %s"), *statusText);
-					if (leftText != prevLeftText || rightText != prevRightText) {
-						shouldRedrawHotbar = true;
-					}
+
+					// Need to redraw the hotbar
+					shouldRedrawHotbar = true;
 
 				}
 
@@ -9161,7 +9315,7 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued(TEXT("enter"));
 			}
 
-			// If something was out of range TODO
+			// If something was out of range
 			if (lastLine.Contains(TEXT("Out of range"))) {
 				writeCommandQueued(TEXT("escape"));
 			}
@@ -9182,6 +9336,8 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued("enter");
 				writeCommandQueued("CLEAR");
 				writeCommandQueued("ctrl-X");
+				writeCommandQueued(">");
+				writeCommandQueued(">");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
 				writeCommandQueued(">");
@@ -9214,7 +9370,7 @@ void Adcss::Tick(float DeltaTime) {
 			if (isMap && hasChanged && hasLoaded) {
 
 				// Copy into the level info
-				FString thingsThatCountAsFloors = TEXT(".H~");
+				FString thingsThatCountAsFloors = TEXT(".");
 				for (int i = 0; i < gridWidth; i++) {
 					for (int j = 0; j < gridWidth; j++) {
 						if (thingsThatCountAsWalls.Contains(levelAscii[i][j], ESearchCase::CaseSensitive) || thingsThatCountAsFloors.Contains(levelAscii[i][j], ESearchCase::CaseSensitive)) {
@@ -9230,6 +9386,7 @@ void Adcss::Tick(float DeltaTime) {
 							levelInfo[i][j].floorChar = TEXT(".");
 						}
 						if (thingsThatCountAsFloors.Contains(levelAscii[i][j], ESearchCase::CaseSensitive) && levelInfo[i][j].enemy.Len() == 0) {
+							levelInfo[i][j].currentChar = levelAscii[i][j];
 							levelInfo[i][j].floorChar = levelAscii[i][j];
 						}
 					}
@@ -9266,6 +9423,8 @@ void Adcss::Tick(float DeltaTime) {
 					writeCommandQueued("enter");
 					writeCommandQueued("CLEAR");
 					writeCommandQueued("ctrl-X");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued(">");
 					writeCommandQueued(">");

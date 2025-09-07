@@ -1,8 +1,8 @@
 type = normal
-name = Uwocri
+name = Naotyimp
 species = Deep Elf
-background = Ice Elementalist
-game_seed = 8310
+background = Necromancer
+game_seed = 1419
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false
