@@ -908,6 +908,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	|| name.Contains("Catalogue") 
 	|| name.Contains("Compendium") 
 	|| name.Contains("Grimoire") 
+	|| name.Contains("Dissertation") 
 	|| name.Contains("Encyclopedia") 
 	|| name.Contains("Papyrus") 
 	|| name.Contains("Incunabulum") 
@@ -971,6 +972,7 @@ FString Adcss::itemNameToTextureName(FString name) {
 	itemName = itemName.Replace(TEXT("polished"), TEXT(""));
 	itemName = itemName.Replace(TEXT("shiny"), TEXT(""));
 	itemName = itemName.Replace(TEXT("weird"), TEXT(""));
+	itemName = itemName.Replace(TEXT("smoking"), TEXT(""));
 	itemName = itemName.Replace(TEXT("pair of "), TEXT(""));
 	itemName = itemName.Replace(TEXT("not visited"), TEXT(""));
 	itemName = itemName.Replace(TEXT("not visit"), TEXT(""));
@@ -2773,6 +2775,14 @@ void Adcss::updateLevel() {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.3f*wallScaling, 0.3f*wallScaling, 1.0f));
 						}
 
+						// If it's on the same tile as the player, lay it flat TODO
+						if (i == 8 && j == 8) {
+							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 0.0f));
+							FVector currentItemLoc = itemArray[itemUseCount]->GetActorLocation();
+							currentItemLoc.Z = 2*epsilon;
+							itemArray[itemUseCount]->SetActorLocation(currentItemLoc);
+						}
+
 						// Update the item count
 						itemUseCount++;
 
@@ -2802,6 +2812,7 @@ void Adcss::buttonHovered(FString buttonName, bool hovered) {
 
 	// If it's inventory item e.g. "ItemButton_1_4"
 	if (buttonName.Contains(TEXT("ItemButton"))) {
+		UE_LOG(LogTemp, Display, TEXT("Inventory hovered: %s"), *buttonName);
 
 		// Get the row and column
 		TArray<FString> parts;
@@ -3990,7 +4001,7 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				isScroll = true;
 			} else if (currentDescription.Contains(TEXT(" potion")) || currentDescription.Contains(TEXT("potions ")) || currentDescription.Contains(TEXT("potion "))) {
 				useType = "q";
-			} else if (currentDescription.Contains(TEXT(" ring")) || currentDescription.Contains(TEXT("ring "))) {
+			} else if ((currentDescription.Contains(TEXT(" ring")) || currentDescription.Contains(TEXT(" ring "))) && !currentDescription.Contains(TEXT("ring mail"))) {
 				isRing = true;
 				if (currentDescription.Contains(TEXT("(left hand)")) || currentDescription.Contains(TEXT("(right hand)"))) {
 					useType = "r";
@@ -4670,6 +4681,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToUIActor->SetActorEnableCollision(true);
 						refToKeyboardActor->SetActorHiddenInGame(true);
 						refToKeyboardActor->SetActorEnableCollision(false);
+						refToTutorialActor->SetActorHiddenInGame(false);
+						refToTutorialActor->SetActorEnableCollision(true);
 						isKeyboardOpen = false;
 						hasBeenWelcomed = false;
 
@@ -6252,7 +6265,7 @@ void Adcss::Tick(float DeltaTime) {
 		descriptionRotation.Yaw += 190.0f;
 		descriptionRotation.Roll = 0.0f;
 
-		// If in VR
+		// If in VR TODO tweak
 		if (vrEnabled) {
 
 			// The vector from the player to the hand
@@ -6268,7 +6281,7 @@ void Adcss::Tick(float DeltaTime) {
 			FVector handToHeadUp = FVector(0.0f, 0.0f, 1.0f);
 
 			// The location
-			descriptionLocation = playerLocation + handToHead * (100.0f + handToHeadLength * 2) + handToHeadRight * 60.0f + handToHeadUp * 70.0f;
+			descriptionLocation = playerLocation + handToHead * (100.0f + handToHeadLength * 2) + handToHeadRight * 70.0f + handToHeadUp * 150.0f;
 
 			// The rotation
 			FRotator handToHeadRotation = handToHead.Rotation();
@@ -6335,7 +6348,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	// The settings panel should also snap
 	FVector settingsLocation = dir * 140.0f;
-	settingsLocation.Z = 200.0f;
+	settingsLocation.Z = 250.0f;
 	refToSettingsActor->SetActorLocation(settingsLocation);
 	FRotator settingsRotation = dir.Rotation();
 	settingsRotation.Pitch = 0.0f;
@@ -6345,7 +6358,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	// The tutorial should also snap
 	FVector tutorialLocation = dir * 200.0f;
-	tutorialLocation.Z = 200.0f;
+	tutorialLocation.Z = 250.0f;
 	refToTutorialActor->SetActorLocation(tutorialLocation);
 	FRotator tutorialRotation = dir.Rotation();
 	tutorialRotation.Pitch = 0.0f;
@@ -6365,7 +6378,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	// The altar menu should also snap
 	FVector altarLocation = dir * 100.0f;
-	altarLocation.Z = 200.0f;
+	altarLocation.Z = 250.0f;
 	refToAltarActor->SetActorLocation(altarLocation);
 	FRotator altarRotation = dir.Rotation();
 	altarRotation.Pitch = 0.0f;
@@ -6375,7 +6388,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	// The shop menu should also snap
 	FVector shopLocation = dir * 150.0f;
-	shopLocation.Z = 200.0f;
+	shopLocation.Z = 250.0f;
 	refToShopActor->SetActorLocation(shopLocation);
 	FRotator shopRotation = dir.Rotation();
 	shopRotation.Pitch = 0.0f;
@@ -6385,7 +6398,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	// The death screen should also snap
 	FVector deathLocation = dir * 100.0f;
-	deathLocation.Z = 150.0f;
+	deathLocation.Z = 200.0f;
 	refToDeathActor->SetActorLocation(deathLocation);
 	FRotator deathRotation = dir.Rotation();
 	deathRotation.Pitch = 0.0f;
@@ -7029,7 +7042,7 @@ void Adcss::Tick(float DeltaTime) {
 	for (int i = 0; i < itemUseCount; i++) {
 		FVector itemLocation = itemArray[i]->GetActorLocation();
 
-		// If it's a corpse or skeleton, keep it facing up
+		// If it's laying flat, don't rotate it
 		if (itemArray[i]->GetActorRotation().Roll == 0.0f) {
 			continue;
 		}

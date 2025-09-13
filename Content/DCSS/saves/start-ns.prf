@@ -1,8 +1,8 @@
 type = normal
-name = Naotyimp
-species = Deep Elf
-background = Necromancer
-game_seed = 1419
+name = Bistruyho
+species = Minotaur
+background = Hunter
+game_seed = 5492
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

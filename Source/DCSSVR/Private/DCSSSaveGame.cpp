@@ -10,6 +10,6 @@ UDCSSSaveGame::UDCSSSaveGame() {
 	inventoryRelRot = FRotator(0.0f, -90.0f, 0.0f);
 	musicVolume = 1.0f;
 	trackInd = 0;
-	snapDegrees = 45;
+	snapDegrees = 30;
 	serverAddress = "";
 }
