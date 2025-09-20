@@ -22,6 +22,9 @@ public:
 	TArray<FString> hotbarInfos;
 
 	UPROPERTY(VisibleAnywhere, Category = Basic)
+	TArray<FString> equippedInfo;
+
+	UPROPERTY(VisibleAnywhere, Category = Basic)
 	FVector inventoryRelLoc;
 
 	UPROPERTY(VisibleAnywhere, Category = Basic)

@@ -750,6 +750,12 @@ void Adcss::saveEverything() {
 		saveGame->hotbarInfos.Add(hotbarInfos[i].type);
 	}
 
+	// The equipped slot TODO
+	saveGame->equippedInfo.Empty();
+	saveGame->equippedInfo.Add(equippedInfo.letter);
+	saveGame->equippedInfo.Add(equippedInfo.name);
+	saveGame->equippedInfo.Add(equippedInfo.type);
+
 	// The inventory grab location
 	saveGame->inventoryRelLoc = inventoryRelLoc;
 	saveGame->inventoryRelRot = inventoryRelRot;
@@ -820,6 +826,14 @@ void Adcss::loadEverything() {
 			for (int i = 0; i < numHotbarSlots; i++) {
 				hotbarInfos.Add(HotbarInfo());
 			}
+		}
+
+		// Load the equipped slot TODO
+		equippedInfo = HotbarInfo();
+		if (saveGame->equippedInfo.Num() == 3) {
+			equippedInfo.letter = saveGame->equippedInfo[0];
+			equippedInfo.name = saveGame->equippedInfo[1];
+			equippedInfo.type = saveGame->equippedInfo[2];
 		}
 
 	}
@@ -1115,6 +1129,11 @@ FString Adcss::enemyNameToTextureName(FString name) {
 		return "Player";
 	}
 
+	// If it's a ghost, for now just use the generic ghost
+	if (name.Contains("(ghost)")) {
+		return "MonsterGhost";
+	}
+
 	// Remove various things
 	FString enemyName = name;
 	enemyName = enemyName.Replace(TEXT("(here)"), TEXT(""));
@@ -1163,7 +1182,7 @@ FString Adcss::enemyNameToTextureName(FString name) {
 	// If it's a mutant beast
 	if (materialName.Contains(TEXT("beast")) && !textures.Contains(materialName)) {
 		getTexture(materialName);
-		return "Beast";
+		return "MonsterBeast";
 	}
 
 	// In case it's a monster version of a weapon
@@ -4182,9 +4201,11 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 			// Make sure we're in range
 			int x = selected.x;
 			int y = selected.y;
+			int spellCost = spellLetterToInfo.Contains(letter) ? spellLetterToInfo[letter].level : 0;
 			int dist = FMath::RoundToInt(FMath::Sqrt(FMath::Pow(float(x-LOS), 2) + FMath::Pow(float(y-LOS), 2)));
 			UE_LOG(LogTemp, Display, TEXT("INPUT - targeting range: %d, distance: %d"), targetingRange, dist);
-			if (dist <= targetingRange || targetingRange <= 0) {
+			UE_LOG(LogTemp, Display, TEXT("INPUT - current mana: %d, spell cost: %d"), currentMP, spellCost);
+			if ((dist <= targetingRange || targetingRange <= 0) && currentMP >= spellCost) {
 				writeCommandQueued("Z");
 				writeCommandQueued(letter);
 				if (targetingRange >= 1) {
@@ -4213,6 +4234,14 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				writeCommandQueued("enter");
 				writeCommandQueued("enter");
 				writeCommandQueued("enter");
+				writeCommandQueued("CLEAR");
+				writeCommandQueued("ctrl-X");
+				writeCommandQueued(">");
+				writeCommandQueued(">");
+				writeCommandQueued(">");
+				writeCommandQueued(">");
+				writeCommandQueued(">");
+				writeCommandQueued("escape");
 			}
 
 		// If we're holding an ability, use it
@@ -4289,6 +4318,14 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
+					writeCommandQueued("CLEAR");
+					writeCommandQueued("ctrl-X");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued("escape");
 				}
 			}
 

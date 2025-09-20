@@ -6,6 +6,7 @@ UDCSSSaveGame::UDCSSSaveGame() {
     inventoryLetterToName = TMap<FString, FString>();
 	inventoryLocToLetter = TArray<FString>();
 	hotbarInfos = TArray<FString>();
+	equippedInfo = TArray<FString>();
 	inventoryRelLoc = FVector(0.0f, 150.0f, 200.0f);
 	inventoryRelRot = FRotator(0.0f, -90.0f, 0.0f);
 	musicVolume = 1.0f;
