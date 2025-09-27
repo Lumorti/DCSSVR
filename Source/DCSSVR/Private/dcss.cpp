@@ -6957,54 +6957,56 @@ void Adcss::Tick(float DeltaTime) {
 			UProgressBar* HealthBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarHP")));
 			if (HealthBar != nullptr) {
 				HealthBar->SetPercent(float(currentHP) / float(maxHP));
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("Health bar not found"));
 			}
 
 			// Set the mana bar value
 			UProgressBar* ManaBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarMP")));
 			if (ManaBar != nullptr) {
 				ManaBar->SetPercent(float(currentMP) / float(maxMP));
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("Mana bar not found"));
 			}
 
 			// Set the xp bar value
 			UProgressBar* XPBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarLevel")));
 			if (XPBar != nullptr) {
 				XPBar->SetPercent(float(currentXP) / 100.0f);
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("XP bar not found"));
 			}
 
 			// Set the HP text
 			UTextBlock* HPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextHP")));
 			if (HPText != nullptr) {
 				HPText->SetText(FText::FromString(FString::FromInt(currentHP) + "/" + FString::FromInt(maxHP)));
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("HP text not found"));
 			}
 
 			// Set the MP text
 			UTextBlock* MPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMP")));
 			if (MPText != nullptr) {
 				MPText->SetText(FText::FromString(FString::FromInt(currentMP) + "/" + FString::FromInt(maxMP)));
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("MP text not found"));
 			}
 
 			// Set the level text
 			UTextBlock* LevelText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextLevel")));
 			if (LevelText != nullptr) {
 				LevelText->SetText(FText::FromString("lvl " + FString::FromInt(currentLevel)));
-			}
-
-			// Set the left text
-			UTextBlock* LeftText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextLeft")));
-			if (LeftText != nullptr) {
-				LeftText->SetText(FText::FromString(leftText));
-			}
-
-			// Set the right text
-			UTextBlock* RightText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextRight")));
-			if (RightText != nullptr) {
-				RightText->SetText(FText::FromString(rightText));
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("Level text not found"));
 			}
 
 			// Set the status text
 			UTextBlock* StatusText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextStatus")));
 			if (StatusText != nullptr) {
 				StatusText->SetText(FText::FromString(statusText));
+			} else {
+				UE_LOG(LogTemp, Warning, TEXT("Status text not found"));
 			}
 
 		}
@@ -8652,13 +8654,13 @@ void Adcss::Tick(float DeltaTime) {
 						}
 					}
 
-					// Remove any duplicates from the hotbar
+					// Remove any duplicates from the hotbar TODO
 					for (int i = 0; i < numHotbarSlots; i++) {
 						if (hotbarInfos[i].letter.Len() == 0) {
 							continue;
 						}
-						for (int j = 0; j < numHotbarSlots; j++) {
-							if (i != j && hotbarInfos[i].letter.Equals(hotbarInfos[j].letter, ESearchCase::CaseSensitive)) {
+						for (int j = i+1; j < numHotbarSlots; j++) {
+							if (hotbarInfos[i].letter.Equals(hotbarInfos[j].letter, ESearchCase::CaseSensitive) && hotbarInfos[i].type == hotbarInfos[j].type) {
 								UE_LOG(LogTemp, Display, TEXT("INVENTORY - fixed, removed duplicate letter %s from hotbar slot %d"), *hotbarInfos[i].letter, i);
 								hotbarInfos[j].name = TEXT("");
 								hotbarInfos[j].type = TEXT("");
@@ -9229,8 +9231,10 @@ void Adcss::Tick(float DeltaTime) {
 
 			// If the map is being shown, then we also have the log
 			if (isMap) {
+
+				// Extract the log line
+				TArray<FString> newLogText;
 				if (charArray.Num() >= 18) {
-					logText.Empty();
 					for (int i = 18; i < charArray.Num(); i++) {
 						FString newLine = charArray[i].Replace(TEXT("\n"), TEXT("")).Replace(TEXT("_"), TEXT(""));
 						if (newLine.Replace(TEXT(" "), TEXT("")).Len() > 0) {
@@ -9301,8 +9305,10 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Really renounce your faith"))
 								|| newLine.Contains(TEXT("Are you sure?"))
 								|| newLine.Contains(TEXT("Cast which spell?"))
+								|| newLine.Contains(TEXT("Cast which spell?"))
 								|| newLine.Contains(TEXT("Press <"))
 								|| newLine.Contains(TEXT("Wizard Command"))
+								|| newLine.Contains(TEXT("Shift-Dir"))
 								|| newLine.Contains(TEXT("Reach:"))
 								|| newLine.Contains(TEXT("Aim:"))
 								|| newLine.Contains(TEXT("Aiming:"))
@@ -9316,11 +9322,52 @@ void Adcss::Tick(float DeltaTime) {
 								continue;
 							}
 
+							// Add the line
 							UE_LOG(LogTemp, Display, TEXT("LOG - adding: %s"), *newLine);
-							logText.Add(newLine);
+							newLogText.Add(newLine);
+
+							// Keep only the last 5
+							if (newLogText.Num() > 5) {
+								newLogText.RemoveAt(0, newLogText.Num() - 5);
+							}
 
 						}
 					}
+
+					// Combine with the previous log TODO
+					int bestShift = 0;
+					int bestMatches = 0;
+					for (int shift = 0; shift < logText.Num(); shift++) {
+						int matches = 0;
+						for (int i = 0; i < newLogText.Num() && shift + i < logText.Num(); i++) {
+							if (logText[shift + i] == newLogText[i]) {
+								matches++;
+							}
+						}
+						if (matches > bestMatches) {
+							bestMatches = matches;
+							bestShift = shift;
+						}
+					}
+					if (bestMatches == 0) {
+						logText.Append(newLogText);
+					} else {
+						for (int i = 0; i < newLogText.Num(); i++) {
+							if (bestShift + i < logText.Num()) {
+								logText[bestShift + i] = newLogText[i];
+							} else {
+								logText.Add(newLogText[i]);
+							}
+						}
+					}
+
+					// Only keep the last maxLogShown lines
+					int maxLogStored = 5;
+					if (logText.Num() > maxLogStored) {
+						logText.RemoveAt(0, logText.Num() - maxLogStored);
+					}
+
+					// Update the log if it's changed
 					UWidgetComponent* WidgetComponentDesc = Cast<UWidgetComponent>(refToUIActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 					if (WidgetComponentDesc != nullptr) {
 						UUserWidget* UserWidgetDesc = WidgetComponentDesc->GetUserWidgetObject();
