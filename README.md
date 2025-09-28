@@ -2,7 +2,7 @@
 
 A VR port of the open-source dungeon crawler [Dungeon Crawl Stone Soup](https://crawl.develz.org/). This works by running a seperate instance of the ASCII version of the game, then using the output to generate the 3D world. Download the latest version [here](https://github.com/Lumorti/DCSSVR/releases). For info on how to play, see the [wiki](http://crawl.chaosforge.org/Crawl_Wiki).
 
-[example.webm](https://github.com/user-attachments/assets/766cd181-cce0-46a7-be1d-6dbc16a1168c)
+<video src="https://github.com/user-attachments/assets/766cd181-cce0-46a7-be1d-6dbc16a1168c" autoplay loop muted playsinline style="max-width:100%; height:auto;"></video>
 
 Please submit bug reports from the settings menu and I'll get around to fixing them whenever I get a chance. Pull requests and suggestions are of course also welcome. Debug mode can be enabled from the settings if you want to cheat and/or test things.
 
