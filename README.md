@@ -6,6 +6,6 @@ A VR port of the open-source dungeon crawler [Dungeon Crawl Stone Soup](https://
 
 This works by running a seperate instance of the ASCII version of the game, then using the output to generate the 3D world. So, when you open your inventory in the VR game, it sends various commands to the ASCII game to open your inventory there, which it then parses and updates the VR version.
 
-Please submit bug reports from the settings menu and I'll get around to fixing them whenever I get a chance. Pull requests and suggestions are also welcome. Debug mode can be enabled from the settings if you want to cheat and/or test things.
+Please submit bug reports from the settings menu and I'll get around to fixing them whenever I get a chance. Pull requests, suggestions and other contributions are also welcome. Debug mode can be enabled from the settings if you want to cheat and/or test things.
 
-There's also an experimental APK for Quest, but this requires you to run a server (i.e. "server.exe") on a device on the same network, which just acts as an HTTP server for the ASCII game. This hasn't been tested as much as the desktop VR version, and the server can be somewhat unreliable. The server is needed in this case since Quest doesn't allow running Crawl as a subprocess like on Windows.
+There's also an experimental APK for Quest (for now not included in the release), but this requires you to run a server (i.e. "server.exe") on a device on the same network, which just acts as an HTTP server for the ASCII game. This hasn't been tested nearly as much as the desktop VR version, and the server can be quite unreliable. The server is needed in this case since Quest doesn't allow running Crawl as a subprocess like on Windows.
