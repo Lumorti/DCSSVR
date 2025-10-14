@@ -121,6 +121,7 @@ int maxHP;
 int currentMP;
 int maxMP;
 int currentLevel;
+FString currentFloor;
 int currentXP;
 bool debugEnabled;
 FString fullName;
@@ -255,6 +256,7 @@ struct HotbarInfo {
 TArray<HotbarInfo> hotbarInfos;
 HotbarInfo equippedInfo;
 bool shouldRedrawHotbar;
+bool shouldRedrawHealth;
 
 // Altar stuff
 FString altarOverview;
@@ -366,6 +368,13 @@ void Adcss::toggleInventory() {
 	if (refToInventoryActor != nullptr) {
 		refToInventoryActor->SetActorHiddenInGame(!inventoryOpen);
 		refToInventoryActor->SetActorEnableCollision(inventoryOpen);
+	}
+
+	// Close the settings
+	settingsOpen = false;
+	if (refToSettingsActor != nullptr) {
+		refToSettingsActor->SetActorHiddenInGame(!settingsOpen);
+		refToSettingsActor->SetActorEnableCollision(settingsOpen);
 	}
 
 	// Depending on the current tab
@@ -750,7 +759,7 @@ void Adcss::saveEverything() {
 		saveGame->hotbarInfos.Add(hotbarInfos[i].type);
 	}
 
-	// The equipped slot TODO
+	// The equipped slot
 	saveGame->equippedInfo.Empty();
 	saveGame->equippedInfo.Add(equippedInfo.letter);
 	saveGame->equippedInfo.Add(equippedInfo.name);
@@ -828,7 +837,7 @@ void Adcss::loadEverything() {
 			}
 		}
 
-		// Load the equipped slot TODO
+		// Load the equipped slot
 		equippedInfo = HotbarInfo();
 		if (saveGame->equippedInfo.Num() == 3) {
 			equippedInfo.letter = saveGame->equippedInfo[0];
@@ -1423,6 +1432,7 @@ void Adcss::init(bool firstTime) {
 	shouldRedrawReligion = true;
 	shouldRedrawSkills = true;
 	shouldRedrawHotbar = true;
+	shouldRedrawHealth = true;
 	religionText = TEXT("You are not religious.");
 	overviewText = TEXT("");
 	skillNameToInfo.Empty();
@@ -2794,7 +2804,7 @@ void Adcss::updateLevel() {
 							itemArray[itemUseCount]->SetActorScale3D(FVector(0.3f*wallScaling, 0.3f*wallScaling, 1.0f));
 						}
 
-						// If it's on the same tile as the player, lay it flat TODO
+						// If it's on the same tile as the player, lay it flat
 						if (i == 8 && j == 8) {
 							itemArray[itemUseCount]->SetActorRotation(FRotator(0.0f, 0.0f, 0.0f));
 							FVector currentItemLoc = itemArray[itemUseCount]->GetActorLocation();
@@ -5087,8 +5097,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		rmbOn = true;
 
 		// If dragging the inventory panel
+		// (for now disabled since honestly it's pretty good where it is and it happens more
+		//  often that I accidentally drag it than want to move it)
 		if (selected.x == -1 && selected.y == -1 && selected.thingIs == TEXT("Inventory") && inventoryOpen) {
-			draggingInventory = true;
+			// draggingInventory = true; 
 
 		// If right clicking on one of the choice slots
 		} else if (selected.thingIs.Contains(TEXT("ButtonOption")) && isChoiceOpen) {
@@ -6040,11 +6052,12 @@ void Adcss::Tick(float DeltaTime) {
 	// Checking what the player is looking at
 	refToNameTagActor->SetActorHiddenInGame(true);
 	refToNameTagActor->SetActorEnableCollision(false);
+	float distance = 5000.0f;
 	FVector Start = playerLocation;
-	FVector End = Start + playerForward * 3000.0f;
+	FVector End = Start + playerForward * distance;
 	if (vrEnabled) {
 		Start = handLocation;
-		End = Start + handForward * 3000.0f;
+		End = Start + handForward * distance;
 	}
 	FHitResult HitResult;
 	FCollisionQueryParams COQP;			
@@ -6302,7 +6315,7 @@ void Adcss::Tick(float DeltaTime) {
 		descriptionRotation.Yaw += 190.0f;
 		descriptionRotation.Roll = 0.0f;
 
-		// If in VR TODO tweak
+		// If in VR
 		if (vrEnabled) {
 
 			// The vector from the player to the hand
@@ -6367,7 +6380,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	}
 
-	// Inventory should snap to the correct quarter
+	// Inventory should snap to the correct quarter TODO
 	FVector inventoryRelLocRotated = inventoryRelLoc;
 	FRotator inventoryRelRotRotated = inventoryRelRot;
 	if (dirString == "right") {
@@ -6382,10 +6395,10 @@ void Adcss::Tick(float DeltaTime) {
 	}
 	refToInventoryActor->SetActorLocation(inventoryRelLocRotated);
 	refToInventoryActor->SetActorRotation(inventoryRelRotRotated);
-
+	
 	// The settings panel should also snap
 	FVector settingsLocation = dir * 140.0f;
-	settingsLocation.Z = 250.0f;
+	settingsLocation.Z = 190.0f;
 	refToSettingsActor->SetActorLocation(settingsLocation);
 	FRotator settingsRotation = dir.Rotation();
 	settingsRotation.Pitch = 0.0f;
@@ -6947,69 +6960,91 @@ void Adcss::Tick(float DeltaTime) {
 	// Keep the ui panel following the player
 	FVector uiLocation = playerLocation + FVector(100.0f, -20.0f, -50.0f);
 
-	// Get the widget component of the ui actor
-	UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToUIActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-	if (WidgetComponent != nullptr) {
-		UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
-		if (UserWidget != nullptr) {
+	// If we need to update the health bars etc.
+	if (shouldRedrawHealth && hasLoaded) {
+		UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToUIActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		if (WidgetComponent != nullptr) {
+			UUserWidget* UserWidget = WidgetComponent->GetUserWidgetObject();
+			if (UserWidget != nullptr) {
 
-			// Set the health bar value
-			UProgressBar* HealthBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarHP")));
-			if (HealthBar != nullptr) {
-				HealthBar->SetPercent(float(currentHP) / float(maxHP));
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("Health bar not found"));
+				// Set the health bar value
+				UProgressBar* HealthBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarHP")));
+				if (HealthBar != nullptr) {
+					float newPercent = float(currentHP) / float(maxHP);
+					newPercent = FMath::RoundToFloat(newPercent * 100.0f) / 100.0f;
+					UE_LOG(LogTemp, Display, TEXT("Setting health bar to %f"), newPercent);
+					HealthBar->SetPercent(newPercent);
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Health bar not found"));
+				}
+
+				// Set the mana bar value
+				UProgressBar* ManaBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarMP")));
+				if (ManaBar != nullptr) {
+					float newPercent = float(currentMP) / float(maxMP);
+					newPercent = FMath::RoundToFloat(newPercent * 100.0f) / 100.0f;
+					UE_LOG(LogTemp, Display, TEXT("Setting mana bar to %f"), newPercent);
+					ManaBar->SetPercent(newPercent);
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Mana bar not found"));
+				}
+
+				// Set the xp bar value
+				UProgressBar* XPBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarLevel")));
+				if (XPBar != nullptr) {
+					float newPercent = float(currentXP) / 100.0f;
+					UE_LOG(LogTemp, Display, TEXT("Setting XP bar to %f"), newPercent);
+					XPBar->SetPercent(newPercent);
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("XP bar not found"));
+				}
+
+				// Set the HP text
+				UTextBlock* HPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextHP")));
+				if (HPText != nullptr) {
+					HPText->SetText(FText::FromString(FString::FromInt(currentHP) + "/" + FString::FromInt(maxHP)));
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("HP text not found"));
+				}
+
+				// Set the MP text
+				UTextBlock* MPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMP")));
+				if (MPText != nullptr) {
+					MPText->SetText(FText::FromString(FString::FromInt(currentMP) + "/" + FString::FromInt(maxMP)));
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("MP text not found"));
+				}
+
+				// Set the floor text
+				UTextBlock* FloorText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextFloor")));
+				if (FloorText != nullptr) {
+					FloorText->SetText(FText::FromString(currentFloor));
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Floor text not found"));
+				}
+
+				// Set the level text
+				UTextBlock* LevelText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextLevel")));
+				if (LevelText != nullptr) {
+					LevelText->SetText(FText::FromString("XL " + FString::FromInt(currentLevel)));
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Level text not found"));
+				}
+
+				// Set the status text
+				UTextBlock* StatusText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextStatus")));
+				if (StatusText != nullptr) {
+					StatusText->SetText(FText::FromString(statusText));
+				} else {
+					UE_LOG(LogTemp, Warning, TEXT("Status text not found"));
+				}
+
 			}
-
-			// Set the mana bar value
-			UProgressBar* ManaBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarMP")));
-			if (ManaBar != nullptr) {
-				ManaBar->SetPercent(float(currentMP) / float(maxMP));
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("Mana bar not found"));
-			}
-
-			// Set the xp bar value
-			UProgressBar* XPBar = Cast<UProgressBar>(UserWidget->GetWidgetFromName(TEXT("BarLevel")));
-			if (XPBar != nullptr) {
-				XPBar->SetPercent(float(currentXP) / 100.0f);
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("XP bar not found"));
-			}
-
-			// Set the HP text
-			UTextBlock* HPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextHP")));
-			if (HPText != nullptr) {
-				HPText->SetText(FText::FromString(FString::FromInt(currentHP) + "/" + FString::FromInt(maxHP)));
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("HP text not found"));
-			}
-
-			// Set the MP text
-			UTextBlock* MPText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextMP")));
-			if (MPText != nullptr) {
-				MPText->SetText(FText::FromString(FString::FromInt(currentMP) + "/" + FString::FromInt(maxMP)));
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("MP text not found"));
-			}
-
-			// Set the level text
-			UTextBlock* LevelText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextLevel")));
-			if (LevelText != nullptr) {
-				LevelText->SetText(FText::FromString("lvl " + FString::FromInt(currentLevel)));
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("Level text not found"));
-			}
-
-			// Set the status text
-			UTextBlock* StatusText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextStatus")));
-			if (StatusText != nullptr) {
-				StatusText->SetText(FText::FromString(statusText));
-			} else {
-				UE_LOG(LogTemp, Warning, TEXT("Status text not found"));
-			}
-
 		}
+
+		// We don't need to redraw anymore
+		shouldRedrawHealth = false;
+
 	}
 
 	// Do an instruction from the queue
@@ -8167,7 +8202,7 @@ void Adcss::Tick(float DeltaTime) {
 						typeOfThing = TEXT("Spell");
 					} else if (charArray[i].Contains(TEXT("potion"))) {
 						typeOfThing = TEXT("Potion");
-					} else if (charArray[i].Contains(TEXT("To read a")) || charArray[i].Contains(TEXT("disposable arcane formula"))) {
+					} else if (charArray[i].Contains(TEXT("To read a")) || charArray[i].Contains(TEXT("scroll.")) || charArray[i].Contains(TEXT("disposable arcane formula"))) {
 						typeOfThing = TEXT("Scroll");
 					} else if (charArray[i].Contains(TEXT(" trap"))) {
 						typeOfThing = TEXT("Trap");
@@ -8654,7 +8689,7 @@ void Adcss::Tick(float DeltaTime) {
 						}
 					}
 
-					// Remove any duplicates from the hotbar TODO
+					// Remove any duplicates from the hotbar
 					for (int i = 0; i < numHotbarSlots; i++) {
 						if (hotbarInfos[i].letter.Len() == 0) {
 							continue;
@@ -9140,6 +9175,7 @@ void Adcss::Tick(float DeltaTime) {
 			// If the map is being shown, then it means we also have the status section
 			if (isMap) {
 				if (charArray.Num() >= 15) {
+					shouldRedrawHealth = true;
 
 					// Extract the name and thus the filename
 					FString nameLine = charArray[1].Mid(37);
@@ -9181,10 +9217,11 @@ void Adcss::Tick(float DeltaTime) {
 						currentXP = FCString::Atoi(*wordsLevel[3]);
 					}
 
-					// Extract the branch info
+					// Extract the branch info TODO
 					FString branchLine = charArray[8].Mid(55);
 					UE_LOG(LogTemp, Display, TEXT("STATUS - branch line -> %s"), *branchLine);
-					branchLine = branchLine.Replace(TEXT("Place: "), TEXT(""));
+					branchLine = branchLine.Replace(TEXT("Place: "), TEXT("")).TrimStartAndEnd();
+					currentFloor = branchLine;
 					int32 colonIndex = branchLine.Find(TEXT(":"));
 					if (colonIndex != INDEX_NONE) {
 						branchLine = branchLine.Mid(0, colonIndex);
@@ -9314,6 +9351,7 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Aiming:"))
 								|| newLine.Contains(TEXT("Casting:"))
 								|| newLine.Contains(TEXT("No monsters, items or features"))
+								|| newLine.Contains(TEXT("You can't go down"))
 								|| newLine.Contains(TEXT("game will not be scored"))
 								|| newLine.Contains(TEXT("enter wizard mode"))
 								|| newLine.Contains(TEXT("Press:"))
@@ -9334,7 +9372,7 @@ void Adcss::Tick(float DeltaTime) {
 						}
 					}
 
-					// Combine with the previous log TODO
+					// Combine with the previous log
 					int bestShift = 0;
 					int bestMatches = 0;
 					for (int shift = 0; shift < logText.Num(); shift++) {

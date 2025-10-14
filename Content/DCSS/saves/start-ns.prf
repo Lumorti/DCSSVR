@@ -1,8 +1,9 @@
 type = normal
-name = Qettucywn
-species = Minotaur
-background = Hunter
-game_seed = 4465
+name = Vuch
+species = Ghoul
+background = Fighter
+weapon = long sword
+game_seed = 6582
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false
