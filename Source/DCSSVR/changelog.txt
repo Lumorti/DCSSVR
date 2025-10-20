@@ -1,0 +1,16 @@
+Changelog for DCSSVR
+
+v0.2 (TODO)
+ - Fixed softlock if you cancel the initial weapon selection TODO
+ - No longer highlight floors of diagonals TODO
+ - Added keyboard typing to the bug report menu TODO
+ - Fixed issue with sending a bug report from the main menu TODO
+ - Added tutorial to info panel TODO
+ - Fixed bug where item sprites remain on the ground past pickup TODO
+ - Allow entering trap tiles TODO
+
+v0.1 (14/10/2025)
+ - Initial release
+
+Future ideas
+ - Add puppet in inventory to show equipped items
