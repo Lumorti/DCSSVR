@@ -184,7 +184,6 @@ FVector inventoryRelLoc;
 FRotator inventoryRelRot;
 
 // Keyboard stuff
-bool isKeyboardOpen;
 bool isShifted;
 FString editting;
 FString defaultNameText;
@@ -1305,10 +1304,14 @@ void Adcss::init(bool firstTime) {
 	args += TEXT(" -extra-opt-first monster_item_view_features+=door ");
 	args += TEXT(" -extra-opt-first monster_item_view_features+=gate ");
 	args += TEXT(" -extra-opt-first prompt_menu=true ");
+	args += TEXT(" -extra-opt-first travel_delay=-1 ");
+	args += TEXT(" -extra-opt-first explore_delay=-1 ");
+	args += TEXT(" -extra-opt-first rest_delay=-1 ");
 	args += TEXT(" -extra-opt-first reduce_animations=true ");
 	args += TEXT(" -extra-opt-first force_spell_targeter=all ");
 	args += TEXT(" -extra-opt-first force_ability_targeter=all ");
-	// args += TEXT(" -extra-opt-first default_autopickup=false ");
+	args += TEXT(" -extra-opt-first warn_contam_cost=false ");
+	args += TEXT(" -extra-opt-first warn_hatches=false ");
 	args += TEXT(" -extra-opt-first fail_severity_to_confirm=0 ");
 	args += TEXT(" -extra-opt-first wiz_mode=yes ");
 	args += TEXT(" -extra-opt-first char_set=ascii ");
@@ -2983,9 +2986,130 @@ void Adcss::buttonHovered(FString buttonName, bool hovered) {
 
 }
 
+// Handle typing / text input
+void Adcss::typeKey(FString letter) {
+	UE_LOG(LogTemp, Display, TEXT("Key typed: %s"), *letter);
+
+	// Handle shift
+	if (letter == "Shift" || letter == "Left Shift" || letter == "Right Shift") {
+		isShifted = !isShifted;
+		shiftLetters();
+		return;
+	}
+
+	// Handle space
+	if (letter == "Space" || letter == "Space Bar") {
+		letter = " ";
+	}
+
+	// Ignore other specials
+	if (letter == "Enter" || letter == "Tab" || letter == "Caps Lock" || letter == "Left Control" || letter == "Right Control" || letter == "Left Alt" || letter == "Right Alt" || letter == "Escape") {
+		return;
+	}
+	
+	// Handle is shifted
+	if (letter != "Backspace") {
+		if (isShifted) {
+			letter = letter.ToUpper();
+		} else {
+			letter = letter.ToLower();
+		}
+		if (isShifted) {
+			isShifted = false;
+			shiftLetters();
+		}
+	}
+
+	// If it's the default text, for now empty it
+	if (editting == "name") {
+		currentName = currentName.Replace(*defaultNameText, TEXT(""));
+	} else if (editting == "seed") {
+		currentSeed = currentSeed.Replace(*defaultSeedText, TEXT(""));
+	} else if (editting == "bug") {
+		currentBug = currentBug.Replace(*defaultBugText, TEXT(""));
+	}
+
+	// Add this to the corresponding string
+	if (letter == "Backspace") {
+		if (editting == "name" && currentName.Len() > 0) {
+			currentName = currentName.LeftChop(1);
+		} else if (editting == "seed" && currentSeed.Len() > 0) {
+			currentSeed = currentSeed.LeftChop(1);
+		} else if (editting == "bug" && currentBug.Len() > 0) {
+			currentBug = currentBug.LeftChop(1);
+		}
+	} else if (letter.Len() == 1) {
+		if (editting == "name") {
+			currentName += letter;
+		} else if (editting == "seed") {
+			currentSeed += letter;
+		} else if (editting == "bug") {
+			currentBug += letter;
+		}
+	}
+
+	// If they're empty, reset to the default text
+	if (currentName.Len() == 0 && editting == "name") {
+		currentName = defaultNameText;
+		isShifted = true;
+		shiftLetters();
+	}
+	if (currentSeed.Len() == 0 && editting == "seed") {
+		currentSeed = defaultSeedText;
+		isShifted = true;
+		shiftLetters();
+	}
+	if (currentBug.Len() == 0 && editting == "bug") {
+		currentBug = defaultBugText;
+		isShifted = true;
+		shiftLetters();
+	}
+
+	// Update the UI element
+	if (refToNameActor != nullptr && (editting == "name" || editting == "seed")) { 
+		UWidgetComponent* WidgetComponentName = Cast<UWidgetComponent>(refToNameActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		if (WidgetComponentName != nullptr) {
+			UUserWidget* UserWidgetName = WidgetComponentName->GetUserWidgetObject();
+			if (UserWidgetName != nullptr) {
+				if (editting == "name") {
+					UTextBlock* NameText = Cast<UTextBlock>(UserWidgetName->GetWidgetFromName(TEXT("EditableName")));
+					if (NameText != nullptr) {
+						NameText->SetText(FText::FromString(currentName));
+					}
+				} else if (editting == "seed") {
+					UTextBlock* SeedText = Cast<UTextBlock>(UserWidgetName->GetWidgetFromName(TEXT("EditableSeed")));
+					if (SeedText != nullptr) {
+						SeedText->SetText(FText::FromString(currentSeed));
+					}
+				}
+			}
+		}
+	} else if (refToSettingsActor != nullptr && editting == "bug") {
+		UWidgetComponent* WidgetComponentBug = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
+		if (WidgetComponentBug != nullptr) {
+			UUserWidget* UserWidgetBug = WidgetComponentBug->GetUserWidgetObject();
+			if (UserWidgetBug != nullptr) {
+				UTextBlock* BugText = Cast<UTextBlock>(UserWidgetBug->GetWidgetFromName(TEXT("EditableBug")));
+				if (BugText != nullptr) {
+					BugText->SetText(FText::FromString(currentBug));
+				}
+			}
+		}
+	}
+
+}
+
 // When a DCSS key is pressed
 void Adcss::keyPressed(FString key, FVector2D delta) {
-	if (key == "move") {
+
+	// If the keyboard is open, process the key
+	UE_LOG(LogTemp, Display, TEXT("Key pressed: %s"), *key);
+	if (isKeyboardOpen && key != "lmb") {
+		typeKey(key);
+		return;
+
+	// Otherwise
+	} else if (key == "move") {
 		if (delta.X < 0) {
 			writeCommandQueued("left");
 		} else if (delta.X > 0) {
@@ -3318,6 +3442,10 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// Choice cancel button
 		} else if (selected.thingIs == "ButtonOptionCancel") {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Choice cancel button clicked"));
+			if (choiceType == "initial") {
+				UE_LOG(LogTemp, Display, TEXT("Ignoring cancel on initial choice"));
+				return;
+			}
 			writeCommandQueued("escape");
 			writeCommandQueued("escape");
 			writeCommandQueued("escape");
@@ -3468,108 +3596,13 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 		// Keyboard shift
 		} else if (selected.thingIs.Contains(TEXT("ButtonKeyboardShift"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Keyboard shift button clicked"));
-			isShifted = !isShifted;
-			shiftLetters();
+			typeKey("Shift");
 
 		// Keyboard keys
 		} else if (selected.thingIs.Contains(TEXT("ButtonKeyboard"))) {
 			UE_LOG(LogTemp, Display, TEXT("INPUT - Keyboard key clicked: %s"), *selected.thingIs);
-
-			// Get the letter
 			FString letter = selected.thingIs.Replace(TEXT("ButtonKeyboard"), TEXT(""));
-			if (letter == "Space") {
-				letter = " ";
-			}
-			
-			// Handle is shifted
-			if (letter != "Backspace") {
-				if (isShifted) {
-					letter = letter.ToUpper();
-				} else {
-					letter = letter.ToLower();
-				}
-				if (isShifted) {
-					isShifted = false;
-					shiftLetters();
-				}
-			}
-
-			// If it's the default text, for now empty it
-			if (editting == "name") {
-				currentName = currentName.Replace(*defaultNameText, TEXT(""));
-			} else if (editting == "seed") {
-				currentSeed = currentSeed.Replace(*defaultSeedText, TEXT(""));
-			} else if (editting == "bug") {
-				currentBug = currentBug.Replace(*defaultBugText, TEXT(""));
-			}
-
-			// Add this to the corresponding string
-			if (letter == "Backspace") {
-				if (editting == "name" && currentName.Len() > 0) {
-					currentName = currentName.LeftChop(1);
-				} else if (editting == "seed" && currentSeed.Len() > 0) {
-					currentSeed = currentSeed.LeftChop(1);
-				} else if (editting == "bug" && currentBug.Len() > 0) {
-					currentBug = currentBug.LeftChop(1);
-				}
-			} else {
-				if (editting == "name") {
-					currentName += letter;
-				} else if (editting == "seed") {
-					currentSeed += letter;
-				} else if (editting == "bug") {
-					currentBug += letter;
-				}
-			}
-
-			// If they're empty, reset to the hint text
-			if (currentName.Len() == 0 && editting == "name") {
-				currentName = defaultNameText;
-				isShifted = true;
-				shiftLetters();
-			}
-			if (currentSeed.Len() == 0 && editting == "seed") {
-				currentSeed = defaultSeedText;
-				isShifted = true;
-				shiftLetters();
-			}
-			if (currentBug.Len() == 0 && editting == "bug") {
-				currentBug = defaultBugText;
-				isShifted = true;
-				shiftLetters();
-			}
-
-			// Update the UI element
-			if (refToNameActor != nullptr && (editting == "name" || editting == "seed")) { 
-				UWidgetComponent* WidgetComponentName = Cast<UWidgetComponent>(refToNameActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-				if (WidgetComponentName != nullptr) {
-					UUserWidget* UserWidgetName = WidgetComponentName->GetUserWidgetObject();
-					if (UserWidgetName != nullptr) {
-						if (editting == "name") {
-							UTextBlock* NameText = Cast<UTextBlock>(UserWidgetName->GetWidgetFromName(TEXT("EditableName")));
-							if (NameText != nullptr) {
-								NameText->SetText(FText::FromString(currentName));
-							}
-						} else if (editting == "seed") {
-							UTextBlock* SeedText = Cast<UTextBlock>(UserWidgetName->GetWidgetFromName(TEXT("EditableSeed")));
-							if (SeedText != nullptr) {
-								SeedText->SetText(FText::FromString(currentSeed));
-							}
-						}
-					}
-				}
-			} else if (refToSettingsActor != nullptr && editting == "bug") {
-				UWidgetComponent* WidgetComponentBug = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
-				if (WidgetComponentBug != nullptr) {
-					UUserWidget* UserWidgetBug = WidgetComponentBug->GetUserWidgetObject();
-					if (UserWidgetBug != nullptr) {
-						UTextBlock* BugText = Cast<UTextBlock>(UserWidgetBug->GetWidgetFromName(TEXT("EditableBug")));
-						if (BugText != nullptr) {
-							BugText->SetText(FText::FromString(currentBug));
-						}
-					}
-				}
-			}
+			typeKey(letter);
 
 		// If it's the submit bug button
 		} else if (selected.thingIs.Contains(TEXT("ButtonSettingsBug"))) {
@@ -3595,13 +3628,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 							}
 						}
 					}
-				}
-
-				// Close the settings
-				settingsOpen = false;
-				if (refToSettingsActor != nullptr) {
-					refToSettingsActor->SetActorHiddenInGame(!settingsOpen);
-					refToSettingsActor->SetActorEnableCollision(settingsOpen);
 				}
 
 				// Close the keyboard
@@ -4478,8 +4504,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToUIActor->SetActorEnableCollision(true);
 						refToSaveActor->SetActorHiddenInGame(true);
 						refToSaveActor->SetActorEnableCollision(false);
-						refToTutorialActor->SetActorHiddenInGame(false);
-						refToTutorialActor->SetActorEnableCollision(true);
 						hasBeenWelcomed = false;
 
 					} else if (selected.thingIs.Contains(TEXT("ButtonDelete"))) {
@@ -4728,8 +4752,6 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 						refToUIActor->SetActorEnableCollision(true);
 						refToKeyboardActor->SetActorHiddenInGame(true);
 						refToKeyboardActor->SetActorEnableCollision(false);
-						refToTutorialActor->SetActorHiddenInGame(false);
-						refToTutorialActor->SetActorEnableCollision(true);
 						isKeyboardOpen = false;
 						hasBeenWelcomed = false;
 
@@ -5087,8 +5109,18 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 				} else if (selected.y > LOS) {
 					writeCommandQueued("j");
 				}
-				writeCommandQueued("enter");
-				writeCommandQueued("enter");
+				// If there's a trap, don't enter since it's gonna ask something
+				bool containsTrap = false;
+				for (int i=0; i<levelInfo[selected.y][selected.x].items.Num(); i++) {
+					if (levelInfo[selected.y][selected.x].items[i].Contains(TEXT("trap"))) {
+						containsTrap = true;
+						break;
+					}
+				}
+				if (!containsTrap) {
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+				}
 			}
 		}
 
@@ -5852,11 +5884,8 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 	// The debug key
 	} else if (key == "debug") {
 		writeCommandQueued("ctrl-X");
-
-	// Otherwise just do that key
-	} else {
-		writeCommandQueued(key);
 	}
+
 }
 
 // Called every frame
@@ -6083,8 +6112,8 @@ void Adcss::Tick(float DeltaTime) {
 					// If not describing an item
 					if (!rmbOn || isBlinkOrUnknown) {
 
-						// If it's not a wall
-						if (selected.thingIs == TEXT("Wall")) {
+						// If it's not a wall or a floor tile with something above it
+						if (selected.thingIs == TEXT("Wall") || (selected.thingIs == TEXT("Floor") && levelInfo[selected.y][selected.x].currentChar == "#")) {
 							selected = SelectedThing();
 						} else {
 
@@ -6380,7 +6409,7 @@ void Adcss::Tick(float DeltaTime) {
 
 	}
 
-	// Inventory should snap to the correct quarter TODO
+	// Inventory should snap to the correct quarter 
 	FVector inventoryRelLocRotated = inventoryRelLoc;
 	FRotator inventoryRelRotRotated = inventoryRelRot;
 	if (dirString == "right") {
@@ -8760,6 +8789,7 @@ void Adcss::Tick(float DeltaTime) {
 				|| charArray[i].Contains(TEXT("Casting with Divine Exegesis"))
 				|| charArray[i].Contains(TEXT("Identify which "))
 				|| charArray[i].Contains(TEXT("Remove which one?"))
+				|| charArray[i].Contains(TEXT("Really walk onto that"))
 				|| charArray[i].Contains(TEXT("Really read "))) {
 					isChoice = true;
 					choiceTitle = charArray[i];
@@ -8786,6 +8816,8 @@ void Adcss::Tick(float DeltaTime) {
 						newChoiceType = "cards";
 					} else if (choiceTitle.Contains(TEXT("Select a spell to forget"))) {
 						newChoiceType = "amnesia";
+					} else if (choiceTitle.Contains(TEXT("You have a choice of weapons"))) {
+						newChoiceType = "initial";
 					}
 					break;
 				}
@@ -9217,7 +9249,7 @@ void Adcss::Tick(float DeltaTime) {
 						currentXP = FCString::Atoi(*wordsLevel[3]);
 					}
 
-					// Extract the branch info TODO
+					// Extract the branch info
 					FString branchLine = charArray[8].Mid(55);
 					UE_LOG(LogTemp, Display, TEXT("STATUS - branch line -> %s"), *branchLine);
 					branchLine = branchLine.Replace(TEXT("Place: "), TEXT("")).TrimStartAndEnd();
@@ -9481,6 +9513,8 @@ void Adcss::Tick(float DeltaTime) {
 				writeCommandQueued("&");
 				writeCommandQueued("{");
 				writeCommandQueued("enter");
+				refToTutorialActor->SetActorHiddenInGame(false);
+				refToTutorialActor->SetActorEnableCollision(true);
 				hasBeenWelcomed = true;
 			}
 

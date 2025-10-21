@@ -1,9 +1,9 @@
 type = normal
-name = Vuch
-species = Ghoul
+name = Yttafoav
+species = Minotaur
 background = Fighter
-weapon = long sword
-game_seed = 6582
+weapon = flail
+game_seed = 7887
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

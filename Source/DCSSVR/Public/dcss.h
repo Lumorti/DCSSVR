@@ -167,6 +167,11 @@ public:
 	void clearThings();
 	void shiftLetters();
 	void submitBug(FString message);
+	void typeKey(FString key);
+
+	// Needed here to prevent move
+	UPROPERTY(EditAnywhere, BlueprintReadWrite)
+	bool isKeyboardOpen;
 
 protected:
 
