@@ -1,9 +1,9 @@
 type = normal
-name = Yttafoav
+name = Helisehu
 species = Minotaur
 background = Fighter
-weapon = flail
-game_seed = 7887
+weapon = long sword
+game_seed = 9018
 fully_random = no
 default_manual_training = no
 quiver_menu_focus = false

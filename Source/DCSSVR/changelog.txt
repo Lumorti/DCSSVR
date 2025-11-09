@@ -1,5 +1,15 @@
 Changelog for DCSSVR
 
+DCSSVR v0.3 (09/11/2025)
+ - Fixed bug where killed enemies wouldn't show as dead during level up
+ - Fixed dying not resetting inventory state
+ - Added enemy indicator
+ - Added collision to closed doors
+ - Improved bug report text input
+ - Disabled Formicid for now since dig doesn't work
+ - Increased debug logging so I can better figure out what went wrong in future
+ - Fixed some in-game log messages
+
 DCSSVR v0.2 (21/10/2025)
  - Fixed softlock if you cancel the initial weapon selection
  - Added keyboard typing to the bug report menu
@@ -9,11 +19,14 @@ DCSSVR v0.2 (21/10/2025)
 
 DCSSVR v0.1 (14/10/2025)
  - Initial release
+ - Things that are disabled because they're quite different: Coglins, digging, Nemelex
 
 Future ideas
  - Added more extensive tutorial to info panel
  - Add puppet in inventory to show equipped items
 
 Reported bugs that are so far unreproducable
- - Item sprites remain on the ground past pickup
- - Unable to interact with ladder
+ - Sleeping indicator on a monster not updating (2025-10-30/182321-W7ZAZALJ)
+ - Item sprites remain on the ground past pickup (2025-10-18/230456-D3IWAC2F)
+ - Unable to interact with ladder (2025-10-18/225408-YIIUBAOD)
+ - Can't interact with consumables (2025-10-18/230023-3XXAXCIM)

@@ -2,11 +2,7 @@
 FString version = TEXT("0.1");
 
 // 0.1 Initial Release
-// Things that are disabled because they're quite different: 
-//    - Playing as a Coglin 
-//    - Using a wand of digging 
-//    - Worshipping Nemelex
-// Everything should should work as expected, but probably it won't
+
 
 // From https://hashnode.com/post/case-sensitive-tmaplessfstring-int32greater-in-unreal-engine-4-in-c-ckvc1jse20qf645s14e3d6ntd
 // Needed because FString == FString is case-insensitive, which is literally insane
@@ -2532,12 +2528,17 @@ void Adcss::updateLevel() {
 			// If it's a door
 			} else if (ascii == TEXT("+") || ascii == TEXT("'")) {
 				wallNorth->SetActorHiddenInGame(false);
-				wallNorth->SetActorEnableCollision(false);
 				wallSouth->SetActorHiddenInGame(false);
-				wallSouth->SetActorEnableCollision(false);
 				wallEast->SetActorHiddenInGame(true);
-				wallEast->SetActorEnableCollision(false);
 				wallWest->SetActorHiddenInGame(true);
+				if (ascii == TEXT("+")) {
+					wallSouth->SetActorEnableCollision(true);
+					wallNorth->SetActorEnableCollision(true);
+				} else {
+					wallNorth->SetActorEnableCollision(false);
+					wallSouth->SetActorEnableCollision(false);
+				}
+				wallEast->SetActorEnableCollision(false);
 				wallWest->SetActorEnableCollision(false);
 				wallNorth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight * (j - LOS), wallWidth / 2.0f));
 				wallSouth->SetActorLocation(FVector(-floorWidth * (i - LOS), floorHeight* (j - LOS), wallWidth / 2.0f));
@@ -3002,6 +3003,13 @@ void Adcss::typeKey(FString letter) {
 		letter = " ";
 	}
 
+	// Handle punctuation
+	if (letter == "Period") {
+		letter = ".";
+	} else if (letter == "Comma") {
+		letter = ",";
+	}
+
 	// Ignore other specials
 	if (letter == "Enter" || letter == "Tab" || letter == "Caps Lock" || letter == "Left Control" || letter == "Right Control" || letter == "Left Alt" || letter == "Right Alt" || letter == "Escape") {
 		return;
@@ -3085,16 +3093,33 @@ void Adcss::typeKey(FString letter) {
 			}
 		}
 	} else if (refToSettingsActor != nullptr && editting == "bug") {
+
+		// Manually wrap the bug text
+		TArray<FString> words;
+		currentBug.ParseIntoArray(words, TEXT(" "), true);
+		FString newBug = "";
+		int32 lineLength = 0;
+		for (FString word : words) {
+			if (lineLength + word.Len() > 40) {
+				newBug += "\n";
+				lineLength = 0;
+			}
+			newBug += word + " ";
+			lineLength += word.Len() + 1;
+		}
+
+		// Update the bug text
 		UWidgetComponent* WidgetComponentBug = Cast<UWidgetComponent>(refToSettingsActor->GetComponentByClass(UWidgetComponent::StaticClass()));
 		if (WidgetComponentBug != nullptr) {
 			UUserWidget* UserWidgetBug = WidgetComponentBug->GetUserWidgetObject();
 			if (UserWidgetBug != nullptr) {
 				UTextBlock* BugText = Cast<UTextBlock>(UserWidgetBug->GetWidgetFromName(TEXT("EditableBug")));
 				if (BugText != nullptr) {
-					BugText->SetText(FText::FromString(currentBug));
+					BugText->SetText(FText::FromString(newBug));
 				}
 			}
 		}
+
 	}
 
 }
@@ -3519,6 +3544,16 @@ void Adcss::keyPressed(FString key, FVector2D delta) {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
+				} else if (choiceType == "attribute") {
+					writeCommandQueued("enter");
+					writeCommandQueued("enter");
+					writeCommandQueued("CLEAR");
+					writeCommandQueued("ctrl-X");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
+					writeCommandQueued(">");
 				} else if (choiceType != "branding" && choiceType != "cards") {
 					writeCommandQueued("enter");
 					writeCommandQueued("enter");
@@ -6989,6 +7024,30 @@ void Adcss::Tick(float DeltaTime) {
 	// Keep the ui panel following the player
 	FVector uiLocation = playerLocation + FVector(100.0f, -20.0f, -50.0f);
 
+	// Adjust things if enemies are nearby
+	bool hasEnemies = false;
+	for (int i = 0; i < enemyUseCount; i++) {
+		FString enemyName = enemyArray[i]->GetName();
+		if (meshNameToThing.Contains(enemyName)) {
+			SelectedThing enemyThing = meshNameToThing[enemyName];
+			if (enemyThing.thingIs == "Enemy") {
+				hasEnemies = true;
+				break;
+			}
+		}
+	}
+	if (hasEnemies) {
+		if (statusText.Find("(Enemies nearby!)") == INDEX_NONE) {
+			statusText += " (Enemies nearby!)";
+			statusText = statusText.TrimStartAndEnd();
+		}
+	} else {
+		if (statusText.Find("(Enemies nearby!)") != INDEX_NONE) {
+			statusText = statusText.Replace(TEXT("(Enemies nearby!)"), TEXT(""));
+			statusText = statusText.TrimStartAndEnd();
+		}
+	}
+
 	// If we need to update the health bars etc.
 	if (shouldRedrawHealth && hasLoaded) {
 		UWidgetComponent* WidgetComponent = Cast<UWidgetComponent>(refToUIActor->GetComponentByClass(UWidgetComponent::StaticClass()));
@@ -7059,6 +7118,7 @@ void Adcss::Tick(float DeltaTime) {
 				} else {
 					UE_LOG(LogTemp, Warning, TEXT("Level text not found"));
 				}
+			
 
 				// Set the status text
 				UTextBlock* StatusText = Cast<UTextBlock>(UserWidget->GetWidgetFromName(TEXT("TextStatus")));
@@ -7268,7 +7328,7 @@ void Adcss::Tick(float DeltaTime) {
 
 			// Add to the log of outputs
 			lastOutputs.Add(extracted);
-			while (lastOutputs.Num() > 10) {
+			while (lastOutputs.Num() > 20) {
 				lastOutputs.RemoveAt(0);
 			}
 
@@ -7594,6 +7654,14 @@ void Adcss::Tick(float DeltaTime) {
 				refToUIActor->SetActorEnableCollision(false);
 				refToDescriptionActor->SetActorHiddenInGame(true);
 				refToDescriptionActor->SetActorEnableCollision(false);
+
+				// Reset some stuff
+				inventoryLetterToName.Empty();
+				spellLetters.Empty();
+				spellLetterToInfo.Empty();
+				abilityLetters.Empty();
+				abilityLetterToInfo.Empty();
+				inventoryOpen = false;
 
 			}
 
@@ -8816,6 +8884,8 @@ void Adcss::Tick(float DeltaTime) {
 						newChoiceType = "cards";
 					} else if (choiceTitle.Contains(TEXT("Select a spell to forget"))) {
 						newChoiceType = "amnesia";
+						} else if (choiceTitle.Contains(TEXT("leads to an increase"))) {
+						newChoiceType = "attribute";
 					} else if (choiceTitle.Contains(TEXT("You have a choice of weapons"))) {
 						newChoiceType = "initial";
 					}
@@ -8893,6 +8963,7 @@ void Adcss::Tick(float DeltaTime) {
 			}
 			if (isAttributeChoice) {
 				UE_LOG(LogTemp, Display, TEXT("Found attribute choice"));
+				choiceType = "attribute";
 				choiceLetters.Empty();
 				choiceNames.Empty();
 				choiceLetters.Add(TEXT("S"));
@@ -9378,6 +9449,8 @@ void Adcss::Tick(float DeltaTime) {
 								|| newLine.Contains(TEXT("Press <"))
 								|| newLine.Contains(TEXT("Wizard Command"))
 								|| newLine.Contains(TEXT("Shift-Dir"))
+								|| newLine.Contains(TEXT("? for help"))
+								|| newLine.Contains(TEXT("--more--"))
 								|| newLine.Contains(TEXT("Reach:"))
 								|| newLine.Contains(TEXT("Aim:"))
 								|| newLine.Contains(TEXT("Aiming:"))
