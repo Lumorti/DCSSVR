@@ -1,5 +1,5 @@
 #include "dcss.h"
-FString version = TEXT("0.1");
+FString version = TEXT("0.3");
 
 // 0.1 Initial Release
 
@@ -436,6 +436,9 @@ void Adcss::submitBug(FString message) {
 
 	// Generate the data dump
 	FString dump = TEXT("");
+
+	// Put the game version
+	dump += FString::Printf(TEXT("Game version: %s\n"), *version);
 
 	// Also put the message at the top
 	dump += FString::Printf(TEXT("Bug report message:\n%s%s\n"), *indent, *message);
